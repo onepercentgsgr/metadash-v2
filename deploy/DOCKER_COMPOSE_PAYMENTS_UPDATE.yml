@@ -1,0 +1,105 @@
+# ACTUALIZACIÓN DE DOCKER-COMPOSE PARA SOPORTE DE PAGOS
+#
+# Este archivo muestra cómo actualizar tu docker-compose.yml
+# para incluir las variables de entorno necesarias para pagos
+
+version: "3.9"
+
+services:
+  backend:
+    build: ../backend
+    container_name: metadash_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../backend/.env
+    environment:
+      # Base de datos
+      DATABASE_URL: "${DATABASE_URL}"
+
+      # JWT
+      SECRET_KEY: "${SECRET_KEY}"
+      JWT_SECRET: "${JWT_SECRET}"
+
+      # Frontend (para CORS y redirecciones)
+      FRONTEND_URL: "${FRONTEND_URL:-http://localhost:3000}"
+
+      # MercadoPago
+      MERCADOPAGO_ACCESS_TOKEN: "${MERCADOPAGO_ACCESS_TOKEN}"
+      MERCADOPAGO_WEBHOOK_TOKEN: "${MERCADOPAGO_WEBHOOK_TOKEN}"
+
+      # Stripe
+      STRIPE_SECRET_KEY: "${STRIPE_SECRET_KEY}"
+      STRIPE_PUBLISHABLE_KEY: "${STRIPE_PUBLISHABLE_KEY}"
+      STRIPE_WEBHOOK_SECRET: "${STRIPE_WEBHOOK_SECRET}"
+      STRIPE_STARTER_PRICE_ID: "${STRIPE_STARTER_PRICE_ID}"
+      STRIPE_PRO_PRICE_ID: "${STRIPE_PRO_PRICE_ID}"
+      STRIPE_ENTERPRISE_PRICE_ID: "${STRIPE_ENTERPRISE_PRICE_ID}"
+
+      # API Keys externos
+      META_ACCESS_TOKEN: "${META_ACCESS_TOKEN}"
+      META_AD_ACCOUNT_ID: "${META_AD_ACCOUNT_ID}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}"
+
+    volumes:
+      - backend_data:/app/data
+    networks:
+      - metadash_net
+    # Health check para verificar que el servicio está listo
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # OPCIONAL: Base de datos PostgreSQL en contenedor (para desarrollo)
+  # database:
+  #   image: postgres:15-alpine
+  #   container_name: metadash_db
+  #   restart: always
+  #   ports:
+  #     - "5432:5432"
+  #   environment:
+  #     POSTGRES_DB: metadash
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+  #   volumes:
+  #     - db_data:/var/lib/postgresql/data
+  #   networks:
+  #     - metadash_net
+
+volumes:
+  backend_data:
+  # db_data:
+
+networks:
+  metadash_net:
+    driver: bridge
+
+# ============================================================
+# INSTRUCCIONES DE USO
+# ============================================================
+#
+# 1. Crear archivo .env en la raíz del proyecto:
+#    cp .env.example .env
+#
+# 2. Rellenar todas las variables de entorno en .env
+#
+# 3. Ejecutar docker-compose:
+#    docker-compose -f deploy/docker-compose.yml up -d
+#
+# 4. Verificar que el servicio está saludable:
+#    docker logs metadash_backend
+#    curl http://localhost:8000/health
+#
+# 5. Ver documentación de API:
+#    http://localhost:8000/docs
+#
+# NOTAS IMPORTANTES:
+# - Las variables de entorno se cargan desde ../backend/.env
+# - Asegúrate de que .env NO esté en el control de versiones (en .gitignore)
+# - En producción, usar variables de entorno del servicio (Vercel, Railway, etc.)
+# - Los webhooks de MercadoPago y Stripe deben ser accesibles desde internet
+#   (usar ngrok en desarrollo: ngrok http 8000)

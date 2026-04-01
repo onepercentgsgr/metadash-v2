@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MetaDash — Meta Ads Intelligence</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a26;
+    --border: #2a2a3a;
+    --accent: #6c63ff;
+    --accent2: #ff6584;
+    --green: #00d4aa;
+    --yellow: #ffd166;
+    --red: #ef233c;
+    --text: #e8e8f0;
+    --muted: #7a7a9a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; }
+
+  /* SIDEBAR */
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0; width: 220px;
+    background: var(--surface); border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; padding: 20px 0; z-index: 100;
+  }
+  .logo { padding: 0 20px 20px; font-size: 20px; font-weight: 700; color: var(--accent); }
+  .logo span { color: var(--text); }
+  .nav-item {
+    padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 10px;
+    color: var(--muted); transition: all 0.2s; font-size: 14px;
+  }
+  .nav-item:hover, .nav-item.active { background: var(--surface2); color: var(--text); border-left: 3px solid var(--accent); }
+  .nav-item .icon { font-size: 18px; width: 24px; text-align: center; }
+  .user-info { margin-top: auto; padding: 16px 20px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--border); }
+
+  /* MAIN */
+  .main { margin-left: 220px; min-height: 100vh; padding: 24px; }
+
+  /* SECTIONS */
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* CARDS */
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; margin-bottom: 16px;
+  }
+  .card-title { font-size: 14px; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .card-value { font-size: 28px; font-weight: 700; }
+
+  /* GRID */
+  .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+
+  /* TABLE */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { padding: 10px 12px; text-align: left; color: var(--muted); border-bottom: 1px solid var(--border); font-weight: 500; }
+  td { padding: 12px; border-bottom: 1px solid var(--border); }
+  tr:hover td { background: var(--surface2); }
+
+  /* BUTTONS */
+  .btn {
+    padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer;
+    font-size: 14px; font-weight: 500; transition: all 0.2s;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #5a52e0; }
+  .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--accent); }
+  .btn-danger { background: var(--red); color: white; }
+  .btn-success { background: var(--green); color: #000; }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+  /* INPUTS */
+  input, textarea, select {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    padding: 10px 14px; border-radius: 8px; width: 100%; font-size: 14px;
+    transition: border-color 0.2s;
+  }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--accent); }
+  .form-group { margin-bottom: 16px; }
+  label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--muted); }
+
+  /* STATUS BADGES */
+  .badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge-active { background: rgba(0, 212, 170, 0.15); color: var(--green); }
+  .badge-paused { background: rgba(239, 35, 60, 0.15); color: var(--red); }
+  .badge-archived { background: rgba(122, 122, 154, 0.15); color: var(--muted); }
+
+  /* HEALTH INDICATOR */
+  .health { font-size: 16px; }
+
+  /* AGENT RESPONSE */
+  .agent-response {
+    background: var(--surface2); border-radius: 10px; padding: 20px;
+    white-space: pre-wrap; font-size: 14px; line-height: 1.7;
+    border-left: 3px solid var(--accent); margin-top: 16px; max-height: 500px; overflow-y: auto;
+  }
+  .agent-tag {
+    display: inline-block; background: var(--accent); color: white;
+    padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-bottom: 10px;
+  }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    font-size: 14px; z-index: 9999; transform: translateY(100px); opacity: 0;
+    transition: all 0.3s; display: flex; align-items: center; gap: 8px;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: var(--green); }
+  .toast.error { border-color: var(--red); }
+
+  /* HEADING */
+  h1 { font-size: 24px; font-weight: 700; margin-bottom: 4px; }
+  h2 { font-size: 18px; font-weight: 600; margin-bottom: 16px; }
+  .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+
+  /* LOADING */
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* LOGIN */
+  .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); }
+  .login-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 40px; width: 100%; max-width: 400px; }
+
+  /* IMAGE */
+  .generated-img { max-width: 100%; border-radius: 12px; margin-top: 16px; }
+
+  /* STATS ROW */
+  .stat-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .stat-row:last-child { border: none; }
+  .stat-label { color: var(--muted); font-size: 13px; }
+  .stat-value { font-weight: 600; }
+
+  @media (max-width: 768px) {
+    .sidebar { width: 60px; }
+    .nav-item span, .logo span, .user-info { display: none; }
+    .main { margin-left: 60px; padding: 16px; }
+    .grid-4 { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginPage" class="login-wrap">
+  <div class="login-card">
+    <div style="text-align:center; margin-bottom:32px;">
+      <div style="font-size:32px; font-weight:800; color:var(--accent)">Meta<span style="color:var(--text)">Dash</span></div>
+      <div style="color:var(--muted); margin-top:8px;">Meta Ads Intelligence Platform</div>
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="tu@email.com">
+    </div>
+    <div class="form-group">
+      <label>Contraseña</label>
+      <input type="password" id="loginPass" placeholder="••••••••" onkeypress="if(event.key==='Enter') doLogin()">
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="doLogin()">Ingresar</button>
+    <div style="text-align:center; margin-top:16px; font-size:13px; color:var(--muted)">
+      ¿Sin cuenta? <a href="#" onclick="showRegister()" style="color:var(--accent)">Registrarse</a>
+    </div>
+  </div>
+</div>
+
+<!-- REGISTER -->
+<div id="registerPage" class="login-wrap" style="display:none">
+  <div class="login-card">
+    <div style="text-align:center; margin-bottom:32px;">
+      <div style="font-size:32px; font-weight:800; color:var(--accent)">Meta<span style="color:var(--text)">Dash</span></div>
+      <div style="color:var(--muted); margin-top:8px;">Crear cuenta</div>
+    </div>
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" id="regEmail" placeholder="tu@email.com">
+    </div>
+    <div class="form-group">
+      <label>Contraseña</label>
+      <input type="password" id="regPass" placeholder="Mínimo 8 caracteres">
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="doRegister()">Crear cuenta</button>
+    <div style="text-align:center; margin-top:16px; font-size:13px; color:var(--muted)">
+      ¿Ya tenés cuenta? <a href="#" onclick="showLogin()" style="color:var(--accent)">Ingresar</a>
+    </div>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="app" style="display:none">
+
+  <div class="sidebar">
+    <div class="logo">Meta<span>Dash</span></div>
+    <div class="nav-item active" onclick="showSection('dashboard')"><span class="icon">📊</span><span>Dashboard</span></div>
+    <div class="nav-item" onclick="showSection('campaigns')"><span class="icon">🚀</span><span>Campañas</span></div>
+    <div class="nav-item" onclick="showSection('agents')"><span class="icon">🤖</span><span>Agentes IA</span></div>
+    <div class="nav-item" onclick="showSection('creativos')"><span class="icon">🎨</span><span>Creativos IA</span></div>
+    <div class="nav-item" onclick="showSection('finanzas')"><span class="icon">💰</span><span>Finanzas</span></div>
+    <div class="nav-item" onclick="showSection('ordenes')"><span class="icon">🛒</span><span>Órdenes</span></div>
+    <div class="nav-item" onclick="showSection('config')"><span class="icon">⚙️</span><span>Configuración</span></div>
+    <div class="user-info">
+      <div id="sidebarEmail" style="font-weight:600; color:var(--text); margin-bottom:4px;"></div>
+      <a href="#" onclick="doLogout()" style="color:var(--red); font-size:12px;">Cerrar sesión</a>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- DASHBOARD -->
+    <div id="sec-dashboard" class="section active">
+      <h1>Dashboard</h1>
+      <div class="subtitle">Resumen de tus campañas Meta Ads</div>
+      <div class="grid-4">
+        <div class="card">
+          <div class="card-title">Gasto Total</div>
+          <div class="card-value" id="kpi-spend">$0</div>
+          <div style="color:var(--muted); font-size:12px; margin-top:4px;">Últimos 30 días</div>
+        </div>
+        <div class="card">
+          <div class="card-title">ROAS Promedio</div>
+          <div class="card-value" id="kpi-roas">0x</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Conversiones</div>
+          <div class="card-value" id="kpi-conv">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">CPA Promedio</div>
+          <div class="card-value" id="kpi-cpa">$0</div>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h2>Performance por Campaña</h2>
+          <canvas id="chartCampaigns" height="200"></canvas>
+        </div>
+        <div class="card">
+          <h2>Distribución de Gasto</h2>
+          <canvas id="chartSpend" height="200"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Estado de Cuenta</h2>
+        <div id="accountHealth" style="color:var(--muted); font-size:14px;">Carga tus credenciales para ver el estado</div>
+      </div>
+    </div>
+
+    <!-- CAMPAIGNS -->
+    <div id="sec-campaigns" class="section">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:24px;">
+        <div>
+          <h1>Campañas</h1>
+          <div class="subtitle">Gestión en tiempo real de tus campañas Meta Ads</div>
+        </div>
+        <button class="btn btn-primary" onclick="loadCampaigns()">🔄 Actualizar</button>
+      </div>
+      <div class="card">
+        <table>
+          <thead>
+            <tr>
+              <th>Salud</th>
+              <th>Nombre</th>
+              <th>Estado</th>
+              <th>Presupuesto/día</th>
+              <th>Gasto</th>
+              <th>CTR</th>
+              <th>CPA</th>
+              <th>ROAS</th>
+              <th>Frecuencia</th>
+              <th>Acción</th>
+            </tr>
+          </thead>
+          <tbody id="campaignsTable">
+            <tr><td colspan="10" style="text-align:center; color:var(--muted); padding:40px">Cargando campañas...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- AGENTS -->
+    <div id="sec-agents" class="section">
+      <h1>Agentes IA</h1>
+      <div class="subtitle">6 expertos especializados analizando tu cuenta</div>
+      <div class="grid-3" style="margin-bottom:24px;">
+        <div class="card" style="cursor:pointer; border-color:var(--accent)" onclick="runAgent('optimizer')">
+          <div style="font-size:32px; margin-bottom:8px;">📈</div>
+          <div style="font-weight:600; margin-bottom:4px;">Media Buyer Senior</div>
+          <div style="font-size:13px; color:var(--muted)">Análisis y optimización de campañas. Diagnóstico de ROAS, CPA, frecuencia y presupuesto.</div>
+        </div>
+        <div class="card" style="cursor:pointer" onclick="runAgent('finance')">
+          <div style="font-size:32px; margin-bottom:8px;">💰</div>
+          <div style="font-weight:600; margin-bottom:4px;">CFO / Director Financiero</div>
+          <div style="font-size:13px; color:var(--muted)">Análisis de P&L, MER, contribution margin y payback period.</div>
+        </div>
+        <div class="card" style="cursor:pointer" onclick="runAgent('creatives')">
+          <div style="font-size:32px; margin-bottom:8px;">🎬</div>
+          <div style="font-weight:600; margin-bottom:4px;">Creative Director</div>
+          <div style="font-size:13px; color:var(--muted)">Estrategia creativa, análisis de hook rate, fatiga y testing.</div>
+        </div>
+        <div class="card" style="cursor:pointer" onclick="runAgent('cro')">
+          <div style="font-size:32px; margin-bottom:8px;">🔬</div>
+          <div style="font-weight:600; margin-bottom:4px;">CRO Expert</div>
+          <div style="font-size:13px; color:var(--muted)">Auditoría de funnel, friction points y experimentos A/B.</div>
+        </div>
+        <div class="card" style="cursor:pointer" onclick="runAgent('growth')">
+          <div style="font-size:32px; margin-bottom:8px;">🚀</div>
+          <div style="font-weight:600; margin-bottom:4px;">Head of Growth</div>
+          <div style="font-size:13px; color:var(--muted)">Framework AARRR, plan 30/60/90 días y levers de crecimiento.</div>
+        </div>
+        <div class="card" style="cursor:pointer" onclick="runAgent('scripts')">
+          <div style="font-size:32px; margin-bottom:8px;">✍️</div>
+          <div style="font-weight:600; margin-bottom:4px;">Copywriter DR</div>
+          <div style="font-size:13px; color:var(--muted)">Scripts y copy para video ads con hooks que detienen el scroll.</div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="form-group">
+          <label>Contexto adicional para el agente (opcional)</label>
+          <textarea id="agentContext" rows="3" placeholder="Ej: estamos lanzando un nuevo producto, el objetivo es CAC < $15..."></textarea>
+        </div>
+        <div id="agentResult" style="display:none">
+          <div id="agentTag" class="agent-tag"></div>
+          <div id="agentOutput" class="agent-response"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CREATIVOS IA -->
+    <div id="sec-creativos" class="section">
+      <h1>Creativos IA</h1>
+      <div class="subtitle">Genera scripts, copy e imágenes para tus anuncios</div>
+      <div class="grid-2">
+        <div class="card">
+          <h2>✍️ Generador de Scripts</h2>
+          <div class="form-group">
+            <label>Brief del creativo</label>
+            <textarea id="creativoBrief" rows="4" placeholder="Ej: Video ad de 30s para producto anti-acné, target mujeres 18-35, precio $29, oferta 2x1 esta semana..."></textarea>
+          </div>
+          <div class="form-group">
+            <label>Cantidad de variaciones</label>
+            <select id="numScripts">
+              <option value="3">3 variaciones</option>
+              <option value="5">5 variaciones</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="generateScripts()">Generar Scripts</button>
+          <div id="scriptsResult" style="display:none; margin-top:16px;">
+            <div class="agent-tag">Copywriter Direct Response</div>
+            <div id="scriptsOutput" class="agent-response"></div>
+          </div>
+        </div>
+        <div class="card">
+          <h2>🖼️ Generador de Imágenes FLUX</h2>
+          <div class="form-group">
+            <label>Descripción de la imagen</label>
+            <textarea id="imagePrompt" rows="4" placeholder="Ej: Professional product photo of a sleek black coffee mug on marble surface, morning light, minimalist style"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Estilo</label>
+            <select id="imageStyle">
+              <option value="photorealistic, professional product photography, studio lighting">Foto de producto</option>
+              <option value="lifestyle photography, natural light, Instagram aesthetic">Lifestyle</option>
+              <option value="minimalist, clean background, editorial style">Editorial minimalista</option>
+              <option value="bold colors, graphic design, advertisement style">Publicitario</option>
+              <option value="UGC style, authentic, phone camera quality">UGC auténtico</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="generateImage()">Generar Imagen</button>
+          <div id="imageResult" style="display:none; margin-top:16px;">
+            <div class="agent-tag">FLUX.1-schnell</div>
+            <img id="generatedImg" class="generated-img" alt="Imagen generada">
+            <div style="margin-top:8px; display:flex; gap:8px;">
+              <button class="btn btn-secondary btn-sm" onclick="downloadImage()">⬇️ Descargar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FINANZAS -->
+    <div id="sec-finanzas" class="section">
+      <h1>Finanzas</h1>
+      <div class="subtitle">Análisis financiero de tu negocio</div>
+      <div class="grid-2" style="margin-bottom:24px;">
+        <div class="card">
+          <h2>📤 Cargar Excel</h2>
+          <p style="color:var(--muted); font-size:13px; margin-bottom:16px;">
+            Formato: Período | Ingresos | Costos COGS | Ad Spend | Devoluciones | Órdenes
+          </p>
+          <input type="file" id="financeFile" accept=".xlsx,.xls" style="margin-bottom:12px">
+          <button class="btn btn-primary" onclick="uploadFinance()">Subir Excel</button>
+        </div>
+        <div class="card">
+          <h2>🤖 Análisis CFO</h2>
+          <p style="color:var(--muted); font-size:13px; margin-bottom:16px;">El agente CFO analizará tus últimos datos financieros.</p>
+          <button class="btn btn-primary" onclick="runFinanceAgent()">Ejecutar Análisis CFO</button>
+          <div id="financeAgentResult" style="display:none; margin-top:16px;">
+            <div class="agent-tag">CFO / Director Financiero</div>
+            <div id="financeAgentOutput" class="agent-response"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Registros Financieros</h2>
+        <table>
+          <thead>
+            <tr><th>Período</th><th>Ingresos</th><th>Costos</th><th>Ad Spend</th><th>Ganancia</th><th>Margen</th><th>MER</th><th>Órdenes</th></tr>
+          </thead>
+          <tbody id="financeTable">
+            <tr><td colspan="8" style="text-align:center; color:var(--muted); padding:40px">Sin registros. Cargá un Excel para comenzar.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ÓRDENES -->
+    <div id="sec-ordenes" class="section">
+      <h1>Órdenes Shopify</h1>
+      <div class="subtitle">Órdenes recibidas via webhook de Shopify</div>
+      <div class="card" style="margin-bottom:16px; background:rgba(108,99,255,0.1); border-color:var(--accent)">
+        <div style="font-size:13px;">
+          <strong>📌 Webhook URL:</strong> <code id="webhookUrl" style="background:var(--surface2); padding:4px 8px; border-radius:4px; font-size:12px;"></code>
+          <button class="btn btn-secondary btn-sm" style="margin-left:8px;" onclick="copyWebhook()">Copiar</button>
+          <div style="color:var(--muted); margin-top:8px; font-size:12px;">Configurá esta URL en Shopify → Settings → Notifications → Webhooks → Orders/Create</div>
+        </div>
+      </div>
+      <div class="card">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Orden</th><th>Cliente</th><th>Total</th><th>Estado pago</th><th>Estado envío</th><th>Fecha</th></tr>
+          </thead>
+          <tbody id="ordersTable">
+            <tr><td colspan="7" style="text-align:center; color:var(--muted); padding:40px">Sin órdenes. Configura el webhook en Shopify.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CONFIG -->
+    <div id="sec-config" class="section">
+      <h1>Configuración</h1>
+      <div class="subtitle">Credenciales y datos de tu negocio</div>
+      <div class="grid-2">
+        <div>
+          <div class="card">
+            <h2>📘 Meta Ads</h2>
+            <div class="form-group">
+              <label>Access Token</label>
+              <input type="password" id="cfg-token" placeholder="EAABwzLixnjYBO...">
+            </div>
+            <div class="form-group">
+              <label>Ad Account ID</label>
+              <input type="text" id="cfg-account" placeholder="act_123456789">
+            </div>
+            <div class="form-group">
+              <label>App ID</label>
+              <input type="text" id="cfg-app-id" placeholder="123456789">
+            </div>
+            <div class="form-group">
+              <label>App Secret</label>
+              <input type="password" id="cfg-app-secret" placeholder="abc123...">
+            </div>
+          </div>
+          <div class="card">
+            <h2>🛒 Shopify</h2>
+            <div class="form-group">
+              <label>Store URL</label>
+              <input type="text" id="cfg-shopify-url" placeholder="tu-tienda.myshopify.com">
+            </div>
+            <div class="form-group">
+              <label>Webhook Secret (opcional)</label>
+              <input type="password" id="cfg-shopify-secret" placeholder="shpss_...">
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="card">
+            <h2>🤖 APIs de IA</h2>
+            <div class="form-group">
+              <label>Anthropic API Key</label>
+              <input type="password" id="cfg-anthropic" placeholder="sk-ant-api03-...">
+            </div>
+            <div class="form-group">
+              <label>HuggingFace API Key (para imágenes FLUX)</label>
+              <input type="password" id="cfg-hf-key" placeholder="hf_...">
+            </div>
+          </div>
+          <div class="card">
+            <h2>💳 MercadoPago</h2>
+            <div class="form-group">
+              <label>Access Token</label>
+              <input type="password" id="cfg-mp-token" placeholder="APP_USR-...">
+            </div>
+          </div>
+          <div class="card" style="border-color:var(--accent)">
+            <h2>🏪 Información del Negocio</h2>
+            <p style="font-size:13px; color:var(--muted); margin-bottom:12px;">
+              Los agentes IA usan esta info para personalizar sus análisis a tu negocio específico.
+            </p>
+            <div class="form-group">
+              <label>Descripción completa del negocio</label>
+              <textarea id="cfg-negocio-info" rows="8" placeholder="Ej:
+Negocio: E-commerce de suplementos deportivos
+Producto estrella: Proteína de suero 1kg ($35.000)
+Margen bruto: 45%
+Avatar ideal: Hombres 22-38 años que van al gym 3-5x/semana
+Objeción principal: Precio alto vs competencia
+Propuesta de valor: Ingredientes premium, sin azúcar, sabores naturales
+CPA objetivo: $8.000
+ROAS objetivo: 3.5x
+Ticket promedio: $38.000"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary" style="margin-top:8px;" onclick="saveConfig()">💾 Guardar Configuración</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast"></div>
+
+<script>
+// ─────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────
+// Cambiar a tu URL de Railway en producción
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:8000'
+  : 'https://TU-APP.railway.app';  // ← CAMBIAR con tu URL de Railway
+
+let TOKEN = localStorage.getItem('metadash_token') || '';
+let USER_EMAIL = localStorage.getItem('metadash_email') || '';
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+window.onload = () => {
+  if (TOKEN) {
+    showApp();
+  }
+  // Set webhook URL
+  document.getElementById('webhookUrl').textContent = `${API_BASE}/orders/webhook`;
+};
+
+// ─────────────────────────────────────────────
+// AUTH
+// ─────────────────────────────────────────────
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  if (!email || !pass) return toast('Completá todos los campos', 'error');
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({email, password: pass})
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Error de login');
+
+    TOKEN = data.access_token;
+    USER_EMAIL = data.email;
+    localStorage.setItem('metadash_token', TOKEN);
+    localStorage.setItem('metadash_email', USER_EMAIL);
+    showApp();
+    toast('¡Bienvenido! 👋', 'success');
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+}
+
+async function doRegister() {
+  const email = document.getElementById('regEmail').value.trim();
+  const pass = document.getElementById('regPass').value;
+  if (!email || !pass) return toast('Completá todos los campos', 'error');
+  if (pass.length < 6) return toast('La contraseña debe tener al menos 6 caracteres', 'error');
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({email, password: pass})
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Error al registrar');
+
+    TOKEN = data.access_token;
+    USER_EMAIL = data.email;
+    localStorage.setItem('metadash_token', TOKEN);
+    localStorage.setItem('metadash_email', USER_EMAIL);
+    showApp();
+    toast('¡Cuenta creada! 🎉', 'success');
+  } catch(e) {
+    toast(e.message, 'error');
+  }
+}
+
+function doLogout() {
+  TOKEN = ''; USER_EMAIL = '';
+  localStorage.removeItem('metadash_token');
+  localStorage.removeItem('metadash_email');
+  document.getElementById('app').style.display = 'none';
+  showLogin();
+}
+
+function showLogin() {
+  document.getElementById('loginPage').style.display = 'flex';
+  document.getElementById('registerPage').style.display = 'none';
+}
+function showRegister() {
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('registerPage').style.display = 'flex';
+}
+
+function showApp() {
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('registerPage').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  document.getElementById('sidebarEmail').textContent = USER_EMAIL;
+  loadConfig();
+  loadCampaigns();
+  loadFinanceRecords();
+  loadOrders();
+}
+
+// ─────────────────────────────────────────────
+// NAVIGATION
+// ─────────────────────────────────────────────
+function showSection(name) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById(`sec-${name}`).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+// ─────────────────────────────────────────────
+// API HELPER
+// ─────────────────────────────────────────────
+async function api(method, path, body = null) {
+  const opts = {
+    method,
+    headers: {'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json'}
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(`${API_BASE}${path}`, opts);
+  if (res.status === 401) { doLogout(); throw new Error('Sesión expirada'); }
+  return res.json();
+}
+
+// ─────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────
+async function loadConfig() {
+  try {
+    const data = await api('GET', '/config');
+    document.getElementById('cfg-token').value = data.meta_access_token || '';
+    document.getElementById('cfg-account').value = data.meta_ad_account_id || '';
+    document.getElementById('cfg-app-id').value = data.meta_app_id || '';
+    document.getElementById('cfg-app-secret').value = data.meta_app_secret || '';
+    document.getElementById('cfg-anthropic').value = data.anthropic_api_key || '';
+    document.getElementById('cfg-hf-key').value = data.hf_api_key || '';
+    document.getElementById('cfg-negocio-info').value = data.negocio_info || '';
+    document.getElementById('cfg-shopify-url').value = data.shopify_store_url || '';
+    document.getElementById('cfg-mp-token').value = data.mercadopago_access_token || '';
+  } catch(e) { console.error('Error cargando config:', e); }
+}
+
+async function saveConfig() {
+  const payload = {
+    meta_access_token: document.getElementById('cfg-token').value,
+    meta_ad_account_id: document.getElementById('cfg-account').value,
+    meta_app_id: document.getElementById('cfg-app-id').value,
+    meta_app_secret: document.getElementById('cfg-app-secret').value,
+    anthropic_api_key: document.getElementById('cfg-anthropic').value,
+    hf_api_key: document.getElementById('cfg-hf-key').value,
+    negocio_info: document.getElementById('cfg-negocio-info').value,
+    shopify_store_url: document.getElementById('cfg-shopify-url').value,
+    shopify_webhook_secret: document.getElementById('cfg-shopify-secret').value,
+    mercadopago_access_token: document.getElementById('cfg-mp-token').value,
+  };
+  try {
+    await api('POST', '/config', payload);
+    toast('✅ Configuración guardada', 'success');
+  } catch(e) { toast('Error guardando: ' + e.message, 'error'); }
+}
+
+// ─────────────────────────────────────────────
+// CAMPAIGNS
+// ─────────────────────────────────────────────
+async function loadCampaigns() {
+  try {
+    const data = await api('GET', '/campaigns');
+    renderCampaigns(data.campaigns || []);
+    updateDashboardKPIs(data.campaigns || []);
+  } catch(e) {
+    document.getElementById('campaignsTable').innerHTML =
+      `<tr><td colspan="10" style="text-align:center; color:var(--muted); padding:40px">⚠️ ${e.message}</td></tr>`;
+  }
+}
+
+function getCampaignHealth(c) {
+  if (c.status === 'PAUSED') return '⏸️';
+  if (c.cpa > 0 && c.roas < 1) return '🔴';
+  if (c.frequency > 4 || c.ctr < 0.5) return '🟡';
+  if (c.roas >= 2) return '🟢';
+  return '🟡';
+}
+
+function renderCampaigns(campaigns) {
+  const tbody = document.getElementById('campaignsTable');
+  if (!campaigns.length) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:var(--muted); padding:40px">Sin campañas activas</td></tr>';
+    return;
+  }
+  tbody.innerHTML = campaigns.map(c => `
+    <tr>
+      <td><span class="health">${getCampaignHealth(c)}</span></td>
+      <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${c.name}">${c.name}</td>
+      <td><span class="badge badge-${c.status.toLowerCase()}">${c.status}</span></td>
+      <td>$${c.daily_budget.toFixed(2)}</td>
+      <td>$${c.spend.toFixed(2)}</td>
+      <td>${c.ctr.toFixed(2)}%</td>
+      <td>$${c.cpa.toFixed(2)}</td>
+      <td style="color:${c.roas >= 2 ? 'var(--green)' : c.roas >= 1 ? 'var(--yellow)' : 'var(--red)'}">${c.roas.toFixed(2)}x</td>
+      <td style="color:${c.frequency > 4 ? 'var(--red)' : 'var(--text)'}">${c.frequency.toFixed(1)}</td>
+      <td>
+        <button class="btn btn-sm ${c.status === 'ACTIVE' ? 'btn-danger' : 'btn-success'}"
+          onclick="toggleCampaign('${c.id}')">
+          ${c.status === 'ACTIVE' ? '⏸ Pausar' : '▶ Activar'}
+        </button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function updateDashboardKPIs(campaigns) {
+  const active = campaigns.filter(c => c.status === 'ACTIVE');
+  const totalSpend = campaigns.reduce((s, c) => s + c.spend, 0);
+  const totalConv = campaigns.reduce((s, c) => s + c.conversions, 0);
+  const avgRoas = active.length ? (active.reduce((s, c) => s + c.roas, 0) / active.length) : 0;
+  const avgCpa = totalConv > 0 ? (totalSpend / totalConv) : 0;
+
+  document.getElementById('kpi-spend').textContent = `$${totalSpend.toLocaleString('es-AR', {minimumFractionDigits:0})}`;
+  document.getElementById('kpi-roas').textContent = `${avgRoas.toFixed(2)}x`;
+  document.getElementById('kpi-conv').textContent = totalConv.toLocaleString();
+  document.getElementById('kpi-cpa').textContent = `$${avgCpa.toFixed(2)}`;
+
+  // Health summary
+  const red = campaigns.filter(c => getCampaignHealth(c) === '🔴').length;
+  const yellow = campaigns.filter(c => getCampaignHealth(c) === '🟡').length;
+  const green = campaigns.filter(c => getCampaignHealth(c) === '🟢').length;
+  document.getElementById('accountHealth').innerHTML = `
+    🟢 ${green} campañas saludables &nbsp;|&nbsp; 🟡 ${yellow} requieren atención &nbsp;|&nbsp; 🔴 ${red} en riesgo
+    &nbsp;|&nbsp; Total activas: ${active.length}
+  `;
+
+  // Charts
+  renderCharts(campaigns);
+}
+
+let chartCampaigns, chartSpend;
+function renderCharts(campaigns) {
+  const top5 = campaigns.slice(0, 5);
+
+  if (chartCampaigns) chartCampaigns.destroy();
+  const ctx1 = document.getElementById('chartCampaigns').getContext('2d');
+  chartCampaigns = new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: top5.map(c => c.name.substring(0, 20)),
+      datasets: [{
+        label: 'ROAS',
+        data: top5.map(c => c.roas),
+        backgroundColor: top5.map(c => c.roas >= 2 ? '#00d4aa' : c.roas >= 1 ? '#ffd166' : '#ef233c'),
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      plugins: {legend: {display: false}},
+      scales: {
+        x: {ticks: {color: '#7a7a9a'}, grid: {color: '#2a2a3a'}},
+        y: {ticks: {color: '#7a7a9a'}, grid: {color: '#2a2a3a'}}
+      }
+    }
+  });
+
+  if (chartSpend) chartSpend.destroy();
+  const ctx2 = document.getElementById('chartSpend').getContext('2d');
+  chartSpend = new Chart(ctx2, {
+    type: 'doughnut',
+    data: {
+      labels: top5.map(c => c.name.substring(0, 15)),
+      datasets: [{
+        data: top5.map(c => c.spend),
+        backgroundColor: ['#6c63ff','#ff6584','#00d4aa','#ffd166','#a78bfa'],
+        borderWidth: 0,
+      }]
+    },
+    options: {plugins: {legend: {labels: {color: '#7a7a9a', font: {size: 11}}}}}
+  });
+}
+
+async function toggleCampaign(campaignId) {
+  try {
+    const data = await api('POST', `/campaigns/${campaignId}/toggle`);
+    toast(`Campaña ${data.new_status === 'ACTIVE' ? 'activada ▶' : 'pausada ⏸'}`, 'success');
+    setTimeout(loadCampaigns, 1000);
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+// ─────────────────────────────────────────────
+// AGENTS
+// ─────────────────────────────────────────────
+const AGENT_NAMES = {
+  optimizer: 'Media Buyer Senior',
+  finance: 'CFO / Director Financiero',
+  creatives: 'Creative Director',
+  cro: 'CRO Expert',
+  growth: 'Head of Growth',
+  scripts: 'Copywriter DR',
+};
+
+async function runAgent(agentType) {
+  const contextText = document.getElementById('agentContext').value;
+  const resultDiv = document.getElementById('agentResult');
+  const outputDiv = document.getElementById('agentOutput');
+  const tagDiv = document.getElementById('agentTag');
+
+  resultDiv.style.display = 'block';
+  tagDiv.textContent = AGENT_NAMES[agentType] + ' — Analizando...';
+  outputDiv.innerHTML = '<div class="spinner"></div> Pensando...';
+
+  try {
+    // Para optimizer y creatives, pasamos datos de campañas
+    let context = {};
+    if (agentType === 'optimizer' || agentType === 'creatives') {
+      try {
+        const cdata = await api('GET', '/campaigns');
+        context.campaigns = cdata.campaigns || [];
+      } catch(e) {}
+    }
+
+    const data = await api('POST', `/agent/${agentType}`, {
+      prompt: contextText || `Analizá el estado actual y dame recomendaciones prioritarias`,
+      context
+    });
+    tagDiv.textContent = data.agent;
+    outputDiv.textContent = data.result;
+  } catch(e) {
+    outputDiv.textContent = '❌ Error: ' + e.message;
+  }
+}
+
+// ─────────────────────────────────────────────
+// CREATIVOS
+// ─────────────────────────────────────────────
+async function generateScripts() {
+  const brief = document.getElementById('creativoBrief').value.trim();
+  if (!brief) return toast('Describí el brief del creativo', 'error');
+
+  const numScripts = parseInt(document.getElementById('numScripts').value);
+  const resultDiv = document.getElementById('scriptsResult');
+  const outputDiv = document.getElementById('scriptsOutput');
+
+  resultDiv.style.display = 'block';
+  outputDiv.innerHTML = '<div class="spinner"></div> Generando scripts...';
+
+  try {
+    const data = await api('POST', '/agent/creativos', {
+      prompt: brief,
+      context: {num_scripts: numScripts}
+    });
+    outputDiv.textContent = data.result;
+  } catch(e) {
+    outputDiv.textContent = '❌ Error: ' + e.message;
+  }
+}
+
+let lastImageBlob = null;
+async function generateImage() {
+  const prompt = document.getElementById('imagePrompt').value.trim();
+  if (!prompt) return toast('Describí la imagen a generar', 'error');
+
+  const style = document.getElementById('imageStyle').value;
+  const resultDiv = document.getElementById('imageResult');
+  const img = document.getElementById('generatedImg');
+
+  resultDiv.style.display = 'block';
+  img.style.opacity = '0.3';
+  img.src = '';
+
+  try {
+    const data = await api('POST', '/agent/generate-image', {prompt, style});
+    img.src = `data:${data.content_type};base64,${data.image_base64}`;
+    img.style.opacity = '1';
+    lastImageBlob = data.image_base64;
+    toast('✅ Imagen generada', 'success');
+  } catch(e) {
+    resultDiv.style.display = 'none';
+    toast('❌ Error: ' + e.message, 'error');
+  }
+}
+
+function downloadImage() {
+  if (!lastImageBlob) return;
+  const a = document.createElement('a');
+  a.href = `data:image/jpeg;base64,${lastImageBlob}`;
+  a.download = `metadash-creative-${Date.now()}.jpg`;
+  a.click();
+}
+
+// ─────────────────────────────────────────────
+// FINANZAS
+// ─────────────────────────────────────────────
+async function uploadFinance() {
+  const file = document.getElementById('financeFile').files[0];
+  if (!file) return toast('Seleccioná un archivo Excel', 'error');
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const res = await fetch(`${API_BASE}/finance/upload`, {
+      method: 'POST',
+      headers: {'Authorization': `Bearer ${TOKEN}`},
+      body: formData
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail);
+    toast(`✅ ${data.records_created} registros importados`, 'success');
+    loadFinanceRecords();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
+}
+
+async function loadFinanceRecords() {
+  try {
+    const data = await api('GET', '/finance/records');
+    const records = data.records || [];
+    const tbody = document.getElementById('financeTable');
+    if (!records.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--muted); padding:40px">Sin registros</td></tr>';
+      return;
+    }
+    tbody.innerHTML = records.map(r => `
+      <tr>
+        <td>${r.periodo}</td>
+        <td>$${r.ingresos.toLocaleString('es-AR', {minimumFractionDigits:0})}</td>
+        <td>$${r.costos.toLocaleString('es-AR', {minimumFractionDigits:0})}</td>
+        <td>$${r.ad_spend.toLocaleString('es-AR', {minimumFractionDigits:0})}</td>
+        <td style="color:${r.ganancia >= 0 ? 'var(--green)' : 'var(--red)'}">
+          $${r.ganancia.toLocaleString('es-AR', {minimumFractionDigits:0})}
+        </td>
+        <td style="color:${r.margen >= 15 ? 'var(--green)' : r.margen >= 5 ? 'var(--yellow)' : 'var(--red)'}">
+          ${r.margen.toFixed(1)}%
+        </td>
+        <td style="color:${r.mer >= 3 ? 'var(--green)' : r.mer >= 1.5 ? 'var(--yellow)' : 'var(--red)'}">
+          ${r.mer.toFixed(2)}x
+        </td>
+        <td>${r.ordenes}</td>
+      </tr>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function runFinanceAgent() {
+  const outputDiv = document.getElementById('financeAgentOutput');
+  const resultDiv = document.getElementById('financeAgentResult');
+  resultDiv.style.display = 'block';
+  outputDiv.innerHTML = '<div class="spinner"></div> Analizando...';
+
+  try {
+    const records = await api('GET', '/finance/records');
+    const latest = records.records?.[0] || {};
+    const data = await api('POST', '/agent/finance', {
+      prompt: 'Analizá los datos financieros y dame un diagnóstico ejecutivo',
+      context: latest
+    });
+    outputDiv.textContent = data.result;
+  } catch(e) {
+    outputDiv.textContent = '❌ Error: ' + e.message;
+  }
+}
+
+// ─────────────────────────────────────────────
+// ÓRDENES
+// ─────────────────────────────────────────────
+async function loadOrders() {
+  try {
+    const data = await api('GET', '/orders');
+    const orders = data.orders || [];
+    const tbody = document.getElementById('ordersTable');
+    if (!orders.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center; color:var(--muted); padding:40px">Sin órdenes. Configura el webhook en Shopify.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = orders.map(o => `
+      <tr>
+        <td>#${o.order_number}</td>
+        <td>${o.order_id}</td>
+        <td>${o.customer_name || '-'}</td>
+        <td>$${parseFloat(o.total_price||0).toLocaleString('es-AR', {minimumFractionDigits:0})} ${o.currency}</td>
+        <td><span class="badge ${o.financial_status === 'paid' ? 'badge-active' : 'badge-paused'}">${o.financial_status}</span></td>
+        <td>${o.fulfillment_status || '-'}</td>
+        <td>${o.created_at ? new Date(o.created_at).toLocaleDateString('es-AR') : '-'}</td>
+      </tr>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+function copyWebhook() {
+  const url = document.getElementById('webhookUrl').textContent;
+  navigator.clipboard.writeText(url).then(() => toast('URL copiada ✅', 'success'));
+}
+
+// ─────────────────────────────────────────────
+// TOAST
+// ─────────────────────────────────────────────
+function toast(msg, type = 'info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast show ${type}`;
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Node
+node_modules/
+.next/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# DB backups
+*.sql
+*.dump
+
+# Old/Legacy folders
+.claude/
+FLORENCIA VIVAS/
+Promts ORO readmap/
+sincron.ia/
+api/
+*.bat
+
+# Documentation (keep in git but optional)
+# Uncomment if you don't want docs in git
+# *.md
+# *.txt
+
+# Frontend node_modules and build
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+
+# Backend venv and cache
+backend/.venv/
+backend/venv/
+backend/__pycache__/
