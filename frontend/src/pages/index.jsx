@@ -1,18 +1,4 @@
-import { useEffect } from 'react';
-import { useRouter } from 'next/router';
-
 export default function Home() {
-  const router = useRouter();
-
-  useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    if (token) {
-      router.push('/agents');
-    } else {
-      router.push('/login');
-    }
-  }, [router]);
-
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center">
       <div className="text-center">
@@ -21,4 +7,12 @@ export default function Home() {
       </div>
     </div>
   );
+}
+
+export async function getServerSideProps(context) {
+  const token = context.req.cookies.token;
+  if (token) {
+    return { redirect: { destination: '/agents', permanent: false } };
+  }
+  return { redirect: { destination: '/login', permanent: false } };
 }
