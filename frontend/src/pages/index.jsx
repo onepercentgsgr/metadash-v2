@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import MetricCard from "../components/MetricCard";
-import CampaignTable from "../components/CampaignTable";
+import { MetricCard } from "../components/MetricCard";
+import { CampaignTable } from "../components/CampaignTable";
 import { api } from "../lib/api";
 
 const PERIODS = [
