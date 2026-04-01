@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Layout } from '@/components/Layout';
-import { ProtectedRoute } from '@/components/ProtectedRoute';
-import { api } from '@/lib/api';
+import { Layout } from '../components/Layout';
+import { ProtectedRoute } from '../components/ProtectedRoute';
+import { api } from '../lib/api';
 
 const AGENTS = [
   {

@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { api } from '@/lib/api';
+import { api } from '../lib/api';
 import { useRouter } from 'next/router';
 
 const AuthContext = createContext(null);

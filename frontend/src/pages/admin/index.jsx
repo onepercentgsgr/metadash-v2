@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Layout } from '@/components/Layout';
-import { AdminRoute } from '@/components/ProtectedRoute';
-import { api } from '@/lib/api';
+import { Layout } from '../../components/Layout';
+import { AdminRoute } from '../../components/ProtectedRoute';
+import { api } from '../../lib/api';
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState([]);
