@@ -11,10 +11,13 @@ from dotenv import load_dotenv
 import json
 import openpyxl
 import io
+import logging
 
 from database import engine, get_db, Base
 from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder
 import config
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -31,28 +34,39 @@ Base.metadata.create_all(bind=engine)
 # Create FastAPI app
 app = FastAPI(title="MetaDash API", version="1.0.0")
 
-# Setup CORS
-cors_origins = [
-    "http://localhost:3000",
-    "https://metadash.vercel.app",
-]
+# Setup CORS with secure defaults
+def _get_cors_origins() -> List[str]:
+    """
+    Get CORS origins from environment variable.
+    Format: comma-separated list of origins (e.g., "http://localhost:3000,https://example.com")
+    Falls back to localhost only in development if not specified.
+    """
+    allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
 
-# Add dynamic Vercel preview URLs
-frontend_url = os.getenv("FRONTEND_URL", "")
-if frontend_url:
-    cors_origins.append(frontend_url)
+    if allowed_origins_env:
+        # Parse comma-separated origins from environment
+        origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
+        logger.info(f"CORS origins loaded from ALLOWED_ORIGINS: {origins}")
+        return origins
+    else:
+        # Development fallback: only localhost
+        is_production = os.getenv("ENVIRONMENT", "development").lower() == "production"
+        if is_production:
+            logger.warning("ALLOWED_ORIGINS not set in production. CORS will be very restrictive.")
+            return []
+        else:
+            logger.info("ALLOWED_ORIGINS not set. Using development default: http://localhost:3000")
+            return ["http://localhost:3000"]
 
-# Add preview app URLs
-cors_origins.extend([
-    "https://metadash-*.vercel.app",
-])
+
+cors_origins = _get_cors_origins()
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 # Include payment routes
@@ -982,7 +996,8 @@ async def optimize_campaigns(
             agent="Campaign Optimizer",
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
 
 
 @app.post("/agent/finance", response_model=AgentResponse)
@@ -1015,7 +1030,8 @@ async def analyze_finances(
             agent="Finance Analyst",
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
 
 
 @app.post("/agent/scripts", response_model=AgentResponse)
@@ -1048,7 +1064,8 @@ async def generate_scripts(
             agent="Script Generator",
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
 
 
 @app.post("/agent/creatives", response_model=AgentResponse)
@@ -1081,7 +1098,8 @@ async def analyze_creatives(
             agent="Creative Director",
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
 
 
 @app.post("/agent/growth", response_model=AgentResponse)
@@ -1114,7 +1132,8 @@ async def get_growth_strategy(
             agent="Growth Advisor",
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
 
 
 @app.post("/agent/cro", response_model=AgentResponse)
@@ -1147,7 +1166,8 @@ async def get_cro_advice(
             agent="CRO Advisor",
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
 
 
 @app.post("/agent/landing-audit", response_model=AgentResponse)
@@ -1183,7 +1203,8 @@ async def audit_landing_page(
             agent="Landing Page Auditor",
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
 
 
 @app.post("/agent/full-audit", response_model=AgentResponse)
@@ -1216,7 +1237,8 @@ async def full_audit(
             agent="Orchestrator",
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
 
 
 @app.post("/agent/run", response_model=AgentResponse)
@@ -1266,7 +1288,8 @@ async def run_agent(
             agent=agent_handlers[agent_type],
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
 
 
 # Finance Endpoints
@@ -1306,7 +1329,8 @@ async def upload_financial_data(
             "message": "Financial data uploaded successfully",
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error processing financial data: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=400, detail="Invalid request data")
 
 
 @app.get("/finance/records", response_model=List[FinancialRecordResponse])
@@ -1397,7 +1421,8 @@ async def upload_financial_records(
             "message": "Financial data uploaded successfully",
         }
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error(f"Error processing financial data: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=400, detail="Invalid request data")
 
 
 # Shopify Endpoints

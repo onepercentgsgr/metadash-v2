@@ -12,8 +12,13 @@ from dotenv import load_dotenv
 import os
 import hmac
 import hashlib
+import logging
+import jwt
+import config
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/payments", tags=["payments"])
 
@@ -23,24 +28,77 @@ MERCADOPAGO_WEBHOOK_TOKEN = os.getenv("MERCADOPAGO_WEBHOOK_TOKEN", "")
 FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 
-def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
+def _verify_token(token: str) -> dict:
+    """Verify JWT token and return payload."""
+    try:
+        payload = jwt.decode(token, config.SECRET_KEY, algorithms=[config.ALGORITHM])
+        user_id: int = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token"
+            )
+        return {"user_id": user_id}
+    except jwt.ExpiredSignatureError:
+        logger.warning("Expired JWT token attempted")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+    except jwt.InvalidTokenError as e:
+        logger.warning(f"Invalid JWT token attempted: {type(e).__name__}")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+
+def get_current_user(
+    request: Request,
+    db: Session = Depends(get_db)
+) -> User:
     """
     Get current user from JWT token in Authorization header.
-    This is a simplified version - implement full JWT validation as needed.
+    Performs full JWT validation and database lookup.
     """
     auth_header = request.headers.get("Authorization")
     if not auth_header:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="No autorizado"
+            detail="Missing authorization header"
         )
-    return None  # Implement full JWT validation
+
+    try:
+        # Extract token from "Bearer <token>" format
+        token = auth_header.replace("Bearer ", "")
+        if not token or token == auth_header:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authorization header format"
+            )
+
+        # Verify token
+        payload = _verify_token(token)
+        user_id = payload.get("user_id")
+
+        # Get user from database
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            logger.warning(f"User ID {user_id} from token not found in database")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+
+        return user
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in get_current_user: {type(e).__name__}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication failed"
+        )
 
 
 @router.post("/create-checkout")
 async def create_mercadopago_checkout(
     plan: str,
-    user_id: int,
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
@@ -48,7 +106,6 @@ async def create_mercadopago_checkout(
 
     Parámetros:
     - plan: Plan a contratar (trial, starter, pro, enterprise)
-    - user_id: ID del usuario
     """
     try:
         # Validate plan
@@ -56,36 +113,38 @@ async def create_mercadopago_checkout(
         if plan not in valid_plans:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Plan '{plan}' no válido"
+                detail=f"Plan '{plan}' is not valid"
             )
 
         # Create checkout
         checkout_url = payments.create_checkout(
-            user_id=user_id,
+            user_id=user.id,
             plan=plan,
             db=db,
             frontend_url=FRONTEND_URL
         )
 
         if not checkout_url:
+            logger.error(f"Failed to create checkout for user {user.id}, plan {plan}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="No se pudo crear el checkout de pago"
+                detail="Could not create payment checkout"
             )
 
         return {
             "success": True,
             "checkout_url": checkout_url,
             "plan": plan,
-            "message": f"Checkout creado para el plan {plan}"
+            "message": f"Checkout created for plan {plan}"
         }
 
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error creating checkout for user {user.id}: {type(e).__name__}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creando checkout: {str(e)}"
+            detail="An error occurred while creating checkout"
         )
 
 
@@ -104,9 +163,10 @@ async def mercadopago_webhook(
         # Verify webhook token
         webhook_token = request.headers.get("X-Webhook-Token", "")
         if webhook_token != MERCADOPAGO_WEBHOOK_TOKEN and MERCADOPAGO_WEBHOOK_TOKEN:
+            logger.warning("Invalid MercadoPago webhook token attempted")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token de webhook inválido"
+                detail="Invalid webhook token"
             )
 
         # Process webhook
@@ -115,26 +175,28 @@ async def mercadopago_webhook(
         if success:
             return {
                 "status": "success",
-                "message": "Webhook procesado correctamente"
+                "message": "Webhook processed successfully"
             }
         else:
             return {
                 "status": "processed",
-                "message": "Webhook procesado sin cambios"
+                "message": "Webhook processed"
             }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Webhook error: {str(e)}")
+        logger.error(f"MercadoPago webhook error: {type(e).__name__}: {str(e)}")
         return {
             "status": "error",
-            "message": str(e)
+            "message": "Webhook processing failed"
         }
 
 
 @router.post("/stripe/create-checkout")
 async def create_stripe_checkout(
     plan: str,
-    user_id: int,
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
@@ -142,7 +204,6 @@ async def create_stripe_checkout(
 
     Parámetros:
     - plan: Plan a contratar (trial, starter, pro, enterprise)
-    - user_id: ID del usuario
     """
     try:
         # Validate plan
@@ -150,36 +211,38 @@ async def create_stripe_checkout(
         if plan not in valid_plans:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Plan '{plan}' no válido"
+                detail=f"Plan '{plan}' is not valid"
             )
 
         # Create checkout session
         checkout_url = stripe_payments.create_checkout_session(
-            user_id=user_id,
+            user_id=user.id,
             plan=plan,
             db=db,
             frontend_url=FRONTEND_URL
         )
 
         if not checkout_url:
+            logger.error(f"Failed to create Stripe checkout for user {user.id}, plan {plan}")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="No se pudo crear la sesión de pago"
+                detail="Could not create payment session"
             )
 
         return {
             "success": True,
             "checkout_url": checkout_url,
             "plan": plan,
-            "message": f"Sesión de pago creada para el plan {plan}"
+            "message": f"Payment session created for plan {plan}"
         }
 
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error creating Stripe checkout for user {user.id}: {type(e).__name__}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error creando sesión de pago: {str(e)}"
+            detail="An error occurred while creating payment session"
         )
 
 
@@ -201,9 +264,10 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)) -> Dic
                 body, sig_header, STRIPE_WEBHOOK_SECRET
             )
         except ValueError:
+            logger.warning("Invalid Stripe webhook signature attempted")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Firma de webhook inválida"
+                detail="Invalid webhook signature"
             )
 
         # Process event
@@ -212,19 +276,21 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)) -> Dic
         if success:
             return {
                 "status": "success",
-                "message": "Evento de Stripe procesado correctamente"
+                "message": "Stripe event processed successfully"
             }
         else:
             return {
                 "status": "processed",
-                "message": "Evento de Stripe procesado"
+                "message": "Stripe event processed"
             }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Stripe webhook error: {str(e)}")
+        logger.error(f"Stripe webhook error: {type(e).__name__}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error procesando webhook: {str(e)}"
+            detail="An error occurred while processing webhook"
         )
 
 
@@ -241,84 +307,79 @@ async def get_plans() -> Dict[str, Any]:
             "total_plans": len(plans)
         }
     except Exception as e:
+        logger.error(f"Error getting subscription plans: {type(e).__name__}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error obteniendo planes: {str(e)}"
+            detail="Could not retrieve subscription plans"
         )
 
 
-@router.get("/status/{user_id}")
+@router.get("/status")
 async def get_subscription_status(
-    user_id: int,
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
-    Get subscription status for a user.
-
-    Parámetros:
-    - user_id: ID del usuario
+    Get subscription status for the current user.
     """
     try:
-        status_info = payments.check_subscription_status(user_id, db)
+        status_info = payments.check_subscription_status(user.id, db)
         return {
             "success": True,
             "subscription": status_info
         }
     except Exception as e:
+        logger.error(f"Error getting subscription status for user {user.id}: {type(e).__name__}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error obteniendo estado de suscripción: {str(e)}"
+            detail="Could not retrieve subscription status"
         )
 
 
-@router.post("/cancel/{user_id}")
+@router.post("/cancel")
 async def cancel_subscription(
-    user_id: int,
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
-    Cancel a user's subscription.
-
-    Parámetros:
-    - user_id: ID del usuario
+    Cancel the current user's subscription.
     """
     try:
-        success = payments.cancel_subscription(user_id, db)
+        success = payments.cancel_subscription(user.id, db)
 
         if success:
             return {
                 "success": True,
-                "message": "Suscripción cancelada correctamente"
+                "message": "Subscription cancelled successfully"
             }
         else:
+            logger.warning(f"Subscription not found for user {user.id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Suscripción no encontrada"
+                detail="Subscription not found"
             )
 
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error cancelling subscription for user {user.id}: {type(e).__name__}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error cancelando suscripción: {str(e)}"
+            detail="Could not cancel subscription"
         )
 
 
-@router.get("/stripe/portal/{user_id}")
+@router.get("/stripe/portal")
 async def get_stripe_portal(
-    user_id: int,
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> Dict[str, Any]:
     """
     Get Stripe customer portal URL for subscription management.
-
-    Parámetros:
-    - user_id: ID del usuario
     """
     try:
         portal_url = stripe_payments.get_customer_portal_url(
-            user_id=user_id,
+            user_id=user.id,
             db=db,
             frontend_url=FRONTEND_URL
         )
@@ -329,15 +390,17 @@ async def get_stripe_portal(
                 "portal_url": portal_url
             }
         else:
+            logger.warning(f"Stripe portal not found for user {user.id}")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Portal de cliente no encontrado"
+                detail="Stripe portal not found"
             )
 
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error getting Stripe portal for user {user.id}: {type(e).__name__}: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error obteniendo portal: {str(e)}"
+            detail="Could not retrieve portal"
         )
