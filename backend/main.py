@@ -51,12 +51,13 @@ def _get_cors_origins() -> List[str]:
     else:
         # Development fallback: only localhost
         is_production = os.getenv("ENVIRONMENT", "development").lower() == "production"
-        if is_production:
-            logger.warning("ALLOWED_ORIGINS not set in production. CORS will be very restrictive.")
-            return []
+               if is_production:
+            logger.warning("ALLOWED_ORIGINS not set in production. Using Vercel URL.")
+            return ["https://metadash-v2-n2em-git-master-one-percents-projects.vercel.app", "https://metadash-v2-n2em.vercel.app", "http://localhost:3000"]
         else:
             logger.info("ALLOWED_ORIGINS not set. Using development default: http://localhost:3000")
             return ["http://localhost:3000"]
+
 
 
 cors_origins = _get_cors_origins()
