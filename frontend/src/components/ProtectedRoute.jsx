@@ -33,7 +33,7 @@ export function AdminRoute({ children }) {
 
   useEffect(() => {
     if (!loading && (!user || user.role !== 'admin')) {
-      router.push('/dashboard');
+      router.push('/agents');
     }
   }, [user, loading, router]);
 

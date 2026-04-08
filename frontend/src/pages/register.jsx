@@ -36,7 +36,7 @@ export default function RegisterPage() {
 
       if (response.access_token) {
         localStorage.setItem('token', response.access_token);
-        router.push('/dashboard');
+        router.push('/agents');
       } else {
         setError('Error al registrarse');
       }

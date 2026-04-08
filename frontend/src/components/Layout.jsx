@@ -11,7 +11,7 @@ export function Layout({ children }) {
   const isActive = (path) => router.pathname === path;
 
   const navItems = [
-    { label: 'Dashboard', path: '/dashboard', icon: '📊' },
+    { label: 'Dashboard', path: '/agents', icon: '📊' },
     { label: 'Agents', path: '/agents', icon: '🤖' },
     { label: 'Full Audit', path: '/audit', icon: '🔍' },
     { label: 'Settings', path: '/settings', icon: '⚙️' },
@@ -31,7 +31,7 @@ export function Layout({ children }) {
       >
         {/* Logo */}
         <div className="p-6 border-b border-gray-800">
-          <Link href="/dashboard" className="flex items-center gap-3">
+          <Link href="/agents" className="flex items-center gap-3">
             <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">
               MD
             </div>

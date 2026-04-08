@@ -77,7 +77,7 @@ export default function PaymentCancel() {
             Volver a Intentar
           </button>
           <button
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push('/agents')}
             className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition"
           >
             Ir al Panel de Control
