@@ -552,7 +552,7 @@ MÉTRICAS DIARIAS A MONITOREAR:
                   </li>
                   <li className="flex items-start gap-3">
                     <input type="checkbox" className="mt-1" />
-                    <span className="text-gray-300">Valor total del stack > 2x precio final</span>
+                    <span className="text-gray-300">Valor total del stack {'>'} 2x precio final</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <input type="checkbox" className="mt-1" />
