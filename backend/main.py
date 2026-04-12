@@ -1,5 +1,7 @@
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Header
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response as StarletteResponse
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 from typing import Optional, List, Any, Dict
@@ -34,46 +36,40 @@ Base.metadata.create_all(bind=engine)
 # Create FastAPI app
 app = FastAPI(title="MetaDash API", version="1.0.0")
 
-# Setup CORS — hardcoded production URLs + env var extras
-# This ensures CORS ALWAYS works regardless of Railway env var config
-HARDCODED_ORIGINS = [
-    "https://metadash-v2-n2em-git-master-one-percents-projects.vercel.app",
-    "https://metadash-v2-n2em.vercel.app",
-    "http://localhost:3000",
-    "http://localhost:3001",
-]
+# ── CORS Middleware Manual ──
+# Refleja el origin del request — funciona para CUALQUIER frontend URL
+# sin depender de variables de entorno ni listas hardcodeadas.
+class ManualCORSMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        origin = request.headers.get("origin", "")
+
+        # Preflight OPTIONS → responder inmediatamente con CORS headers
+        if request.method == "OPTIONS":
+            response = StarletteResponse(status_code=200)
+            if origin:
+                response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Max-Age"] = "3600"
+            return response
+
+        # Request normal → ejecutar y agregar CORS headers a la respuesta
+        try:
+            response = await call_next(request)
+        except Exception:
+            response = StarletteResponse(status_code=500, content="Internal Server Error")
+
+        if origin:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+
+        return response
 
 
-def _get_cors_origins() -> List[str]:
-    origins = set(HARDCODED_ORIGINS)
-
-    # Add any extra origins from ALLOWED_ORIGINS env var
-    allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
-    if allowed_origins_env:
-        for origin in allowed_origins_env.split(","):
-            cleaned = origin.strip().rstrip("/")
-            if cleaned:
-                origins.add(cleaned)
-
-    # Add FRONTEND_URL if set
-    frontend_url = os.getenv("FRONTEND_URL", "")
-    if frontend_url:
-        origins.add(frontend_url.strip().rstrip("/"))
-
-    result = list(origins)
-    logger.info(f"CORS origins: {result}")
-    return result
-
-
-cors_origins = _get_cors_origins()
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.add_middleware(ManualCORSMiddleware)
 
 # Include payment routes
 if PAYMENTS_AVAILABLE:
