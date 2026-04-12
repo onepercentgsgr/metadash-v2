@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
@@ -212,6 +212,10 @@ class AdminUserUpdate(BaseModel):
     is_active: Optional[bool] = None
 
 
+class AdminSetPlanRequest(BaseModel):
+    plan: str
+
+
 class SubscriptionResponse(BaseModel):
     id: int
     user_id: int
@@ -347,7 +351,7 @@ def get_current_user(
 
 
 def get_current_user_from_header(
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ) -> User:
     if not authorization:
@@ -394,7 +398,7 @@ def get_active_subscription(user_id: int, db: Session) -> Subscription:
 
 
 async def check_subscription(
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ) -> User:
     user = get_current_user_from_header(authorization, db)
@@ -577,7 +581,7 @@ async def login(
 
 @app.get("/auth/me", response_model=UserResponse)
 async def get_me(
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = get_current_user_from_header(authorization, db)
@@ -602,7 +606,7 @@ async def get_me(
 # Config Endpoints
 @app.get("/config", response_model=TenantConfigResponse)
 async def get_config(
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = get_current_user_from_header(authorization, db)
@@ -623,7 +627,7 @@ async def get_config(
 @app.post("/config", response_model=TenantConfigResponse)
 async def update_config(
     request: TenantConfigUpdate,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = get_current_user_from_header(authorization, db)
@@ -641,7 +645,7 @@ async def update_config(
 
 @app.get("/tenant-config", response_model=TenantConfigResponse)
 async def get_tenant_config_endpoint(
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = get_current_user_from_header(authorization, db)
@@ -662,7 +666,7 @@ async def get_tenant_config_endpoint(
 @app.put("/tenant-config", response_model=TenantConfigResponse)
 async def update_tenant_config_endpoint(
     request: TenantConfigUpdate,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = get_current_user_from_header(authorization, db)
@@ -681,7 +685,7 @@ async def update_tenant_config_endpoint(
 # Subscription Endpoints
 @app.get("/subscription")
 async def get_subscription(
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = get_current_user_from_header(authorization, db)
@@ -706,7 +710,7 @@ async def get_subscription(
 # Admin Endpoints
 @app.get("/admin/users", response_model=List[AdminUserResponse])
 async def list_users(
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = get_current_user_from_header(authorization, db)
@@ -739,7 +743,7 @@ async def list_users(
 @app.post("/admin/users/{user_id}/toggle")
 async def toggle_user(
     user_id: int,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     admin = get_current_user_from_header(authorization, db)
@@ -761,7 +765,7 @@ async def toggle_user(
 async def extend_trial(
     user_id: int,
     days: int = 7,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     admin = get_current_user_from_header(authorization, db)
@@ -789,15 +793,16 @@ async def extend_trial(
 @app.post("/admin/users/{user_id}/set-plan")
 async def set_plan(
     user_id: int,
-    plan: str,
-    authorization: Optional[str] = None,
+    request: AdminSetPlanRequest,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     admin = get_current_user_from_header(authorization, db)
-    
+    plan = request.plan
+
     if admin.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
-    
+
     if plan not in ["trial", "starter", "pro", "enterprise"]:
         raise HTTPException(status_code=400, detail="Invalid plan")
     
@@ -836,7 +841,7 @@ async def set_plan(
 
 @app.get("/admin/stats", response_model=AdminStats)
 async def get_admin_stats(
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     admin = get_current_user_from_header(authorization, db)
@@ -884,7 +889,7 @@ async def get_admin_stats(
 async def update_user(
     user_id: int,
     request: AdminUserUpdate,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     admin = get_current_user_from_header(authorization, db)
@@ -924,7 +929,7 @@ async def update_user(
 @app.delete("/admin/users/{user_id}")
 async def delete_user(
     user_id: int,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     admin = get_current_user_from_header(authorization, db)
@@ -945,7 +950,7 @@ async def delete_user(
 
 @app.get("/admin/subscriptions", response_model=List[SubscriptionResponse])
 async def list_subscriptions(
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     admin = get_current_user_from_header(authorization, db)
@@ -961,7 +966,7 @@ async def list_subscriptions(
 async def update_subscription(
     sub_id: int,
     request: SubscriptionUpdate,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     admin = get_current_user_from_header(authorization, db)
@@ -992,7 +997,7 @@ async def update_subscription(
 # Campaign Endpoints
 @app.get("/campaigns")
 async def get_campaigns(
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
@@ -1012,7 +1017,7 @@ async def get_campaigns(
 @app.post("/campaigns/{campaign_id}/toggle")
 async def toggle_campaign(
     campaign_id: str,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
@@ -1028,7 +1033,7 @@ async def toggle_campaign(
 @app.post("/agent/optimize", response_model=AgentResponse)
 async def optimize_campaigns(
     request: AgentRequest,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
@@ -1060,7 +1065,7 @@ async def optimize_campaigns(
 @app.post("/agent/finance", response_model=AgentResponse)
 async def run_finance_agent(
     request: AgentRequest,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
@@ -1091,7 +1096,7 @@ async def run_finance_agent(
 @app.post("/agent/scripts", response_model=AgentResponse)
 async def generate_scripts(
     request: AgentRequest,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
@@ -1122,7 +1127,7 @@ async def generate_scripts(
 @app.post("/agent/creatives", response_model=AgentResponse)
 async def analyze_creatives(
     request: AgentRequest,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
@@ -1153,7 +1158,7 @@ async def analyze_creatives(
 @app.post("/agent/growth", response_model=AgentResponse)
 async def get_growth_strategy(
     request: AgentRequest,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
@@ -1184,7 +1189,7 @@ async def get_growth_strategy(
 @app.post("/agent/cro", response_model=AgentResponse)
 async def get_cro_advice(
     request: AgentRequest,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
@@ -1215,7 +1220,7 @@ async def get_cro_advice(
 @app.post("/agent/landing-audit", response_model=AgentResponse)
 async def audit_landing_page(
     request: AgentRequest,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
@@ -1249,7 +1254,7 @@ async def audit_landing_page(
 @app.post("/agent/full-audit", response_model=AgentResponse)
 async def full_audit(
     request: AgentRequest,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
@@ -1307,7 +1312,7 @@ async def full_audit(
 @app.post("/agent/analytics", response_model=AgentResponse)
 async def run_analytics_agent(
     request: AgentRequest,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     """Run GA4 analytics analysis agent."""
@@ -1348,7 +1353,7 @@ async def run_analytics_agent(
 @app.get("/analytics/data")
 async def get_analytics_data(
     days: int = 30,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     """Get raw GA4 data for dashboard display."""
@@ -1376,7 +1381,7 @@ async def get_analytics_data(
 @app.post("/agent/playbook/copywriter", response_model=AgentResponse)
 async def run_playbook_copywriter(
     request: PlaybookCopywriterRequest,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     """Run Playbook Copywriter - Genera copy para landing page, anuncios y email sequence."""
@@ -1412,7 +1417,7 @@ async def run_playbook_copywriter(
 @app.post("/agent/playbook/design", response_model=AgentResponse)
 async def run_playbook_design(
     request: PlaybookDesignRequest,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     """Run Playbook Design - Genera mockups, auditoría de conversión y estrategia de colores."""
@@ -1448,7 +1453,7 @@ async def run_playbook_design(
 @app.post("/agent/playbook/social-media", response_model=AgentResponse)
 async def run_playbook_social_media(
     request: PlaybookSocialMediaRequest,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     """Run Playbook Social Media - TikTok orgánico + variaciones de creativos para Meta Ads."""
@@ -1488,7 +1493,7 @@ async def run_playbook_social_media(
 async def get_autonomous_actions(
     limit: int = 50,
     status: Optional[str] = None,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     """Get history of autonomous actions (last 50 by default)."""
@@ -1520,7 +1525,7 @@ async def get_autonomous_actions(
 @app.post("/autonomous/actions/{action_id}/approve")
 async def approve_action(
     action_id: int,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     """Admin approves an autonomous action (e.g., scale budget)."""
@@ -1554,7 +1559,7 @@ async def approve_action(
 @app.post("/autonomous/actions/{action_id}/reject")
 async def reject_action(
     action_id: int,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     """Admin rejects an autonomous action."""
@@ -1581,7 +1586,7 @@ async def reject_action(
 @app.post("/agent/run", response_model=AgentResponse)
 async def run_agent(
     request: AgentRunRequest,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
@@ -1633,7 +1638,7 @@ async def run_agent(
 @app.post("/finance/upload")
 async def upload_financial_data(
     file: UploadFile = File(...),
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
@@ -1672,7 +1677,7 @@ async def upload_financial_data(
 
 @app.get("/finance/records", response_model=List[FinancialRecordResponse])
 async def get_financial_records(
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
@@ -1686,7 +1691,7 @@ async def get_financial_records(
 
 @app.get("/financials", response_model=List[FinancialRecordResponse])
 async def get_financials(
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
@@ -1701,7 +1706,7 @@ async def get_financials(
 @app.post("/financials", response_model=FinancialRecordResponse)
 async def create_financial_record(
     request: FinancialRecordCreate,
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
@@ -1725,7 +1730,7 @@ async def create_financial_record(
 @app.post("/financials/upload")
 async def upload_financial_records(
     file: UploadFile = File(...),
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
@@ -1775,7 +1780,7 @@ async def shopify_webhook(
 
 @app.get("/orders", response_model=List[ShopifyOrderResponse])
 async def get_orders(
-    authorization: Optional[str] = None,
+    authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)

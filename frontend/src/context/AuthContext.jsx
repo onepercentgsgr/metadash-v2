@@ -36,7 +36,7 @@ export function AuthProvider({ children }) {
     try {
       setLoading(true);
       const response = await api.login(email, password);
-      const { access_token, user_id, email: userEmail } = response;
+      const { access_token, user_id, email: userEmail, role } = response;
 
       localStorage.setItem('token', access_token);
       setToken(access_token);
@@ -46,7 +46,7 @@ export function AuthProvider({ children }) {
         ...response,
       });
 
-      return { success: true };
+      return { success: true, role: role || 'client' };
     } catch (error) {
       return { success: false, error: error.message };
     } finally {

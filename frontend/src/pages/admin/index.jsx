@@ -44,8 +44,17 @@ export default function AdminPage() {
         api.getUsers(),
         api.getStats(),
       ]);
-      if (usersData.status === 'fulfilled') setUsers(usersData.value);
-      if (statsData.status === 'fulfilled') setStats(statsData.value);
+      if (usersData.status === 'fulfilled') {
+        setUsers(Array.isArray(usersData.value) ? usersData.value : []);
+      } else {
+        console.error('Failed to load users:', usersData.reason);
+        setError('Error cargando usuarios: ' + (usersData.reason?.message || 'Error desconocido'));
+      }
+      if (statsData.status === 'fulfilled') {
+        setStats(statsData.value);
+      } else {
+        console.error('Failed to load stats:', statsData.reason);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
