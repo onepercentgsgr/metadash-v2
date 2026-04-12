@@ -440,21 +440,37 @@ def startup_event():
             db.add(admin)
             db.commit()
             db.refresh(admin)
-            
+
             # Create admin tenant config
             tenant_config = TenantConfig(user_id=admin.id)
             db.add(tenant_config)
-            
+
             # Create admin trial subscription
-            trial_end = datetime.utcnow() + timedelta(days=7)
+            trial_end = datetime.utcnow() + timedelta(days=365)
             subscription = Subscription(
                 user_id=admin.id,
-                plan="trial",
+                plan="enterprise",
                 status="active",
                 trial_start=datetime.utcnow(),
                 trial_end=trial_end,
             )
             db.add(subscription)
+            db.commit()
+        elif admin.role != "admin":
+            # If admin email user exists but isn't admin yet, upgrade them
+            admin.role = "admin"
+            admin.is_active = True
+            db.commit()
+            logger.info(f"Upgraded {admin_email} to admin role")
+
+        # Ensure admin has enterprise plan (not trial)
+        admin_sub = db.query(Subscription).filter(
+            Subscription.user_id == admin.id
+        ).order_by(Subscription.created_at.desc()).first()
+        if admin_sub and admin_sub.plan == "trial":
+            admin_sub.plan = "enterprise"
+            admin_sub.status = "active"
+            admin_sub.trial_end = datetime.utcnow() + timedelta(days=365)
             db.commit()
     finally:
         db.close()
