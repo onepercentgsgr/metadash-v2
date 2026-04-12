@@ -50,7 +50,7 @@ export default function HomePage() {
               Login
             </Link>
             <Link
-              href="/signup"
+              href="/register"
               className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg font-medium transition"
             >
               Registrarse
@@ -82,7 +82,7 @@ export default function HomePage() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
             <Link
-              href="/signup"
+              href="/register"
               className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 rounded-xl font-semibold text-lg transition transform hover:scale-105 flex items-center justify-center gap-2"
             >
               Comenzar Gratis <ArrowIcon className="w-5 h-5" />
@@ -283,7 +283,7 @@ export default function HomePage() {
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
-              href="/signup"
+              href="/register"
               className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 rounded-xl font-semibold text-lg transition flex items-center justify-center gap-2"
             >
               Registrarse Gratis <ArrowIcon className="w-5 h-5" />
