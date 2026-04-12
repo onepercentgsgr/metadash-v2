@@ -34,29 +34,35 @@ Base.metadata.create_all(bind=engine)
 # Create FastAPI app
 app = FastAPI(title="MetaDash API", version="1.0.0")
 
-# Setup CORS with secure defaults
-def _get_cors_origins() -> List[str]:
-    """
-    Get CORS origins from environment variable.
-    Format: comma-separated list of origins (e.g., "http://localhost:3000,https://example.com")
-    Falls back to localhost only in development if not specified.
-    """
-    allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
+# Setup CORS — hardcoded production URLs + env var extras
+# This ensures CORS ALWAYS works regardless of Railway env var config
+HARDCODED_ORIGINS = [
+    "https://metadash-v2-n2em-git-master-one-percents-projects.vercel.app",
+    "https://metadash-v2-n2em.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:3001",
+]
 
+
+def _get_cors_origins() -> List[str]:
+    origins = set(HARDCODED_ORIGINS)
+
+    # Add any extra origins from ALLOWED_ORIGINS env var
+    allowed_origins_env = os.getenv("ALLOWED_ORIGINS", "")
     if allowed_origins_env:
-        # Parse comma-separated origins from environment
-        origins = [origin.strip() for origin in allowed_origins_env.split(",") if origin.strip()]
-        logger.info(f"CORS origins loaded from ALLOWED_ORIGINS: {origins}")
-        return origins
-    else:
-        # Development fallback: only localhost
-        is_production = os.getenv("ENVIRONMENT", "development").lower() == "production"
-        if is_production:
-            logger.warning("ALLOWED_ORIGINS not set in production. Using Vercel URL.")
-            return ["https://metadash-v2-n2em-git-master-one-percents-projects.vercel.app", "https://metadash-v2-n2em.vercel.app", "http://localhost:3000"]
-        else:
-            logger.info("ALLOWED_ORIGINS not set. Using development default: http://localhost:3000")
-            return ["http://localhost:3000"]
+        for origin in allowed_origins_env.split(","):
+            cleaned = origin.strip().rstrip("/")
+            if cleaned:
+                origins.add(cleaned)
+
+    # Add FRONTEND_URL if set
+    frontend_url = os.getenv("FRONTEND_URL", "")
+    if frontend_url:
+        origins.add(frontend_url.strip().rstrip("/"))
+
+    result = list(origins)
+    logger.info(f"CORS origins: {result}")
+    return result
 
 
 cors_origins = _get_cors_origins()
@@ -65,8 +71,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Include payment routes
