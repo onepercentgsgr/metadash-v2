@@ -13,6 +13,7 @@ export function Layout({ children }) {
   const navItems = [
     { label: 'Dashboard', path: '/dashboard', icon: '📊' },
     { label: 'Agentes IA', path: '/agents', icon: '🤖' },
+    { label: 'Playbook Nivel Dios', path: '/playbook', icon: '📚' },
     { label: 'Auditoría', path: '/audit', icon: '🔍' },
     { label: 'Finanzas', path: '/financials', icon: '💰' },
     { label: 'Configuración', path: '/settings', icon: '⚙️' },

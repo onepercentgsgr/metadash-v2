@@ -6,6 +6,9 @@ from .creative_director import analyze_creatives
 from .landing_auditor import audit_landing_page
 from .orchestrator import run_full_audit
 from .analytics_advisor import analyze_analytics, get_ga4_summary_for_agents, fetch_ga4_data
+from .copywriter_agent import generate_landing_page_copy, generate_ad_scripts, generate_email_sequence, run_copywriter_analysis
+from .design_agent import generate_mockup_strategy, generate_landing_optimization_audit, generate_color_psychology_strategy, run_design_analysis
+from .social_media_agent import generate_tiktok_strategy, generate_creative_variations, generate_scaling_strategy, run_social_media_analysis
 
 __all__ = [
     "analyze_campaigns",
@@ -19,4 +22,17 @@ __all__ = [
     "analyze_analytics",
     "get_ga4_summary_for_agents",
     "fetch_ga4_data",
+    # Playbook Nivel Dios Agents
+    "generate_landing_page_copy",
+    "generate_ad_scripts",
+    "generate_email_sequence",
+    "run_copywriter_analysis",
+    "generate_mockup_strategy",
+    "generate_landing_optimization_audit",
+    "generate_color_psychology_strategy",
+    "run_design_analysis",
+    "generate_tiktok_strategy",
+    "generate_creative_variations",
+    "generate_scaling_strategy",
+    "run_social_media_analysis",
 ]

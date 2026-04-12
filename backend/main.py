@@ -259,6 +259,41 @@ class ShopifyOrderResponse(BaseModel):
         from_attributes = True
 
 
+# ── Playbook Nivel Dios Models ──
+
+class PlaybookCopywriterRequest(BaseModel):
+    nicho: str
+    audience: str
+    pain_point: str
+    mechanism_name: str
+    mechanism_description: str
+    price: float = 17
+    bonos: List[str] = []
+    tone: str = "cercano, humilde y motivador"
+
+
+class PlaybookDesignRequest(BaseModel):
+    product_type: str  # "PDF", "VIDEO", "TEMPLATE", "CURSO"
+    product_name: str
+    nicho: str
+    price: float = 17
+    headline: str = ""
+    pain_point: str = ""
+    emotion_target: str = "trust"
+
+
+class PlaybookSocialMediaRequest(BaseModel):
+    nicho: str
+    pain_point: str
+    mechanism_name: str
+    audience: str
+    hook: str = ""
+    angle_type: str = "pain"
+    format_type: str = "9x16"
+    winning_creative_stats: Optional[Dict[str, Any]] = None
+    current_budget: float = 10
+
+
 # Utility Functions
 def hash_password(password: str) -> str:
     # bcrypt has a 72-byte limit, truncate to prevent ValueError
@@ -1334,6 +1369,117 @@ async def get_analytics_data(
     except Exception as e:
         logger.error(f"GA4 data fetch error: {type(e).__name__}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching analytics: {str(e)}")
+
+
+# ── Playbook Nivel Dios Endpoints ──
+
+@app.post("/agent/playbook/copywriter", response_model=AgentResponse)
+async def run_playbook_copywriter(
+    request: PlaybookCopywriterRequest,
+    authorization: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Run Playbook Copywriter - Genera copy para landing page, anuncios y email sequence."""
+    user = await check_subscription(authorization, db)
+
+    try:
+        from agents import run_copywriter_analysis
+        result = await run_copywriter_analysis({
+            "nicho": request.nicho,
+            "audience": request.audience,
+            "pain_point": request.pain_point,
+            "mechanism_name": request.mechanism_name,
+            "mechanism_description": request.mechanism_description,
+            "price": request.price,
+            "bonos": request.bonos,
+            "tone": request.tone,
+        })
+
+        log_entry = AgentLog(
+            user_id=user.id, agent_type="playbook_copywriter",
+            input_summary=f"Copywriter: {request.nicho}",
+            output=str(result)[:500],
+        )
+        db.add(log_entry)
+        db.commit()
+
+        return AgentResponse(result=result, agent="Playbook Copywriter")
+    except Exception as e:
+        logger.error(f"Playbook Copywriter error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en Copywriter: {str(e)}")
+
+
+@app.post("/agent/playbook/design", response_model=AgentResponse)
+async def run_playbook_design(
+    request: PlaybookDesignRequest,
+    authorization: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Run Playbook Design - Genera mockups, auditoría de conversión y estrategia de colores."""
+    user = await check_subscription(authorization, db)
+
+    try:
+        from agents import run_design_analysis
+        result = await run_design_analysis({
+            "product_type": request.product_type,
+            "product_name": request.product_name,
+            "nicho": request.nicho,
+            "price": request.price,
+            "headline": request.headline,
+            "pain_point": request.pain_point,
+            "emotion_target": request.emotion_target,
+            "bonos": [],
+        })
+
+        log_entry = AgentLog(
+            user_id=user.id, agent_type="playbook_design",
+            input_summary=f"Design: {request.product_name}",
+            output=str(result)[:500],
+        )
+        db.add(log_entry)
+        db.commit()
+
+        return AgentResponse(result=result, agent="Playbook Design")
+    except Exception as e:
+        logger.error(f"Playbook Design error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en Design: {str(e)}")
+
+
+@app.post("/agent/playbook/social-media", response_model=AgentResponse)
+async def run_playbook_social_media(
+    request: PlaybookSocialMediaRequest,
+    authorization: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Run Playbook Social Media - TikTok orgánico + variaciones de creativos para Meta Ads."""
+    user = await check_subscription(authorization, db)
+
+    try:
+        from agents import run_social_media_analysis
+        result = await run_social_media_analysis({
+            "nicho": request.nicho,
+            "pain_point": request.pain_point,
+            "mechanism_name": request.mechanism_name,
+            "audience": request.audience,
+            "hook": request.hook,
+            "angle_type": request.angle_type,
+            "format_type": request.format_type,
+            "winning_creative_stats": request.winning_creative_stats,
+            "current_budget": request.current_budget,
+        })
+
+        log_entry = AgentLog(
+            user_id=user.id, agent_type="playbook_social_media",
+            input_summary=f"Social Media: {request.nicho}",
+            output=str(result)[:500],
+        )
+        db.add(log_entry)
+        db.commit()
+
+        return AgentResponse(result=result, agent="Playbook Social Media")
+    except Exception as e:
+        logger.error(f"Playbook Social Media error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en Social Media: {str(e)}")
 
 
 # ── Autonomous Actions Endpoints ──
