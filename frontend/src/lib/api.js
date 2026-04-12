@@ -81,7 +81,11 @@ export const api = {
     }),
 
   // Agent endpoints
-  runOptimizer: () => apiFetch("/agent/optimizer", { method: "POST" }),
+  runOptimizer: (payload) =>
+    apiFetch("/agent/optimize", {
+      method: "POST",
+      body: JSON.stringify(payload || { prompt: "", context: {} }),
+    }),
 
   runFinance: (payload) =>
     apiFetch("/agent/finance", {
@@ -111,7 +115,20 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
-  runFullAudit: () => apiFetch("/agent/full-audit", { method: "POST" }),
+  runFullAudit: (payload) =>
+    apiFetch("/agent/full-audit", {
+      method: "POST",
+      body: JSON.stringify(payload || { prompt: "", context: {} }),
+    }),
+
+  // Google Analytics endpoints
+  runAnalytics: (days = 30) =>
+    apiFetch("/agent/analytics", {
+      method: "POST",
+      body: JSON.stringify({ prompt: "", context: { days } }),
+    }),
+
+  getAnalyticsData: (days = 30) => apiFetch(`/analytics/data?days=${days}`),
 
   // Admin endpoints
   getUsers: () => apiFetch("/admin/users"),

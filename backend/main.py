@@ -127,6 +127,8 @@ class TenantConfigUpdate(BaseModel):
     shopify_store_url: Optional[str] = None
     shopify_webhook_secret: Optional[str] = None
     mercadopago_access_token: Optional[str] = None
+    ga4_property_id: Optional[str] = None
+    ga4_credentials_json: Optional[dict] = None
 
 
 class TenantConfigResponse(BaseModel):
@@ -143,6 +145,8 @@ class TenantConfigResponse(BaseModel):
     shopify_store_url: Optional[str] = None
     shopify_webhook_secret: Optional[str] = None
     mercadopago_access_token: Optional[str] = None
+    ga4_property_id: Optional[str] = None
+    ga4_credentials_json: Optional[dict] = None
 
     class Config:
         from_attributes = True
@@ -975,15 +979,15 @@ async def optimize_campaigns(
 ):
     user = await check_subscription(authorization, db)
     config_obj = get_tenant_config(user.id, db)
-    
+
     if not config_obj.anthropic_api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
-    
-    # Call optimizer agent
+
     try:
-        result = "Optimizer agent analysis - placeholder"
-        
-        # Log the result
+        from agents import analyze_campaigns as run_optimizer
+        campaigns_data = (request.context or {}).get("campaigns_data", [])
+        result = run_optimizer(campaigns_data, config_obj.negocio_info or "", config_obj.anthropic_api_key)
+
         log_entry = AgentLog(
             user_id=user.id,
             agent_type="optimizer",
@@ -992,48 +996,42 @@ async def optimize_campaigns(
         )
         db.add(log_entry)
         db.commit()
-        
-        return AgentResponse(
-            result=result,
-            agent="Campaign Optimizer",
-        )
+
+        return AgentResponse(result=result, agent="Campaign Optimizer")
     except Exception as e:
-        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
-        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
+        logger.error(f"Optimizer agent error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en agente optimizador: {str(e)}")
 
 
 @app.post("/agent/finance", response_model=AgentResponse)
-async def analyze_finances(
+async def run_finance_agent(
     request: AgentRequest,
     authorization: Optional[str] = None,
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
     config_obj = get_tenant_config(user.id, db)
-    
+
     if not config_obj.anthropic_api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
-    
+
     try:
-        result = "Finance agent analysis - placeholder"
-        
-        # Log the result
+        from agents import analyze_finances as run_finance
+        financial_data = (request.context or {}).get("financial_data", {})
+        result = run_finance(financial_data, config_obj.negocio_info or "", config_obj.anthropic_api_key)
+
         log_entry = AgentLog(
-            user_id=user.id,
-            agent_type="finance",
+            user_id=user.id, agent_type="finance",
             input_summary=request.prompt[:100] if request.prompt else "Financial analysis",
             output=str(result)[:1000],
         )
         db.add(log_entry)
         db.commit()
-        
-        return AgentResponse(
-            result=result,
-            agent="Finance Analyst",
-        )
+
+        return AgentResponse(result=result, agent="Finance Analyst")
     except Exception as e:
-        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
-        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
+        logger.error(f"Finance agent error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en agente financiero: {str(e)}")
 
 
 @app.post("/agent/scripts", response_model=AgentResponse)
@@ -1049,25 +1047,22 @@ async def generate_scripts(
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
     
     try:
-        result = "Generated scripts - placeholder"
-        
-        # Log the result
+        from agents import generate_scripts as run_scripts
+        brief = request.prompt or "Generate ad scripts for current campaigns"
+        result = run_scripts(brief, config_obj.negocio_info or "", config_obj.anthropic_api_key)
+
         log_entry = AgentLog(
-            user_id=user.id,
-            agent_type="script_gen",
+            user_id=user.id, agent_type="script_gen",
             input_summary=request.prompt[:100] if request.prompt else "Script generation",
             output=str(result)[:1000],
         )
         db.add(log_entry)
         db.commit()
-        
-        return AgentResponse(
-            result=result,
-            agent="Script Generator",
-        )
+
+        return AgentResponse(result=result, agent="Script Generator")
     except Exception as e:
-        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
-        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
+        logger.error(f"Script agent error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en agente de scripts: {str(e)}")
 
 
 @app.post("/agent/creatives", response_model=AgentResponse)
@@ -1083,25 +1078,22 @@ async def analyze_creatives(
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
     
     try:
-        result = "Creative analysis - placeholder"
-        
-        # Log the result
+        from agents import analyze_creatives as run_creatives
+        creatives_data = (request.context or {}).get("creatives_data", [])
+        result = run_creatives(creatives_data, config_obj.negocio_info or "", config_obj.anthropic_api_key)
+
         log_entry = AgentLog(
-            user_id=user.id,
-            agent_type="creative_director",
+            user_id=user.id, agent_type="creative_director",
             input_summary=request.prompt[:100] if request.prompt else "Creative analysis",
             output=str(result)[:1000],
         )
         db.add(log_entry)
         db.commit()
-        
-        return AgentResponse(
-            result=result,
-            agent="Creative Director",
-        )
+
+        return AgentResponse(result=result, agent="Creative Director")
     except Exception as e:
-        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
-        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
+        logger.error(f"Creative agent error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en agente creativo: {str(e)}")
 
 
 @app.post("/agent/growth", response_model=AgentResponse)
@@ -1117,25 +1109,22 @@ async def get_growth_strategy(
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
     
     try:
-        result = "Growth strategy - placeholder"
-        
-        # Log the result
+        from agents import get_growth_strategy as run_growth
+        context_data = request.context or {}
+        result = run_growth(context_data, config_obj.negocio_info or "", config_obj.anthropic_api_key)
+
         log_entry = AgentLog(
-            user_id=user.id,
-            agent_type="advisor",
+            user_id=user.id, agent_type="advisor",
             input_summary=request.prompt[:100] if request.prompt else "Growth strategy",
             output=str(result)[:1000],
         )
         db.add(log_entry)
         db.commit()
-        
-        return AgentResponse(
-            result=result,
-            agent="Growth Advisor",
-        )
+
+        return AgentResponse(result=result, agent="Growth Advisor")
     except Exception as e:
-        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
-        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
+        logger.error(f"Growth agent error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en agente de growth: {str(e)}")
 
 
 @app.post("/agent/cro", response_model=AgentResponse)
@@ -1151,25 +1140,22 @@ async def get_cro_advice(
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
     
     try:
-        result = "CRO advice - placeholder"
-        
-        # Log the result
+        from agents import get_cro_advice as run_cro
+        context_data = request.context or {}
+        result = run_cro(context_data, config_obj.negocio_info or "", config_obj.anthropic_api_key)
+
         log_entry = AgentLog(
-            user_id=user.id,
-            agent_type="advisor",
+            user_id=user.id, agent_type="cro",
             input_summary=request.prompt[:100] if request.prompt else "CRO analysis",
             output=str(result)[:1000],
         )
         db.add(log_entry)
         db.commit()
-        
-        return AgentResponse(
-            result=result,
-            agent="CRO Advisor",
-        )
+
+        return AgentResponse(result=result, agent="CRO Advisor")
     except Exception as e:
-        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
-        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
+        logger.error(f"CRO agent error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en agente CRO: {str(e)}")
 
 
 @app.post("/agent/landing-audit", response_model=AgentResponse)
@@ -1184,29 +1170,26 @@ async def audit_landing_page(
     if not config_obj.anthropic_api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
     
-    if not config_obj.landing_page_url:
+    landing_url = (request.context or {}).get("landing_page_url", "") or config_obj.landing_page_url
+    if not landing_url:
         raise HTTPException(status_code=400, detail="Landing page URL not configured")
-    
+
     try:
-        result = "Landing page audit - placeholder"
-        
-        # Log the result
+        from agents import audit_landing_page as run_landing
+        result = run_landing(landing_url, config_obj.negocio_info or "", config_obj.anthropic_api_key)
+
         log_entry = AgentLog(
-            user_id=user.id,
-            agent_type="landing_page_auditor",
-            input_summary=config_obj.landing_page_url,
+            user_id=user.id, agent_type="landing_page_auditor",
+            input_summary=landing_url,
             output=str(result)[:1000],
         )
         db.add(log_entry)
         db.commit()
-        
-        return AgentResponse(
-            result=result,
-            agent="Landing Page Auditor",
-        )
+
+        return AgentResponse(result=result, agent="Landing Page Auditor")
     except Exception as e:
-        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
-        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
+        logger.error(f"Landing audit error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en auditoría de landing: {str(e)}")
 
 
 @app.post("/agent/full-audit", response_model=AgentResponse)
@@ -1222,25 +1205,116 @@ async def full_audit(
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
 
     try:
-        result = "Full audit - all agents coordinated - placeholder"
+        from agents import run_full_audit as run_orchestrator
+        ctx = request.context or {}
 
-        # Log the result
+        # Gather GA4 summary if configured
+        ga4_summary = ""
+        if config_obj.ga4_property_id and config_obj.ga4_credentials_json:
+            try:
+                from agents import get_ga4_summary_for_agents
+                ga4_summary = get_ga4_summary_for_agents(
+                    config_obj.ga4_property_id,
+                    config_obj.ga4_credentials_json,
+                )
+            except Exception as ga_err:
+                logger.warning(f"GA4 data fetch failed (non-blocking): {ga_err}")
+                ga4_summary = "[GA4 no disponible]"
+
+        result = run_orchestrator(
+            campaigns_data=ctx.get("campaigns_data", []),
+            creatives_data=ctx.get("creatives_data", []),
+            financial_data=ctx.get("financial_data", {}),
+            landing_url=config_obj.landing_page_url or "",
+            negocio_info=config_obj.negocio_info or "",
+            api_key=config_obj.anthropic_api_key,
+        )
+
+        # Append GA4 context to result if available
+        if ga4_summary and "[GA4 no disponible]" not in ga4_summary:
+            result = result + "\n\n---\n\n" + ga4_summary
+
         log_entry = AgentLog(
-            user_id=user.id,
-            agent_type="orchestrator",
-            input_summary="Full business audit",
+            user_id=user.id, agent_type="orchestrator",
+            input_summary="Full business audit (with GA4)" if ga4_summary else "Full business audit",
             output=str(result)[:1000],
         )
         db.add(log_entry)
         db.commit()
 
-        return AgentResponse(
-            result=result,
-            agent="Orchestrator",
-        )
+        return AgentResponse(result=result, agent="Orchestrator")
     except Exception as e:
-        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
-        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
+        logger.error(f"Orchestrator error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en auditoría completa: {str(e)}")
+
+
+# ── Google Analytics 4 Endpoints ──
+
+@app.post("/agent/analytics", response_model=AgentResponse)
+async def run_analytics_agent(
+    request: AgentRequest,
+    authorization: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Run GA4 analytics analysis agent."""
+    user = await check_subscription(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+
+    if not config_obj.anthropic_api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+    if not config_obj.ga4_property_id or not config_obj.ga4_credentials_json:
+        raise HTTPException(status_code=400, detail="Google Analytics 4 not configured. Add GA4 Property ID and Service Account credentials in Settings.")
+
+    try:
+        from agents import analyze_analytics
+        days = (request.context or {}).get("days", 30)
+        result = analyze_analytics(
+            property_id=config_obj.ga4_property_id,
+            ga4_credentials=config_obj.ga4_credentials_json,
+            negocio_info=config_obj.negocio_info or "",
+            api_key=config_obj.anthropic_api_key,
+            days=days,
+            landing_url=config_obj.landing_page_url or "",
+        )
+
+        log_entry = AgentLog(
+            user_id=user.id, agent_type="analytics",
+            input_summary=f"GA4 analysis ({days} days)",
+            output=str(result)[:1000],
+        )
+        db.add(log_entry)
+        db.commit()
+
+        return AgentResponse(result=result, agent="Analytics Advisor")
+    except Exception as e:
+        logger.error(f"Analytics agent error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en agente de analytics: {str(e)}")
+
+
+@app.get("/analytics/data")
+async def get_analytics_data(
+    days: int = 30,
+    authorization: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Get raw GA4 data for dashboard display."""
+    user = await check_subscription(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+
+    if not config_obj.ga4_property_id or not config_obj.ga4_credentials_json:
+        raise HTTPException(status_code=400, detail="Google Analytics 4 not configured")
+
+    try:
+        from agents import fetch_ga4_data
+        data = fetch_ga4_data(config_obj.ga4_property_id, config_obj.ga4_credentials_json, days)
+        if "error" in data:
+            raise HTTPException(status_code=502, detail=f"GA4 API error: {data['error']}")
+        return data
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"GA4 data fetch error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching analytics: {str(e)}")
 
 
 @app.post("/agent/run", response_model=AgentResponse)

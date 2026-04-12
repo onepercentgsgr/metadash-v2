@@ -75,6 +75,17 @@ const AGENTS = [
     tag: 'CRO',
     examples: ['Puntos de fricción', 'Copy persuasivo', 'Trust signals'],
   },
+  {
+    id: 'analytics',
+    name: 'Google Analytics Advisor',
+    icon: '📊',
+    description: 'Analiza tráfico, conversiones, fuentes y comportamiento de usuarios con datos reales de GA4',
+    color: 'blue',
+    endpoint: 'analytics',
+    hasInput: false,
+    tag: 'Analytics',
+    examples: ['Fuentes de tráfico', 'Bounce rate', 'Correlación Meta ↔ GA4'],
+  },
 ];
 
 const colorMap = {
@@ -119,6 +130,13 @@ const colorMap = {
     button: 'bg-sky-600 hover:bg-sky-500',
     result: 'border-sky-700/40 bg-sky-950/20',
     icon: 'bg-sky-900/30',
+  },
+  blue: {
+    card: 'hover:border-blue-700/50',
+    tag: 'bg-blue-900/30 text-blue-300 border-blue-700/30',
+    button: 'bg-blue-600 hover:bg-blue-500',
+    result: 'border-blue-700/40 bg-blue-950/20',
+    icon: 'bg-blue-900/30',
   },
 };
 

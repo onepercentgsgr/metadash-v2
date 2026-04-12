@@ -16,6 +16,8 @@ export default function SettingsPage() {
   // Track which fields user has actually modified
   const modifiedFields = useRef(new Set());
 
+  const [ga4File, setGa4File] = useState(null);
+
   const [formData, setFormData] = useState({
     meta_access_token: '',
     meta_ad_account_id: '',
@@ -28,6 +30,7 @@ export default function SettingsPage() {
     shopify_store_url: '',
     shopify_webhook_secret: '',
     mercadopago_access_token: '',
+    ga4_property_id: '',
   });
 
   useEffect(() => {
@@ -58,6 +61,24 @@ export default function SettingsPage() {
     }));
   }
 
+  function handleGa4FileChange(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const json = JSON.parse(ev.target.result);
+        setGa4File(json);
+        modifiedFields.current.add('ga4_credentials_json');
+        setSuccess('Archivo de credenciales GA4 cargado');
+        setTimeout(() => setSuccess(''), 3000);
+      } catch {
+        setError('El archivo no es un JSON válido');
+      }
+    };
+    reader.readAsText(file);
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
@@ -68,7 +89,11 @@ export default function SettingsPage() {
       // Only send fields that the user actually modified
       const payload = {};
       modifiedFields.current.forEach(field => {
-        payload[field] = formData[field];
+        if (field === 'ga4_credentials_json') {
+          payload.ga4_credentials_json = ga4File;
+        } else {
+          payload[field] = formData[field];
+        }
       });
 
       if (Object.keys(payload).length === 0) {
@@ -80,7 +105,7 @@ export default function SettingsPage() {
       await api.updateConfig(payload);
       setSuccess('Configuración guardada exitosamente');
       modifiedFields.current.clear();
-      // Refresh to get updated masked values
+      setGa4File(null);
       await fetchConfig();
       setTimeout(() => setSuccess(''), 4000);
     } catch (err) {
@@ -136,6 +161,15 @@ export default function SettingsPage() {
         { name: 'negocio_info', label: 'Descripción del Negocio', type: 'textarea', help: 'Describe tu negocio, productos, público objetivo, etc. Cuanto más detalle, mejores los análisis.' },
         { name: 'landing_page_url', label: 'URL Landing Page', type: 'url', help: 'URL principal de tu landing — el auditor la analiza automáticamente' },
       ],
+    },
+    {
+      title: 'Google Analytics 4',
+      icon: '📊',
+      description: 'Conecta GA4 para que los agentes analicen tráfico, conversiones y comportamiento de usuarios',
+      fields: [
+        { name: 'ga4_property_id', label: 'GA4 Property ID', type: 'text', help: 'ID numérico de tu propiedad GA4 (ej: 123456789)' },
+      ],
+      customContent: 'ga4_upload',
     },
     {
       title: 'Shopify',
@@ -198,6 +232,30 @@ export default function SettingsPage() {
               </div>
 
               <div className="p-5 pt-2 space-y-4">
+                {section.customContent === 'ga4_upload' && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-300 mb-1.5">
+                      Credenciales de Service Account (JSON)
+                      {config?.ga4_credentials_json && (
+                        <span className="ml-2 text-xs text-green-400 font-normal">Configurado</span>
+                      )}
+                    </label>
+                    <div className="flex items-center gap-3">
+                      <label className="flex-1 cursor-pointer bg-gray-800/80 border border-dashed border-gray-600 rounded-lg px-4 py-3 text-sm text-gray-400 hover:border-indigo-500 hover:text-indigo-400 transition-colors text-center">
+                        {ga4File ? '✓ Archivo cargado' : 'Subir archivo JSON de Service Account'}
+                        <input
+                          type="file"
+                          accept=".json"
+                          onChange={handleGa4FileChange}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Creá una Service Account en Google Cloud Console con acceso a GA4 y descargá el JSON
+                    </p>
+                  </div>
+                )}
                 {section.fields.map((field) => {
                   const val = formData[field.name] || '';
                   const masked = isMasked(val) && !modifiedFields.current.has(field.name);
