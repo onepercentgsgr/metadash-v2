@@ -351,7 +351,7 @@ def get_current_user(
 
 
 def get_current_user_from_header(
-    authorization: Optional[str] = Header(None),
+    authorization: Optional[str] = None,
     db: Session = Depends(get_db),
 ) -> User:
     if not authorization:
@@ -398,7 +398,7 @@ def get_active_subscription(user_id: int, db: Session) -> Subscription:
 
 
 async def check_subscription(
-    authorization: Optional[str] = Header(None),
+    authorization: Optional[str] = None,
     db: Session = Depends(get_db),
 ) -> User:
     user = get_current_user_from_header(authorization, db)
