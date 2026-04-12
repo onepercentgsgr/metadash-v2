@@ -54,13 +54,10 @@ export default function DashboardPage() {
   const [campaigns, setCampaigns] = useState([]);
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [ga4Data, setGa4Data] = useState(null);
-  const [autonomousActions, setAutonomousActions] = useState([]);
   const [configStatus, setConfigStatus] = useState({
     meta: 'disconnected',
     anthropic: 'disconnected',
     landing: 'disconnected',
-    ga4: 'disconnected',
   });
 
   useEffect(() => {
@@ -70,33 +67,20 @@ export default function DashboardPage() {
   async function loadAll() {
     setLoading(true);
     try {
-      const [configData, campaignData, financeData, autonomousData] = await Promise.allSettled([
+      const [configData, campaignData, financeData] = await Promise.allSettled([
         api.getConfig(),
         api.getCampaigns('last_7d'),
         api.getRecords(),
-        api.getAutonomousActions(20),
       ]);
 
       if (configData.status === 'fulfilled') {
         const c = configData.value;
         setConfig(c);
-        const hasGa4 = !!(c.ga4_property_id && c.ga4_credentials_json);
         setConfigStatus({
           meta: c.meta_access_token && c.meta_ad_account_id ? 'connected' : (c.meta_access_token || c.meta_ad_account_id ? 'partial' : 'disconnected'),
           anthropic: c.anthropic_api_key ? 'connected' : 'disconnected',
           landing: c.landing_page_url ? 'connected' : 'disconnected',
-          ga4: hasGa4 ? 'connected' : 'disconnected',
         });
-
-        // Fetch GA4 data if configured
-        if (hasGa4) {
-          try {
-            const gaData = await api.apiFetch('/analytics/data?days=30');
-            setGa4Data(gaData);
-          } catch (gaErr) {
-            console.warn('GA4 data fetch failed:', gaErr);
-          }
-        }
       }
 
       if (campaignData.status === 'fulfilled' && Array.isArray(campaignData.value)) {
@@ -105,10 +89,6 @@ export default function DashboardPage() {
 
       if (financeData.status === 'fulfilled' && Array.isArray(financeData.value)) {
         setRecords(financeData.value);
-      }
-
-      if (autonomousData.status === 'fulfilled' && Array.isArray(autonomousData.value)) {
-        setAutonomousActions(autonomousData.value);
       }
     } catch (err) {
       console.error('Dashboard load error:', err);
@@ -160,27 +140,20 @@ export default function DashboardPage() {
         {/* Connection Status */}
         <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
           <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Estado de Conexiones</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
               <div className="flex items-center gap-3">
                 <span className="text-xl">📱</span>
-                <span className="text-sm text-gray-300">Meta Ads</span>
+                <span className="text-sm text-gray-300">Meta Ads API</span>
               </div>
               <StatusBadge status={configStatus.meta} />
             </div>
             <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
               <div className="flex items-center gap-3">
                 <span className="text-xl">🤖</span>
-                <span className="text-sm text-gray-300">Agentes IA</span>
+                <span className="text-sm text-gray-300">Agentes IA (Anthropic)</span>
               </div>
               <StatusBadge status={configStatus.anthropic} />
-            </div>
-            <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">📊</span>
-                <span className="text-sm text-gray-300">Google Analytics</span>
-              </div>
-              <StatusBadge status={configStatus.ga4} />
             </div>
             <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
               <div className="flex items-center gap-3">
@@ -230,72 +203,6 @@ export default function DashboardPage() {
             />
           </div>
         </div>
-
-        {/* Google Analytics Section */}
-        {ga4Data && ga4Data.overview && (
-          <div>
-            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Google Analytics 4 — Últimos 30 días</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-              <MetricCard
-                icon="👥"
-                label="Sesiones"
-                value={ga4Data.overview.sessions?.toLocaleString() || '—'}
-                color="blue"
-              />
-              <MetricCard
-                icon="🧑"
-                label="Usuarios"
-                value={ga4Data.overview.totalUsers?.toLocaleString() || '—'}
-                subtitle={`${ga4Data.overview.newUsers?.toLocaleString() || 0} nuevos`}
-                color="indigo"
-              />
-              <MetricCard
-                icon="↩️"
-                label="Bounce Rate"
-                value={ga4Data.overview.bounceRate ? `${(ga4Data.overview.bounceRate * 100).toFixed(1)}%` : '—'}
-                color={ga4Data.overview.bounceRate > 0.6 ? 'red' : ga4Data.overview.bounceRate > 0.4 ? 'yellow' : 'green'}
-              />
-              <MetricCard
-                icon="🎯"
-                label="Conversiones"
-                value={ga4Data.overview.conversions?.toLocaleString() || '0'}
-                color="green"
-              />
-              <MetricCard
-                icon="📄"
-                label="PageViews"
-                value={ga4Data.overview.screenPageViews?.toLocaleString() || '—'}
-                color="purple"
-              />
-            </div>
-
-            {/* Traffic Sources */}
-            {ga4Data.traffic_sources && ga4Data.traffic_sources.length > 0 && (
-              <div className="mt-4 bg-gray-900/80 border border-gray-800 rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-gray-300 mb-3">Fuentes de Tráfico</h3>
-                <div className="space-y-2">
-                  {ga4Data.traffic_sources.slice(0, 5).map((src, i) => {
-                    const maxSessions = ga4Data.traffic_sources[0]?.sessions || 1;
-                    const pct = ((src.sessions / maxSessions) * 100).toFixed(0);
-                    return (
-                      <div key={i} className="flex items-center gap-3">
-                        <div className="w-32 text-sm text-gray-400 truncate">{src.channel}</div>
-                        <div className="flex-1 bg-gray-800 rounded-full h-2.5">
-                          <div
-                            className="bg-indigo-500 h-2.5 rounded-full transition-all"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <div className="text-xs text-gray-400 w-20 text-right">{src.sessions.toLocaleString()} ses.</div>
-                        <div className="text-xs text-gray-500 w-16 text-right">{src.conversions} conv</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Campaigns Overview + Quick Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -405,64 +312,6 @@ export default function DashboardPage() {
                   </div>
                 </>
               ))}
-            </div>
-          </div>
-        )}
-
-        {/* Autonomous Actions */}
-        {autonomousActions.length > 0 && (
-          <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
-            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
-              🤖 Acciones Autónomas — Últimas 24h
-            </h2>
-            <div className="space-y-3 max-h-64 overflow-y-auto">
-              {autonomousActions.slice(0, 10).map((action) => {
-                const statusColors = {
-                  pending: 'bg-yellow-900/30 border-yellow-700/40 text-yellow-300',
-                  approved: 'bg-blue-900/30 border-blue-700/40 text-blue-300',
-                  executed: 'bg-green-900/30 border-green-700/40 text-green-300',
-                  failed: 'bg-red-900/30 border-red-700/40 text-red-300',
-                  cancelled: 'bg-gray-700/30 border-gray-600/40 text-gray-400',
-                };
-
-                return (
-                  <div
-                    key={action.id}
-                    className={`border rounded-lg p-3 ${statusColors[action.status] || 'bg-gray-800/40 border-gray-700/40 text-gray-300'}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="text-sm font-medium">{action.description}</div>
-                        <div className="text-xs opacity-75 mt-0.5">{action.triggered_by} • {action.target}</div>
-                      </div>
-                      <span className="text-xs font-medium px-2 py-1 bg-black/30 rounded">
-                        {action.status === 'pending' ? '⏳' : '✓'} {action.status.toUpperCase()}
-                      </span>
-                    </div>
-
-                    {action.status === 'pending' && action.requires_approval && (
-                      <div className="flex gap-2 mt-2">
-                        <button
-                          onClick={() => {
-                            api.approveAutonomousAction(action.id).then(() => loadAll());
-                          }}
-                          className="flex-1 text-xs px-2 py-1 bg-green-600 hover:bg-green-500 rounded transition-colors"
-                        >
-                          ✓ Aprobar
-                        </button>
-                        <button
-                          onClick={() => {
-                            api.rejectAutonomousAction(action.id).then(() => loadAll());
-                          }}
-                          className="flex-1 text-xs px-2 py-1 bg-red-600 hover:bg-red-500 rounded transition-colors"
-                        >
-                          ✕ Rechazar
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
             </div>
           </div>
         )}

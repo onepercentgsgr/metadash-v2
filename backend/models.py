@@ -108,3 +108,24 @@ class ShopifyOrder(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="shopify_orders")
+
+
+class AutonomousActionLog(Base):
+    __tablename__ = "autonomous_action_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    action_type = Column(String)  # "pause_campaign", "scale_budget", "rotate_creative", "alert", etc.
+    status = Column(String, default="pending")  # "pending", "approved", "executed", "failed", "cancelled"
+    target = Column(String)  # "campaign_123" or "adset_456"
+    description = Column(Text)  # Human-readable: "Paused Campaign X due to CPA > $50"
+    details = Column(JSON, nullable=True)  # Full data: {campaign_id, old_budget, new_budget, reason, metrics}
+    result = Column(Text, nullable=True)  # Response from Meta API or error message
+    triggered_by = Column(String)  # Which agent triggered it: "optimizer", "creative_director", etc.
+    requires_approval = Column(Boolean, default=False)
+    approved_by = Column(String, nullable=True)  # user_id of admin who approved
+    approved_at = Column(DateTime, nullable=True)
+    executed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    user = relationship("User")

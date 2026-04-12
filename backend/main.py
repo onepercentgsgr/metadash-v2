@@ -14,7 +14,7 @@ import io
 import logging
 
 from database import engine, get_db, Base
-from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder
+from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog
 import config
 
 logger = logging.getLogger(__name__)
@@ -413,6 +413,25 @@ def startup_event():
             db.commit()
     finally:
         db.close()
+
+    # Start autonomous scheduler
+    try:
+        from jobs.scheduler import schedule_autonomous_audits
+        schedule_autonomous_audits()
+    except ImportError:
+        logger.warning("Jobs module not available, autonomous audits disabled")
+    except Exception as e:
+        logger.error(f"Error starting scheduler: {str(e)}")
+
+
+# Shutdown Event
+@app.on_event("shutdown")
+def shutdown_event():
+    try:
+        from jobs.scheduler import stop_scheduler
+        stop_scheduler()
+    except:
+        pass
 
 
 # Health Endpoints
@@ -1315,6 +1334,102 @@ async def get_analytics_data(
     except Exception as e:
         logger.error(f"GA4 data fetch error: {type(e).__name__}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error fetching analytics: {str(e)}")
+
+
+# ── Autonomous Actions Endpoints ──
+
+@app.get("/autonomous/actions")
+async def get_autonomous_actions(
+    limit: int = 50,
+    status: Optional[str] = None,
+    authorization: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Get history of autonomous actions (last 50 by default)."""
+    user = await check_subscription(authorization, db)
+
+    query = db.query(AutonomousActionLog).filter(AutonomousActionLog.user_id == user.id)
+    if status:
+        query = query.filter(AutonomousActionLog.status == status)
+
+    actions = query.order_by(AutonomousActionLog.created_at.desc()).limit(limit).all()
+
+    return [
+        {
+            "id": a.id,
+            "action_type": a.action_type,
+            "status": a.status,
+            "target": a.target,
+            "description": a.description,
+            "triggered_by": a.triggered_by,
+            "requires_approval": a.requires_approval,
+            "approved_by": a.approved_by,
+            "created_at": a.created_at.isoformat(),
+            "executed_at": a.executed_at.isoformat() if a.executed_at else None,
+        }
+        for a in actions
+    ]
+
+
+@app.post("/autonomous/actions/{action_id}/approve")
+async def approve_action(
+    action_id: int,
+    authorization: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Admin approves an autonomous action (e.g., scale budget)."""
+    user = await check_subscription(authorization, db)
+
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can approve actions")
+
+    action = db.query(AutonomousActionLog).filter(AutonomousActionLog.id == action_id).first()
+    if not action:
+        raise HTTPException(status_code=404, detail="Action not found")
+
+    if action.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Action is already {action.status}")
+
+    # Mark as approved
+    action.status = "approved"
+    action.approved_by = str(user.id)
+    action.approved_at = datetime.utcnow()
+
+    # TODO: Here you would actually execute the action in Meta Ads API
+    # For now, just mark as approved
+    # action.status = "executed"
+    # action.executed_at = datetime.utcnow()
+
+    db.commit()
+
+    return {"status": "approved", "action_id": action_id, "approved_at": action.approved_at}
+
+
+@app.post("/autonomous/actions/{action_id}/reject")
+async def reject_action(
+    action_id: int,
+    authorization: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """Admin rejects an autonomous action."""
+    user = await check_subscription(authorization, db)
+
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only admins can reject actions")
+
+    action = db.query(AutonomousActionLog).filter(AutonomousActionLog.id == action_id).first()
+    if not action:
+        raise HTTPException(status_code=404, detail="Action not found")
+
+    if action.status != "pending":
+        raise HTTPException(status_code=400, detail=f"Action is already {action.status}")
+
+    action.status = "cancelled"
+    action.approved_by = str(user.id)
+    action.approved_at = datetime.utcnow()
+    db.commit()
+
+    return {"status": "rejected", "action_id": action_id}
 
 
 @app.post("/agent/run", response_model=AgentResponse)

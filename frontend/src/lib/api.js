@@ -130,6 +130,18 @@ export const api = {
 
   getAnalyticsData: (days = 30) => apiFetch(`/analytics/data?days=${days}`),
 
+  // Autonomous actions endpoints
+  getAutonomousActions: (limit = 50, status = null) => {
+    const url = `/autonomous/actions?limit=${limit}${status ? `&status=${status}` : ''}`;
+    return apiFetch(url);
+  },
+
+  approveAutonomousAction: (actionId) =>
+    apiFetch(`/autonomous/actions/${actionId}/approve`, { method: "POST" }),
+
+  rejectAutonomousAction: (actionId) =>
+    apiFetch(`/autonomous/actions/${actionId}/reject`, { method: "POST" }),
+
   // Admin endpoints
   getUsers: () => apiFetch("/admin/users"),
 
