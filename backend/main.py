@@ -317,14 +317,19 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 def verify_token(token: str) -> dict:
     try:
+        logger.debug(f"verify_token: Decoding token, length={len(token)}, starts_with={token[:20] if len(token) > 20 else token}")
         payload = jwt.decode(token, config.SECRET_KEY, algorithms=[config.ALGORITHM])
         user_id: int = payload.get("sub")
         if user_id is None:
+            logger.error("verify_token: No 'sub' field in JWT payload")
             raise HTTPException(status_code=401, detail="Invalid token")
+        logger.debug(f"verify_token: Token verified for user_id={user_id}")
         return {"user_id": user_id}
     except jwt.ExpiredSignatureError:
+        logger.warning("verify_token: Token expired")
         raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
+    except jwt.InvalidTokenError as e:
+        logger.error(f"verify_token: Invalid token - {type(e).__name__}: {str(e)}")
         raise HTTPException(status_code=401, detail="Invalid token")
 
 
@@ -350,20 +355,31 @@ def get_current_user_from_header(
     db: Session = Depends(get_db),
 ) -> User:
     if not authorization:
+        logger.error("get_current_user_from_header: No authorization header received")
         raise HTTPException(status_code=401, detail="No authorization header")
-    
+
     try:
+        logger.debug(f"get_current_user_from_header: Authorization header present, length={len(authorization)}")
         token = authorization.replace("Bearer ", "")
+        if not token or len(token) < 10:
+            logger.error(f"get_current_user_from_header: Token extraction failed or too short: {len(token) if token else 0}")
+            raise HTTPException(status_code=401, detail="Invalid token format")
+
         payload = verify_token(token)
         user_id = payload.get("user_id")
-        
+
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
+            logger.error(f"get_current_user_from_header: User not found for id={user_id}")
             raise HTTPException(status_code=404, detail="User not found")
-        
+
+        logger.debug(f"get_current_user_from_header: Successfully authenticated user={user.email}")
         return user
     except HTTPException:
         raise
+    except Exception as e:
+        logger.error(f"get_current_user_from_header: Unexpected error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=401, detail="Authentication failed")
 
 
 def get_tenant_config(user_id: int, db: Session) -> TenantConfig:
