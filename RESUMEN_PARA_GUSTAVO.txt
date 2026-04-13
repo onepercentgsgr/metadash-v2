@@ -1,0 +1,67 @@
+🚀 METADASH - RESUMEN EJECUTIVO PARA GUSTAVO
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ NECESITAS HACER 2 COSAS ÚNICAMENTE:                                │
+└─────────────────────────────────────────────────────────────────────┘
+
+1️⃣ VERCEL (Frontend) - Actualizar 1 variable
+
+   Abre: https://vercel.com/dashboard
+   Proyecto: metadash-v2
+   Settings → Environment Variables
+
+   Busca: NEXT_PUBLIC_API_URL
+   Cambia a: https://api.skyeleven.com.ar
+
+   ✅ Listo → Vercel hace redeploy automático
+
+2️⃣ RAILWAY (Backend) - Actualizar 1 variable
+
+   Abre: https://railway.app
+   Proyecto: MetaDash → Backend
+   Variables (Environment)
+
+   Busca: FRONTEND_URL
+   Cambia a: https://metadash.skyeleven.com.ar
+
+   ✅ Listo → Click "Deploy"
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ CLOUDFLARE - CONFIGURAR DNS (en tu zona skyeleven.com.ar)         │
+└─────────────────────────────────────────────────────────────────────┘
+
+Ve a: https://dash.cloudflare.com → skyeleven.com.ar → DNS
+
+Agrega 1 CNAME:
+
+  Name:   metadash
+  Target: metadash-v2-git-master-onepercentgsgr.vercel.app
+  Proxy:  Proxied (naranja)
+
+(Opcional - para API en subdominio):
+  Name:   api
+  Target: [Tu dominio de Railway, ver paso 1]
+  Proxy:  DNS only (gris)
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ PRUEBAS - Después de 15 minutos                                   │
+└─────────────────────────────────────────────────────────────────────┘
+
+✅ Abre: https://metadash.skyeleven.com.ar
+✅ Click en "Comienza Gratis"
+✅ Registra un usuario test
+✅ Debe ir a onboarding
+✅ Login con: onepercent.gsgr@gmail.com
+✅ Debes ver admin panel
+✅ Debes ver lista de usuarios registrados
+
+¿Falla algo? Lee: INSTRUCCIONES_DOMINIO_GUSTAVO.txt (más detallado)
+
+═══════════════════════════════════════════════════════════════════════
+
+📌 RECUERDA:
+   - Frontend URL: https://metadash.skyeleven.com.ar
+   - Backend URL:  https://api.skyeleven.com.ar (o sin /api)
+   - Admin:        https://metadash.skyeleven.com.ar/admin
+
+═══════════════════════════════════════════════════════════════════════

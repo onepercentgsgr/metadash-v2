@@ -1,0 +1,237 @@
+═══════════════════════════════════════════════════════════════════════════════
+INSTRUCCIONES PARA CONFIGURAR metadash.skyeleven.com.ar
+(Paso a paso para Gustavo - No romper nada 🚀)
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 RESUMEN RÁPIDO
+───────────────────────────────────────────────────────────────────────────────
+MetaDash tiene 2 partes que necesitan estar accesibles:
+✅ FRONTEND: Vercel (interfaz visual)
+✅ BACKEND: Railway (API Rest)
+
+Ambos deben estar bajo metadash.skyeleven.com.ar para que funcione perfectamente.
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 1️⃣: OBTENER LAS URLs DE VERCEL Y RAILWAY
+═══════════════════════════════════════════════════════════════════════════════
+
+VERCEL (Frontend)
+─────────────────
+1. Abre: https://vercel.com/dashboard
+2. Busca el proyecto "metadash-v2" o similar
+3. En los Settings, busca "Domains"
+4. Anota el dominio actual (ej: metadash-v2-n2em.vercel.app)
+5. TAMBIEN ANOTA: "metadash-v2-git-master-onepercentgsgr.vercel.app" (rama master)
+
+RAILWAY (Backend)
+─────────────────
+1. Abre: https://railway.app/dashboard
+2. Busca el proyecto de MetaDash
+3. Click en el deployment del backend
+4. En Settings → Domain
+5. Genera un dominio público si aún no tiene
+6. Anota ese dominio (ej: metadash-api-prod.up.railway.app)
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 2️⃣: CONFIGURAR DNS EN CLOUDFLARE
+═══════════════════════════════════════════════════════════════════════════════
+
+(Esto lo haces en Cloudflare donde administras skyeleven.com.ar)
+
+1. Abre: https://dash.cloudflare.com
+2. Busca tu zona "skyeleven.com.ar"
+3. Ve a la sección "DNS"
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ REGISTRO 1️⃣: Para el Frontend                                       │
+├─────────────────────────────────────────────────────────────────────┤
+│ Type:   CNAME                                                       │
+│ Name:   metadash (o el subdominio que uses)                        │
+│ Target: [EL_DOMINIO_DE_VERCEL_QUE_ANOTASTE_ARRIBA]                 │
+│ TTL:    Auto                                                        │
+│ Proxy:  Proxied (nube naranja)                                      │
+└─────────────────────────────────────────────────────────────────────┘
+
+EJEMPLO:
+  Name:   metadash
+  Target: metadash-v2-git-master-onepercentgsgr.vercel.app
+
+RESULTADO: metadash.skyeleven.com.ar → apunta al frontend en Vercel
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ REGISTRO 2️⃣: Para el Backend (OPCIONAL pero recomendado)           │
+├─────────────────────────────────────────────────────────────────────┤
+│ Type:   CNAME                                                       │
+│ Name:   api (o metadash-api)                                       │
+│ Target: [EL_DOMINIO_DE_RAILWAY_QUE_ANOTASTE_ARRIBA]               │
+│ TTL:    Auto                                                        │
+│ Proxy:  DNS only (nube gris) ← IMPORTANTE: No proxied             │
+└─────────────────────────────────────────────────────────────────────┘
+
+EJEMPLO:
+  Name:   api
+  Target: metadash-api-prod.up.railway.app
+
+RESULTADO: api.skyeleven.com.ar → apunta al backend en Railway
+
+⏱️ Espera 5-15 minutos para que los DNS se propaguen. Mientras tanto, haz el paso 3.
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 3️⃣: ACTUALIZAR VARIABLES DE ENTORNO EN VERCEL
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Abre Vercel → proyecto metadash-v2
+2. Settings → Environment Variables
+3. Busca o crea la variable: NEXT_PUBLIC_API_URL
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ VARIABLE: NEXT_PUBLIC_API_URL                                       │
+├─────────────────────────────────────────────────────────────────────┤
+│ Valor actual: https://metadash-backend.up.railway.app (o similar)  │
+│ Valor nuevo:  https://api.skyeleven.com.ar                         │
+└─────────────────────────────────────────────────────────────────────┘
+
+⚠️  IMPORTANTE:
+  - Si metiste "api.skyeleven.com.ar" en el CNAME de Cloudflare, usa ese
+  - Si NO metiste subdominio "api", entonces usa: https://metadash.skyeleven.com.ar/api
+  - Vercel automáticamente hace redeploy después de cambiar variables
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 4️⃣: ACTUALIZAR VARIABLES DE ENTORNO EN RAILWAY (Backend)
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Abre Railway → proyecto MetaDash → Backend
+2. Variables → Environment
+3. Busca o crea la variable: FRONTEND_URL
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ VARIABLE: FRONTEND_URL                                              │
+├─────────────────────────────────────────────────────────────────────┤
+│ Valor actual: https://metadash.vercel.app (o similar)              │
+│ Valor nuevo:  https://metadash.skyeleven.com.ar                    │
+└─────────────────────────────────────────────────────────────────────┘
+
+⚠️  IMPORTANTE:
+  - Este es el dominio del FRONTEND, tal como lo configuraste en Cloudflare
+  - Se usa para redirecciones y URLs de callback de pagos
+
+4. Click en "Deploy" o espera a que Railway haga redeploy automático
+
+═══════════════════════════════════════════════════════════════════════════════
+PASO 5️⃣: ACTUALIZAR URLs DE CALLBACK (Meta & Pagos)
+═══════════════════════════════════════════════════════════════════════════════
+
+Si estás usando Meta/Facebook Ads o pagos (Stripe/MercadoPago):
+
+FACEBOOK/META (Si integración está activa)
+──────────────────────────────────────────
+1. Abre: https://developers.facebook.com
+2. Busca tu App de MetaDash
+3. Settings → Basic
+4. Actualiza el campo "App Domains":
+   ✅ Agregar: metadash.skyeleven.com.ar
+   ❌ Remover o desactivar: antiguo dominio si lo había
+
+5. Settings → Productos → Facebook Login → Valid OAuth Redirect URIs:
+   ✅ Agregar: https://metadash.skyeleven.com.ar/auth/callback
+   ❌ Remover antiguo si existe
+
+STRIPE (Si integración está activa)
+───────────────────────────────────
+1. Abre: https://dashboard.stripe.com
+2. Settings → Authorized domains
+3. ✅ Agregar: metadash.skyeleven.com.ar
+4. Settings → Webhooks
+5. Endpoint URL debe ser: https://api.skyeleven.com.ar/payments/stripe/webhook
+   (O sin subdominio "api": https://metadash.skyeleven.com.ar/payments/stripe/webhook)
+
+MERCADOPAGO (Si integración está activa)
+─────────────────────────────────────────
+1. Abre: https://www.mercadopago.com.ar/developers/panel
+2. Busca tus aplicaciones
+3. URLs de redirección:
+   ✅ Agregar: https://metadash.skyeleven.com.ar/auth/callback
+   ❌ Remover antiguo
+
+═══════════════════════════════════════════════════════════════════════════════
+✅ CHECKLIST FINAL (Después de 15-30 minutos)
+═══════════════════════════════════════════════════════════════════════════════
+
+Abre tu navegador en modo incógnito (sin cache) y testa lo siguiente:
+
+□ Abre https://metadash.skyeleven.com.ar
+  ✅ Debes ver la landing page de MetaDash
+  ❌ Si ves error 404 o conexión rechazada → DNS no propagó aún
+
+□ Click en "Comienza Gratis" o "Registrarse"
+  ✅ Forma de registro debe verse
+  ❌ Si hay error de CORS → NEXT_PUBLIC_API_URL está mal configurado
+
+□ Completa el registro con un email test
+  Email: test@test.com.ar
+  ✅ Debes ser redirigido a /onboarding
+  ✅ En la consola (F12 → Network), los requests a la API deben ir a api.skyeleven.com.ar
+  ❌ Si hay error 500 → Revisar Railway logs
+
+□ Completa el onboarding (5 pasos)
+  ✅ Debes poder ir al dashboard
+
+□ Login con el usuario admin
+  Email: onepercent.gsgr@gmail.com
+  Password: [tu password]
+  ✅ Debes ver el Admin Panel
+  ✅ En /admin debes ver la lista de usuarios
+  ❌ Si ves error "No authorization header" → TOKEN no se está pasando
+
+□ En Admin Panel, busca al usuario test que creaste
+  ✅ Debes verlo en la lista
+
+═══════════════════════════════════════════════════════════════════════════════
+🚨 TROUBLESHOOTING - SI ALGO FALLA
+═══════════════════════════════════════════════════════════════════════════════
+
+Problema: "ERR_NAME_NOT_FOUND" o "No internet connection"
+Solución: DNS aún no propagó. Espera 15-30 minutos más.
+         Verifica que el CNAME esté bien en Cloudflare.
+
+Problema: "Error de CORS" en la consola
+Solución: NEXT_PUBLIC_API_URL en Vercel está mal.
+         Revisa que apunta a https://api.skyeleven.com.ar (o lo que configuraste)
+
+Problema: "API Error: 500" al registrarse
+Solución: Revisa los logs en Railway → Backend
+         Probablemente DATABASE_URL o credenciales de pago están mal
+
+Problema: "No authorization header" en Admin Panel
+Solución: El token no se está pasando en el header.
+         Abre F12 → Network, haz un request a /admin/users
+         Verifica que el header "Authorization" esté presente
+
+Problema: Registración funciona pero login falla
+Solución: Token en localStorage puede estar corrupto.
+         Limpiar datos del sitio: F12 → Application → Local Storage → delete
+
+═══════════════════════════════════════════════════════════════════════════════
+📋 RESUMEN DE CAMBIOS HECHOS EN EL CÓDIGO
+═══════════════════════════════════════════════════════════════════════════════
+
+El código está listo. No necesita cambios adicionales. Lo único que debes hacer:
+
+✅ Vercel:  NEXT_PUBLIC_API_URL = https://api.skyeleven.com.ar
+✅ Railway: FRONTEND_URL = https://metadash.skyeleven.com.ar
+✅ Cloudflare: CNAME records apuntando a Vercel y Railway
+
+Todo lo demás ya está configurado en el código.
+
+═══════════════════════════════════════════════════════════════════════════════
+🎯 URLS FINALES QUE DEBERÍA TENER
+═══════════════════════════════════════════════════════════════════════════════
+
+Frontend:   https://metadash.skyeleven.com.ar
+Backend API: https://api.skyeleven.com.ar (o https://metadash.skyeleven.com.ar/api)
+Admin Panel: https://metadash.skyeleven.com.ar/admin
+Dashboard:  https://metadash.skyeleven.com.ar/dashboard
+
+═══════════════════════════════════════════════════════════════════════════════
+✨ Una vez esté todo listo, MetaDash estará 100% operativo con tu dominio
+═══════════════════════════════════════════════════════════════════════════════
