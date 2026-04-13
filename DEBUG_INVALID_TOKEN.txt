@@ -1,0 +1,122 @@
+═══════════════════════════════════════════════════════════════════════════════
+DEBUGGING: Error "Invalid token" en Admin Panel
+═══════════════════════════════════════════════════════════════════════════════
+
+🔍 SÍNTOMAS
+───────────────────────────────────────────────────────────────────────────────
+- Admin panel carga
+- Pero dice: "Error cargando usuarios: Invalid token"
+- Devtools muestra: "Failed to load resource: the server responded with a status of 401"
+
+📋 PASOS PARA DIAGNOSTICAR
+───────────────────────────────────────────────────────────────────────────────
+
+1️⃣ VER LOS LOGS EN RAILWAY
+   ───────────────────────────────────────────────────────────────────────
+   1. Abre: https://railway.app/dashboard
+   2. Busca tu proyecto MetaDash
+   3. Click en "Backend" deployment
+   4. Abre la pestaña "Logs"
+   5. Busca líneas que digan:
+      - "verify_token:"
+      - "get_current_user_from_header:"
+      - "Invalid token"
+
+   ¿Qué debería ver?
+   Si el token es realmente inválido, verás algo como:
+
+   ❌ MALO:
+      ERROR verify_token: Invalid token - InvalidSignatureError: ...
+
+   ✅ BUENO (si todo fuera a funcionar):
+      DEBUG verify_token: Token verified for user_id=1
+      DEBUG get_current_user_from_header: Successfully authenticated user=...
+
+2️⃣ REVISAR SI EL SECRET_KEY ESTÁ CONFIGURADO
+   ───────────────────────────────────────────────────────────────────────
+   1. En Railway → Backend → Variables (Environment)
+   2. Busca la variable: SECRET_KEY
+   3. ¿Está presente? Si no está, el servidor no podría iniciar.
+   4. Si está, asegúrate que su valor sea **consistente y NO cambie**
+      (Si cambias SECRET_KEY, todos los tokens antiguos se vuelven inválidos)
+
+3️⃣ REVISAR TOKEN EN DEVTOOLS
+   ───────────────────────────────────────────────────────────────────────
+   1. Abre admin panel
+   2. Presiona F12 → Application → Local Storage
+   3. Busca la variable: "token"
+   4. ¿Está presente? ¿Tiene contenido?
+   5. El token debería verse así: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...."
+      (Empieza con "eyJ" y tiene 2 puntos que lo dividen en 3 partes)
+
+4️⃣ REVISAR REQUEST EN DEVTOOLS
+   ───────────────────────────────────────────────────────────────────────
+   1. Abre admin panel
+   2. Presiona F12 → Network
+   3. Busca el request a: GET /admin/users
+   4. Click en ese request
+   5. Ve a "Headers"
+   6. Busca el header: "Authorization"
+   7. ¿Está presente? Debería verse como:
+      Authorization: Bearer eyJhbGc...
+
+   Si dice "Bearer Bearer eyJhbGc..." → El header está duplicado
+   Si está vacío → El token no se está enviando
+   Si no existe → El header se perdió
+
+
+═══════════════════════════════════════════════════════════════════════════════
+🚀 SOLUCIONES SEGÚN EL PROBLEMA
+═══════════════════════════════════════════════════════════════════════════════
+
+SOLUCIÓN 1: Token corrupto en localStorage
+──────────────────────────────────────────
+1. Abre DevTools (F12)
+2. Application → Local Storage
+3. Busca "token" y DELETE
+4. Recarga la página
+5. Login nuevamente
+6. Intenta cargar usuarios nuevamente
+
+→ Si funciona: El problema era un token viejo/corrupto
+
+SOLUCIÓN 2: SECRET_KEY cambió en Railway
+──────────────────────────────────────────
+1. Ve a Railway → Backend → Variables
+2. Copia el valor actual de SECRET_KEY
+3. Asegúrate que sea ÚNICO y ALEATORIO (algo como: sk_prod_abc123xyz...)
+4. Copia ese valor exactamente
+5. NO lo cambies nuevamente (o todos los tokens se vuelven inválidos)
+6. Limpia localStorage (Solución 1) y login de nuevo
+
+SOLUCIÓN 3: El replace() no está removiendo "Bearer "
+───────────────────────────────────────────────────────
+(Esto es un bug raro)
+1. Abre DevTools → Network
+2. Haz una petición a /admin/users
+3. Mira el header Authorization
+4. Si ve "Bearer Bearer ..." → Hay un duplicado
+5. Si solo ve "Bearer ..." → Es correcto
+
+Si hay duplicado, el problema está en el frontend. Avísame.
+
+SOLUCIÓN 4: Token expirado
+──────────────────────────
+El token tiene un tiempo de vida de 24 horas. Si lo generaste hace más tiempo:
+1. Limpia localStorage (Solución 1)
+2. Login nuevamente
+3. El nuevo token será válido por 24h
+
+═══════════════════════════════════════════════════════════════════════════════
+📝 CHECKLIST FINAL
+═══════════════════════════════════════════════════════════════════════════════
+
+□ He limpiado localStorage del token
+□ He hecho logout y login nuevamente
+□ He revisado los logs en Railway
+□ He revisado que SECRET_KEY esté configurado en Railway
+□ He revisado el header Authorization en Devtools → Network
+
+¿Sigue fallando? Avísame qué ves en los logs de Railway y el token en localStorage.
+
+═══════════════════════════════════════════════════════════════════════════════
