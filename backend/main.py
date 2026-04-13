@@ -126,8 +126,6 @@ class TenantConfigUpdate(BaseModel):
     shopify_store_url: Optional[str] = None
     shopify_webhook_secret: Optional[str] = None
     mercadopago_access_token: Optional[str] = None
-    ga4_property_id: Optional[str] = None
-    ga4_credentials_json: Optional[dict] = None
 
 
 class TenantConfigResponse(BaseModel):
@@ -144,8 +142,6 @@ class TenantConfigResponse(BaseModel):
     shopify_store_url: Optional[str] = None
     shopify_webhook_secret: Optional[str] = None
     mercadopago_access_token: Optional[str] = None
-    ga4_property_id: Optional[str] = None
-    ga4_credentials_json: Optional[dict] = None
 
     class Config:
         from_attributes = True
@@ -1282,9 +1278,10 @@ async def full_audit(
         from agents import run_full_audit as run_orchestrator
         ctx = request.context or {}
 
-        # Gather GA4 summary if configured
+        # Gather GA4 summary if configured (optional, non-blocking)
         ga4_summary = ""
-        if config_obj.ga4_property_id and config_obj.ga4_credentials_json:
+        if (hasattr(config_obj, 'ga4_property_id') and hasattr(config_obj, 'ga4_credentials_json') and
+            config_obj.ga4_property_id and config_obj.ga4_credentials_json):
             try:
                 from agents import get_ga4_summary_for_agents
                 ga4_summary = get_ga4_summary_for_agents(
@@ -1336,7 +1333,8 @@ async def run_analytics_agent(
 
     if not config_obj.anthropic_api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
-    if not config_obj.ga4_property_id or not config_obj.ga4_credentials_json:
+    if not (hasattr(config_obj, 'ga4_property_id') and hasattr(config_obj, 'ga4_credentials_json') and
+            config_obj.ga4_property_id and config_obj.ga4_credentials_json):
         raise HTTPException(status_code=400, detail="Google Analytics 4 not configured. Add GA4 Property ID and Service Account credentials in Settings.")
 
     try:
@@ -1375,7 +1373,8 @@ async def get_analytics_data(
     user = await check_subscription(authorization, db)
     config_obj = get_tenant_config(user.id, db)
 
-    if not config_obj.ga4_property_id or not config_obj.ga4_credentials_json:
+    if not (hasattr(config_obj, 'ga4_property_id') and hasattr(config_obj, 'ga4_credentials_json') and
+            config_obj.ga4_property_id and config_obj.ga4_credentials_json):
         raise HTTPException(status_code=400, detail="Google Analytics 4 not configured")
 
     try:
