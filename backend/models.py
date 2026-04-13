@@ -38,8 +38,6 @@ class TenantConfig(Base):
     shopify_store_url = Column(String, nullable=True)
     shopify_webhook_secret = Column(String, nullable=True)
     mercadopago_access_token = Column(String, nullable=True)
-    ga4_property_id = Column(String, nullable=True)
-    ga4_credentials_json = Column(JSON, nullable=True)
 
     user = relationship("User", back_populates="tenant_config")
 
