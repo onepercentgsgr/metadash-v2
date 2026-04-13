@@ -1030,36 +1030,69 @@ async def update_subscription(
 # Campaign Endpoints
 @app.get("/campaigns")
 async def get_campaigns(
+    date_preset: str = "last_7d",
     authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
+    """Trae campañas REALES de Meta Ads API con métricas."""
     user = await check_subscription(authorization, db)
-    
-    # This is a placeholder - actual implementation would fetch from Meta API
     config_obj = get_tenant_config(user.id, db)
-    
+
+    if not config_obj.meta_access_token:
+        raise HTTPException(status_code=400, detail="Meta API token not configured. Go to Settings to add your Meta credentials.")
+    if not config_obj.meta_ad_account_id:
+        raise HTTPException(status_code=400, detail="Ad Account ID not configured. Go to Settings to add your Meta Ad Account ID.")
+
+    try:
+        from meta_api import get_campaigns as fetch_meta_campaigns
+        campaigns = await fetch_meta_campaigns(
+            access_token=config_obj.meta_access_token,
+            ad_account_id=config_obj.meta_ad_account_id,
+            date_preset=date_preset,
+        )
+        logger.info(f"Fetched {len(campaigns)} campaigns for user {user.id}")
+        return campaigns
+    except Exception as e:
+        logger.error(f"Meta API error for user {user.id}: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Error connecting to Meta API: {str(e)}")
+
+
+@app.post("/campaigns/action")
+async def campaign_action(
+    request: dict,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Pausar o activar una campaña en Meta Ads."""
+    user = await check_subscription(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+
+    campaign_id = request.get("campaign_id")
+    action = request.get("action", "toggle")
+
+    if not campaign_id:
+        raise HTTPException(status_code=400, detail="campaign_id is required")
     if not config_obj.meta_access_token:
         raise HTTPException(status_code=400, detail="Meta API token not configured")
-    
-    return {
-        "campaigns": [],
-        "message": "Fetch from Meta API using configured token",
-    }
 
+    try:
+        from meta_api import pause_campaign, enable_campaign
+        if action == "pause":
+            success = await pause_campaign(config_obj.meta_access_token, campaign_id)
+            new_status = "PAUSED"
+        else:
+            success = await enable_campaign(config_obj.meta_access_token, campaign_id)
+            new_status = "ACTIVE"
 
-@app.post("/campaigns/{campaign_id}/toggle")
-async def toggle_campaign(
-    campaign_id: str,
-    authorization: Optional[str] = Header(None),
-    db: Session = Depends(get_db),
-):
-    user = await check_subscription(authorization, db)
-    
-    # Placeholder implementation
-    return {
-        "campaign_id": campaign_id,
-        "status": "toggled",
-    }
+        if success:
+            return {"campaign_id": campaign_id, "status": new_status, "success": True}
+        else:
+            raise HTTPException(status_code=502, detail="Meta API returned error")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Campaign action error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Error: {str(e)}")
 
 
 # Agent Endpoints
@@ -1078,6 +1111,20 @@ async def optimize_campaigns(
     try:
         from agents import analyze_campaigns as run_optimizer
         campaigns_data = (request.context or {}).get("campaigns_data", [])
+
+        # Auto-fetch from Meta if no campaigns provided and credentials exist
+        if not campaigns_data and config_obj.meta_access_token and config_obj.meta_ad_account_id:
+            try:
+                from meta_api import get_campaigns as fetch_meta
+                campaigns_data = await fetch_meta(
+                    access_token=config_obj.meta_access_token,
+                    ad_account_id=config_obj.meta_ad_account_id,
+                    date_preset="last_7d",
+                )
+                logger.info(f"Auto-fetched {len(campaigns_data)} campaigns for optimizer agent")
+            except Exception as meta_err:
+                logger.warning(f"Auto-fetch failed (non-blocking): {meta_err}")
+
         result = run_optimizer(campaigns_data, config_obj.negocio_info or "", config_obj.anthropic_api_key)
 
         log_entry = AgentLog(
