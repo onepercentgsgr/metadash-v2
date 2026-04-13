@@ -85,24 +85,26 @@ Cada fase: Prompt copyable + AI button + checklist
 ✅ /signup 404 → Fixed links a /register
 ✅ set-plan endpoint → Agregar AdminSetPlanRequest model
 ✅ DB sin pooling → Connection pool para Railway PostgreSQL
+✅ GA4 columns mismatch → Removido de ORM models, Pydantic models, y endpoints
 
 
 🚀 ESTADO ACTUAL
 ─────────────────────────────────────────────────────────────────────────────────
 ✅ FUNCIONANDO:
   - Landing page (hero + 8 agentes showcase)
-  - Registro de clientes (crea trial automático 7 días)
-  - Login (admin + clients)
+  - Registro de clientes (crea trial automático 7 días) ← FIXED
+  - Login (admin + clients) ← FIXED
   - Admin Panel (CRUD de clientes, cambiar planes)
   - Onboarding wizard (5 pasos)
   - Dashboard (stats básicas)
   - Playbook Nivel Dios (8 fases con IA)
   - CORS (fixed)
   - Database pooling (production)
+  - Autonomous scheduler (APScheduler, cada 6h)
 
 ⚠️ PENDIENTE:
   - Meta API integration real (endpoints placeholder)
-  - GA4 integration (endpoints ready, await credentials)
+  - GA4 integration (pendiente para future release)
   - MercadoPago suscripciones automáticas (checkout OK, webhooks testing)
   - Autonomous agents validation (code ready, await cron test)
 
@@ -157,6 +159,22 @@ GitHub:   [repo URL]
 ─────────────────────────────────────────────────────────────────────────────────
 Ver: METADASH_V2_CONTEXTO_COMPLETO.md (archivo detallado en root del proyecto)
 
+
+🔧 ÚLTIMO FIX CRÍTICO (Sesión Actual)
+─────────────────────────────────────────────────────────────────────────────────
+PROBLEMA: Registro/Login retornaban 500 "API Error" porque ORM models en
+backend/models.py referenciaban columnas ga4_property_id y ga4_credentials_json
+que NO EXISTÍAN en la base de datos Railway PostgreSQL.
+
+SOLUCIÓN: Removido completamente de:
+  1. TenantConfig ORM model (backend/models.py líneas 41-42)
+  2. TenantConfigUpdate Pydantic model (backend/main.py líneas 129-130)
+  3. TenantConfigResponse Pydantic model (backend/main.py líneas 147-148)
+  4. Endpoints que checkeaban GA4 (wrapped con hasattr checks)
+
+RESULTADO: Registro ✅ Login ✅ Autonomous Scheduler ✅
+
+GA4 puede agregarse en el futuro con una migration de DB cuando esté lista.
 
 ═══════════════════════════════════════════════════════════════════════════════
 ✨ Copia este archivo + METADASH_V2_CONTEXTO_COMPLETO.md para el próximo chat
