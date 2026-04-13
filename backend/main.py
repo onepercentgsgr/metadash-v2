@@ -55,10 +55,7 @@ class ManualCORSMiddleware(BaseHTTPMiddleware):
             return response
 
         # Request normal → ejecutar y agregar CORS headers a la respuesta
-        try:
-            response = await call_next(request)
-        except Exception:
-            response = StarletteResponse(status_code=500, content="Internal Server Error")
+        response = await call_next(request)
 
         if origin:
             response.headers["Access-Control-Allow-Origin"] = origin
