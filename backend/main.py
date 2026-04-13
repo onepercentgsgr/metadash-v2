@@ -319,9 +319,15 @@ def verify_token(token: str) -> dict:
     try:
         logger.debug(f"verify_token: Decoding token, length={len(token)}, starts_with={token[:20] if len(token) > 20 else token}")
         payload = jwt.decode(token, config.SECRET_KEY, algorithms=[config.ALGORITHM])
-        user_id: int = payload.get("sub")
-        if user_id is None:
+        sub = payload.get("sub")
+        if sub is None:
             logger.error("verify_token: No 'sub' field in JWT payload")
+            raise HTTPException(status_code=401, detail="Invalid token")
+        # Convert sub to int (it's stored as string in JWT)
+        try:
+            user_id: int = int(sub)
+        except (ValueError, TypeError):
+            logger.error(f"verify_token: Invalid user_id format: {sub}")
             raise HTTPException(status_code=401, detail="Invalid token")
         logger.debug(f"verify_token: Token verified for user_id={user_id}")
         return {"user_id": user_id}
@@ -552,7 +558,7 @@ async def register(
     
     # Generate token
     access_token = create_access_token(
-        data={"sub": user.id},
+        data={"sub": str(user.id)},
         expires_delta=timedelta(hours=24),
     )
     
@@ -589,7 +595,7 @@ async def login(
     
     # Generate token
     access_token = create_access_token(
-        data={"sub": user.id},
+        data={"sub": str(user.id)},
         expires_delta=timedelta(hours=24),
     )
     
