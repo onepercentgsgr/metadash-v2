@@ -22,7 +22,7 @@ function StatCard({ label, value, icon, color }) {
 }
 
 export default function AdminPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [users, setUsers] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -33,9 +33,9 @@ export default function AdminPage() {
   const [updatingUser, setUpdatingUser] = useState(null);
 
   useEffect(() => {
-    if (user?.role !== 'admin') return;
+    if (user?.role !== 'admin' || !token) return;
     loadData();
-  }, [user]);
+  }, [user, token]);
 
   async function loadData() {
     setLoading(true);
