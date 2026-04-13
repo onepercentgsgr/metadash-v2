@@ -1,62 +1,42 @@
-# Environment variables
-.env
-.env.local
-.env.*.local
-
-# Database files
-*.db
-*.sqlite
-*.sqlite3
-
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
+*.pyo
+.env
 *.egg-info/
-.installed.cfg
-*.egg
+dist/
+build/
+.venv/
+venv/
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-*.log
-logs/
-
-# Temporary files
-*.tmp
-*.bak
-FIX_SUMMARY_*.txt
-DEBUG_*.txt
-SOLUCION_*.md
-
-# Node modules
+# Node
 node_modules/
 .next/
-dist/
-build/
+
+# DB backups
+*.sql
+*.dump
+
+# Old/Legacy folders
+.claude/
+FLORENCIA VIVAS/
+Promts ORO readmap/
+sincron.ia/
+api/
+*.bat
+
+# Documentation (keep in git but optional)
+# *.md
+# *.txt
+
+# Frontend node_modules and build
+frontend/node_modules/
+frontend/.next/
+frontend/.env.local
+
+# Backend venv and cache
+backend/.venv/
+backend/venv/
+backend/__pycache__/
+
+logs/
