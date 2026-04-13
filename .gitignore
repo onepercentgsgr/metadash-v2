@@ -1,22 +1,44 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
 # Python
 __pycache__/
 *.py[cod]
-*.pyo
-.env
-*.egg-info/
-dist/
-build/
-.venv/
+*$py.class
+*.so
+.Python
+env/
 venv/
-
-# Node
-node_modules/
-.next/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
 # IDE
 .vscode/
 .idea/
 *.swp
+*.swo
+*~
 
 # OS
 .DS_Store
@@ -26,29 +48,15 @@ Thumbs.db
 *.log
 logs/
 
-# DB backups
-*.sql
-*.dump
+# Temporary files
+*.tmp
+*.bak
+FIX_SUMMARY_*.txt
+DEBUG_*.txt
+SOLUCION_*.md
 
-# Old/Legacy folders
-.claude/
-FLORENCIA VIVAS/
-Promts ORO readmap/
-sincron.ia/
-api/
-*.bat
-
-# Documentation (keep in git but optional)
-# Uncomment if you don't want docs in git
-# *.md
-# *.txt
-
-# Frontend node_modules and build
-frontend/node_modules/
-frontend/.next/
-frontend/.env.local
-
-# Backend venv and cache
-backend/.venv/
-backend/venv/
-backend/__pycache__/
+# Node modules
+node_modules/
+.next/
+dist/
+build/
