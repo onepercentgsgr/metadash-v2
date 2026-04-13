@@ -1,0 +1,163 @@
+═══════════════════════════════════════════════════════════════════════════════
+  METADASH V2 — RESUMEN RÁPIDO PARA NUEVO CHAT
+═══════════════════════════════════════════════════════════════════════════════
+
+🎯 QUÉ ES?
+─────────────────────────────────────────────────────────────────────────────────
+SaaS de gestión de Meta Ads con 8 agentes IA autónomos.
+Escala productos digitales automáticamente siguiendo el Playbook "Nivel Dios".
+
+Tech: Next.js (Pages Router) + FastAPI + PostgreSQL + Claude Haiku 4.5
+Deploy: Vercel (frontend) + Railway (backend + DB)
+
+
+🔐 ACCESO
+─────────────────────────────────────────────────────────────────────────────────
+ADMIN LOGIN:
+  Email: onepercent.gsgr@gmail.com
+  (password en Railway var: ADMIN_PASSWORD)
+
+CLIENTES:
+  Se registran en landing → crecimiento automático 7 días
+  Redirige a /onboarding (5 pasos) → /dashboard
+
+
+🏗️ ARQUITECTURA
+─────────────────────────────────────────────────────────────────────────────────
+Frontend (Vercel):
+  - Landing page (marketing)
+  - Dashboard (user area)
+  - Playbook Nivel Dios (8 fases interactivas)
+  - Admin Panel (ver/gestionar clientes)
+  - Pricing (planes + MercadoPago)
+  - Onboarding (5 pasos)
+  - Settings (Meta token + GA4)
+
+Backend (Railway - FastAPI):
+  - Auth: JWT + bcrypt (roles: admin/client)
+  - 8 agentes IA: Optimizer, Finance, Scripts, Creatives, Growth, CRO, Landing, Orchestrator
+  - 3 agentes Playbook: Copywriter, Designer, Social Media
+  - Endpoints: /auth/*, /config, /campaigns, /agent/*, /admin/users, /payments/*, /autonomous/
+  - Scheduler: APScheduler (corre agentes cada 6 horas)
+  - CORS: ManualCORSMiddleware (refleja Origin header)
+
+Database (Railway PostgreSQL):
+  - users, subscriptions, tenant_configs
+  - agent_logs, autonomous_action_logs, financial_records, shopify_orders
+  - Connection pooling: pool_size=10, max_overflow=20, pool_recycle=1800
+
+
+🤖 AGENTES (8 Principales)
+─────────────────────────────────────────────────────────────────────────────────
+1. Campaign Optimizer    → Optimiza campañas Meta
+2. Finance Analyst       → Analiza ROI, costos, ingresos
+3. Script Generator      → Genera scripts de ads
+4. Creative Director     → Audita creativos
+5. Growth Strategist     → Estrategia de escalado
+6. CRO Advisor          → Optimización de conversión
+7. Landing Page Auditor  → Audita landing pages
+8. Orchestrator         → Auditoría completa (tous los datos)
+
++ 3 agentes Playbook (Copywriter, Designer, Social Media)
+
+
+📚 PLAYBOOK NIVEL DIOS
+─────────────────────────────────────────────────────────────────────────────────
+8 fases interactivas para escalar productos digitales en 48h (RPV > CPV):
+
+Fase 0: Niche             → Seleccionar mercado
+Fase 1: Research + Avatar → Definir target audience
+Fase 2: Stack de Oferta   → Product + 3 bonuses (value > 2x price)
+Fase 3: Landing Page      → Copy + design
+Fase 4: Mockups + Shopify → Visual + e-commerce
+Fase 5: TikTok Orgánico   → Validación pre-Meta spend
+Fase 6: Meta Ads          → RPV > CPV
+Fase 7: RPV vs CPV        → Análisis y scaling
+
+Cada fase: Prompt copyable + AI button + checklist
+
+
+🐛 BUGS ARREGLADOS
+─────────────────────────────────────────────────────────────────────────────────
+✅ Header() missing en endpoints → 42 endpoints ahora usan Header(None)
+✅ CORS destruido → ManualCORSMiddleware refleja Origin
+✅ Admin no se asignaba → Startup auto-promueve ADMIN_EMAIL a admin role
+✅ /signup 404 → Fixed links a /register
+✅ set-plan endpoint → Agregar AdminSetPlanRequest model
+✅ DB sin pooling → Connection pool para Railway PostgreSQL
+
+
+🚀 ESTADO ACTUAL
+─────────────────────────────────────────────────────────────────────────────────
+✅ FUNCIONANDO:
+  - Landing page (hero + 8 agentes showcase)
+  - Registro de clientes (crea trial automático 7 días)
+  - Login (admin + clients)
+  - Admin Panel (CRUD de clientes, cambiar planes)
+  - Onboarding wizard (5 pasos)
+  - Dashboard (stats básicas)
+  - Playbook Nivel Dios (8 fases con IA)
+  - CORS (fixed)
+  - Database pooling (production)
+
+⚠️ PENDIENTE:
+  - Meta API integration real (endpoints placeholder)
+  - GA4 integration (endpoints ready, await credentials)
+  - MercadoPago suscripciones automáticas (checkout OK, webhooks testing)
+  - Autonomous agents validation (code ready, await cron test)
+
+
+🔑 ENV VARS CRÍTICAS (Railway Backend)
+─────────────────────────────────────────────────────────────────────────────────
+SECRET_KEY=ca90492e04d8aaea836343d83787c39e221fdee6a94d15ca2612b99219183d54
+ADMIN_EMAIL=onepercent.gsgr@gmail.com
+ADMIN_PASSWORD=<secure>
+DATABASE_URL=postgresql://...
+ENVIRONMENT=production
+FRONTEND_URL=https://metadash-v2-n2em-git-master-one-percents-projects.vercel.app
+
+META_APP_ID=1660121868759220
+META_ACCESS_TOKEN=EAAXl3z5FcL...
+META_AD_ACCOUNT_ID=act_893021690235868
+
+
+📁 ESTRUCTURA
+─────────────────────────────────────────────────────────────────────────────────
+frontend/src/pages:
+  - index.jsx (landing)
+  - login.jsx, register.jsx
+  - dashboard.jsx, agents.jsx, audit.jsx, financials.jsx, settings.jsx
+  - pricing.jsx, onboarding.jsx, playbook.jsx
+  - admin/index.jsx (admin panel)
+
+backend:
+  - main.py (app principal + 42 endpoints)
+  - models.py (SQLAlchemy models)
+  - database.py (connection pooling)
+  - agents/ (8+ agentes IA)
+  - payment_routes.py, payments.py
+
+
+💡 RÁPIDA VERIFICACIÓN
+─────────────────────────────────────────────────────────────────────────────────
+1. Loguearse como admin → Ver panel con link "👑 Admin" → Click → Ver clientes
+2. Registrar cliente nuevo (incógnito) → Debería redirigir a /onboarding
+3. /pricing → Select plan → Debería ir a MercadoPago checkout
+4. Backend logs → Ver que scheduler corre cada 6h (APScheduler)
+
+
+🔗 URLS
+─────────────────────────────────────────────────────────────────────────────────
+Frontend: https://metadash-v2-n2em-git-master-one-percents-projects.vercel.app
+Backend:  https://mellow-healing-production-36fd.up.railway.app
+GitHub:   [repo URL]
+
+
+📖 DOCUMENTACIÓN COMPLETA
+─────────────────────────────────────────────────────────────────────────────────
+Ver: METADASH_V2_CONTEXTO_COMPLETO.md (archivo detallado en root del proyecto)
+
+
+═══════════════════════════════════════════════════════════════════════════════
+✨ Copia este archivo + METADASH_V2_CONTEXTO_COMPLETO.md para el próximo chat
+═══════════════════════════════════════════════════════════════════════════════
