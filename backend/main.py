@@ -14,6 +14,10 @@ import json
 import openpyxl
 import io
 import logging
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi.responses import JSONResponse
 
 from database import engine, get_db, Base
 from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog
@@ -34,31 +38,47 @@ except ImportError:
 Base.metadata.create_all(bind=engine)
 
 # Create FastAPI app
-app = FastAPI(title="MetaDash API", version="1.0.0")
+app = FastAPI(title="MetaDash API", version="2.0.0")
 
-# ── CORS Middleware Manual ──
-# Refleja el origin del request — funciona para CUALQUIER frontend URL
-# sin depender de variables de entorno ni listas hardcodeadas.
-class ManualCORSMiddleware(BaseHTTPMiddleware):
+# Setup rate limiting
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Rate limit exceeded. Please try again later."}
+    )
+
+# ── CORS Configuration ──
+# Secure allowlist of origins - reject everything else
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS]
+
+class SecureCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         origin = request.headers.get("origin", "")
+
+        # Only respond to whitelisted origins
+        allowed_origin = origin if origin in ALLOWED_ORIGINS else None
 
         # Preflight OPTIONS → responder inmediatamente con CORS headers
         if request.method == "OPTIONS":
             response = StarletteResponse(status_code=200)
-            if origin:
-                response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Max-Age"] = "3600"
+            if allowed_origin:
+                response.headers["Access-Control-Allow-Origin"] = allowed_origin
+                response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+                response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                response.headers["Access-Control-Max-Age"] = "3600"
             return response
 
         # Request normal → ejecutar y agregar CORS headers a la respuesta
         response = await call_next(request)
 
-        if origin:
-            response.headers["Access-Control-Allow-Origin"] = origin
+        if allowed_origin:
+            response.headers["Access-Control-Allow-Origin"] = allowed_origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
             response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
@@ -66,7 +86,7 @@ class ManualCORSMiddleware(BaseHTTPMiddleware):
         return response
 
 
-app.add_middleware(ManualCORSMiddleware)
+app.add_middleware(SecureCORSMiddleware)
 
 # Include payment routes
 if PAYMENTS_AVAILABLE:
