@@ -1,7 +1,9 @@
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, Text, JSON
 from sqlalchemy.orm import relationship
+from sqlalchemy.ext.hybrid import hybrid_property
 from datetime import datetime
 from database import Base
+from encryption import encrypt_credential, decrypt_credential
 
 
 class User(Base):
@@ -27,19 +29,75 @@ class TenantConfig(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, index=True)
-    meta_access_token = Column(String, nullable=True)
+    _meta_access_token = Column("meta_access_token", String, nullable=True)
     meta_ad_account_id = Column(String, nullable=True)
-    meta_app_id = Column(String, nullable=True)
-    meta_app_secret = Column(String, nullable=True)
-    anthropic_api_key = Column(String, nullable=True)
-    hf_api_key = Column(String, nullable=True)
+    _meta_app_id = Column("meta_app_id", String, nullable=True)
+    _meta_app_secret = Column("meta_app_secret", String, nullable=True)
+    _anthropic_api_key = Column("anthropic_api_key", String, nullable=True)
+    _hf_api_key = Column("hf_api_key", String, nullable=True)
     negocio_info = Column(Text, nullable=True)
     landing_page_url = Column(String, nullable=True)
     shopify_store_url = Column(String, nullable=True)
-    shopify_webhook_secret = Column(String, nullable=True)
-    mercadopago_access_token = Column(String, nullable=True)
+    _shopify_webhook_secret = Column("shopify_webhook_secret", String, nullable=True)
+    _mercadopago_access_token = Column("mercadopago_access_token", String, nullable=True)
 
     user = relationship("User", back_populates="tenant_config")
+
+    @hybrid_property
+    def meta_access_token(self):
+        return decrypt_credential(self._meta_access_token) if self._meta_access_token else None
+
+    @meta_access_token.setter
+    def meta_access_token(self, value):
+        self._meta_access_token = encrypt_credential(value) if value else None
+
+    @hybrid_property
+    def meta_app_id(self):
+        return decrypt_credential(self._meta_app_id) if self._meta_app_id else None
+
+    @meta_app_id.setter
+    def meta_app_id(self, value):
+        self._meta_app_id = encrypt_credential(value) if value else None
+
+    @hybrid_property
+    def meta_app_secret(self):
+        return decrypt_credential(self._meta_app_secret) if self._meta_app_secret else None
+
+    @meta_app_secret.setter
+    def meta_app_secret(self, value):
+        self._meta_app_secret = encrypt_credential(value) if value else None
+
+    @hybrid_property
+    def anthropic_api_key(self):
+        return decrypt_credential(self._anthropic_api_key) if self._anthropic_api_key else None
+
+    @anthropic_api_key.setter
+    def anthropic_api_key(self, value):
+        self._anthropic_api_key = encrypt_credential(value) if value else None
+
+    @hybrid_property
+    def hf_api_key(self):
+        return decrypt_credential(self._hf_api_key) if self._hf_api_key else None
+
+    @hf_api_key.setter
+    def hf_api_key(self, value):
+        self._hf_api_key = encrypt_credential(value) if value else None
+
+    @hybrid_property
+    def shopify_webhook_secret(self):
+        return decrypt_credential(self._shopify_webhook_secret) if self._shopify_webhook_secret else None
+
+    @shopify_webhook_secret.setter
+    def shopify_webhook_secret(self, value):
+        self._shopify_webhook_secret = encrypt_credential(value) if value else None
+
+    @hybrid_property
+    def mercadopago_access_token(self):
+        return decrypt_credential(self._mercadopago_access_token) if self._mercadopago_access_token else None
+
+    @mercadopago_access_token.setter
+    def mercadopago_access_token(self, value):
+        self._mercadopago_access_token = encrypt_credential(value) if value else None
 
 
 class Subscription(Base):

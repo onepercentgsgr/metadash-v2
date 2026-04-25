@@ -14,9 +14,14 @@ import json
 import openpyxl
 import io
 import logging
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from fastapi.responses import JSONResponse
 
 from database import engine, get_db, Base
 from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog
+from agents.shared_memory import AgentMemory  # registers table with Base.metadata
 import config
 
 logger = logging.getLogger(__name__)
@@ -34,31 +39,47 @@ except ImportError:
 Base.metadata.create_all(bind=engine)
 
 # Create FastAPI app
-app = FastAPI(title="MetaDash API", version="1.0.0")
+app = FastAPI(title="MetaDash API", version="2.0.0")
 
-# ── CORS Middleware Manual ──
-# Refleja el origin del request — funciona para CUALQUIER frontend URL
-# sin depender de variables de entorno ni listas hardcodeadas.
-class ManualCORSMiddleware(BaseHTTPMiddleware):
+# Setup rate limiting
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Rate limit exceeded. Please try again later."}
+    )
+
+# ── CORS Configuration ──
+# Secure allowlist of origins - reject everything else
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS]
+
+class SecureCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         origin = request.headers.get("origin", "")
+
+        # Only respond to whitelisted origins
+        allowed_origin = origin if origin in ALLOWED_ORIGINS else None
 
         # Preflight OPTIONS → responder inmediatamente con CORS headers
         if request.method == "OPTIONS":
             response = StarletteResponse(status_code=200)
-            if origin:
-                response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
-            response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Max-Age"] = "3600"
+            if allowed_origin:
+                response.headers["Access-Control-Allow-Origin"] = allowed_origin
+                response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+                response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                response.headers["Access-Control-Max-Age"] = "3600"
             return response
 
         # Request normal → ejecutar y agregar CORS headers a la respuesta
         response = await call_next(request)
 
-        if origin:
-            response.headers["Access-Control-Allow-Origin"] = origin
+        if allowed_origin:
+            response.headers["Access-Control-Allow-Origin"] = allowed_origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
             response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With"
@@ -66,7 +87,7 @@ class ManualCORSMiddleware(BaseHTTPMiddleware):
         return response
 
 
-app.add_middleware(ManualCORSMiddleware)
+app.add_middleware(SecureCORSMiddleware)
 
 # Include payment routes
 if PAYMENTS_AVAILABLE:
@@ -1873,6 +1894,154 @@ async def get_orders(
     ).order_by(ShopifyOrder.created_at.desc()).all()
     
     return [ShopifyOrderResponse.from_orm(order) for order in orders]
+
+
+# ── Shared Memory + Multi-Agent Endpoints ──
+
+class MemoryWriteRequest(BaseModel):
+    value: Any
+    memory_type: str = "product"
+
+
+class InfoproductoRunRequest(BaseModel):
+    step_id: str
+    state: Dict[str, Any]
+
+
+class TikTokAdsRunRequest(BaseModel):
+    mode: str  # "strategy" | "optimize"
+    payload: Dict[str, Any] = {}
+
+
+class TikTokVideoRequest(BaseModel):
+    context: Dict[str, Any] = {}
+
+
+@app.get("/memory/{key}")
+async def read_memory(
+    key: str,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    from agents.shared_memory import SharedMemoryStore
+    memory = SharedMemoryStore(db, user.id)
+    value = memory.read(key)
+    return {"key": key, "value": value}
+
+
+@app.post("/memory/{key}")
+async def write_memory(
+    key: str,
+    request: MemoryWriteRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    from agents.shared_memory import SharedMemoryStore
+    memory = SharedMemoryStore(db, user.id)
+    memory.write(key, request.value, agent="user", memory_type=request.memory_type)
+    return {"key": key, "ok": True}
+
+
+@app.post("/agents/infoproducto/run")
+async def run_infoproducto_endpoint(
+    request: InfoproductoRunRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    if not config_obj.anthropic_api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+    try:
+        from agents.infoproducto_agent import run_infoproducto_step
+        output = run_infoproducto_step(
+            db=db,
+            user_id=user.id,
+            step_id=request.step_id,
+            state=request.state,
+            api_key=config_obj.anthropic_api_key,
+        )
+        return {"step_id": request.step_id, "output": output}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Infoproducto agent error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en agente infoproducto: {str(e)}")
+
+
+@app.post("/agents/tiktok-ads/run")
+async def run_tiktok_ads_endpoint(
+    request: TikTokAdsRunRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    if not config_obj.anthropic_api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+    try:
+        from agents.tiktok_ads_agent import run_tiktok_ads
+        output = run_tiktok_ads(
+            db=db,
+            user_id=user.id,
+            mode=request.mode,
+            payload=request.payload,
+            api_key=config_obj.anthropic_api_key,
+        )
+        return {"mode": request.mode, "output": output}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"TikTok Ads agent error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en agente TikTok Ads: {str(e)}")
+
+
+@app.post("/agents/tiktok/video")
+async def generate_tiktok_video_endpoint(
+    request: TikTokVideoRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    if not config_obj.anthropic_api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+    try:
+        from agents.tiktok_creator import TikTokCreatorAgent
+        from agents.shared_memory import SharedMemoryStore
+        memory = SharedMemoryStore(db, user.id)
+        ctx = {**memory.get_full_context(), **request.context}
+        agent = TikTokCreatorAgent(api_key=config_obj.anthropic_api_key)
+        result = agent.generate_daily_video(ctx)
+        return result
+    except Exception as e:
+        logger.error(f"TikTok video agent error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en agente TikTok orgánico: {str(e)}")
+
+
+@app.post("/agents/tiktok/calendar")
+async def generate_tiktok_calendar_endpoint(
+    request: TikTokVideoRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    if not config_obj.anthropic_api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+    try:
+        from agents.tiktok_creator import TikTokCreatorAgent
+        from agents.shared_memory import SharedMemoryStore
+        memory = SharedMemoryStore(db, user.id)
+        ctx = {**memory.get_full_context(), **request.context}
+        agent = TikTokCreatorAgent(api_key=config_obj.anthropic_api_key)
+        result = agent.generate_weekly_calendar(ctx)
+        return result
+    except Exception as e:
+        logger.error(f"TikTok calendar agent error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en agente calendario TikTok: {str(e)}")
 
 
 if __name__ == "__main__":
