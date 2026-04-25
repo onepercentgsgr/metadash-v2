@@ -21,6 +21,7 @@ from fastapi.responses import JSONResponse
 
 from database import engine, get_db, Base
 from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog
+from agents.shared_memory import AgentMemory  # registers table with Base.metadata
 import config
 
 logger = logging.getLogger(__name__)
