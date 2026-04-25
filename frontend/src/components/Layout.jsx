@@ -12,6 +12,9 @@ export function Layout({ children }) {
 
   const navItems = [
     { label: 'Dashboard', path: '/dashboard', icon: '📊' },
+    { label: 'Campañas', path: '/campaigns', icon: '🎯' },
+    { label: 'TikTok Orgánico', path: '/tiktok', icon: '🎵' },
+    { label: 'Infoproducto', path: '/infoproducto', icon: '🚀' },
     { label: 'Agentes IA', path: '/agents', icon: '🤖' },
     { label: 'Playbook Nivel Dios', path: '/playbook', icon: '📚' },
     { label: 'Auditoría', path: '/audit', icon: '🔍' },

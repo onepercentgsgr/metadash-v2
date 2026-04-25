@@ -21,8 +21,7 @@ export default function LoginPage() {
     try {
       const result = await login(email, password);
       if (result.success) {
-        // Admin va al panel de admin, clientes al dashboard
-        const dest = result.role === 'admin' ? '/admin' : '/dashboard';
+        const dest = result.role === 'admin' ? '/admin' : '/welcome';
         router.push(dest);
       } else {
         setError(result.error || 'Error al iniciar sesión');

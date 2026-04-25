@@ -1896,6 +1896,154 @@ async def get_orders(
     return [ShopifyOrderResponse.from_orm(order) for order in orders]
 
 
+# ── Shared Memory + Multi-Agent Endpoints ──
+
+class MemoryWriteRequest(BaseModel):
+    value: Any
+    memory_type: str = "product"
+
+
+class InfoproductoRunRequest(BaseModel):
+    step_id: str
+    state: Dict[str, Any]
+
+
+class TikTokAdsRunRequest(BaseModel):
+    mode: str  # "strategy" | "optimize"
+    payload: Dict[str, Any] = {}
+
+
+class TikTokVideoRequest(BaseModel):
+    context: Dict[str, Any] = {}
+
+
+@app.get("/memory/{key}")
+async def read_memory(
+    key: str,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    from agents.shared_memory import SharedMemoryStore
+    memory = SharedMemoryStore(db, user.id)
+    value = memory.read(key)
+    return {"key": key, "value": value}
+
+
+@app.post("/memory/{key}")
+async def write_memory(
+    key: str,
+    request: MemoryWriteRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    from agents.shared_memory import SharedMemoryStore
+    memory = SharedMemoryStore(db, user.id)
+    memory.write(key, request.value, agent="user", memory_type=request.memory_type)
+    return {"key": key, "ok": True}
+
+
+@app.post("/agents/infoproducto/run")
+async def run_infoproducto_endpoint(
+    request: InfoproductoRunRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    if not config_obj.anthropic_api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+    try:
+        from agents.infoproducto_agent import run_infoproducto_step
+        output = run_infoproducto_step(
+            db=db,
+            user_id=user.id,
+            step_id=request.step_id,
+            state=request.state,
+            api_key=config_obj.anthropic_api_key,
+        )
+        return {"step_id": request.step_id, "output": output}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Infoproducto agent error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en agente infoproducto: {str(e)}")
+
+
+@app.post("/agents/tiktok-ads/run")
+async def run_tiktok_ads_endpoint(
+    request: TikTokAdsRunRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    if not config_obj.anthropic_api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+    try:
+        from agents.tiktok_ads_agent import run_tiktok_ads
+        output = run_tiktok_ads(
+            db=db,
+            user_id=user.id,
+            mode=request.mode,
+            payload=request.payload,
+            api_key=config_obj.anthropic_api_key,
+        )
+        return {"mode": request.mode, "output": output}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"TikTok Ads agent error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en agente TikTok Ads: {str(e)}")
+
+
+@app.post("/agents/tiktok/video")
+async def generate_tiktok_video_endpoint(
+    request: TikTokVideoRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    if not config_obj.anthropic_api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+    try:
+        from agents.tiktok_creator import TikTokCreatorAgent
+        from agents.shared_memory import SharedMemoryStore
+        memory = SharedMemoryStore(db, user.id)
+        ctx = {**memory.get_full_context(), **request.context}
+        agent = TikTokCreatorAgent(api_key=config_obj.anthropic_api_key)
+        result = agent.generate_daily_video(ctx)
+        return result
+    except Exception as e:
+        logger.error(f"TikTok video agent error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en agente TikTok orgánico: {str(e)}")
+
+
+@app.post("/agents/tiktok/calendar")
+async def generate_tiktok_calendar_endpoint(
+    request: TikTokVideoRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    if not config_obj.anthropic_api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+    try:
+        from agents.tiktok_creator import TikTokCreatorAgent
+        from agents.shared_memory import SharedMemoryStore
+        memory = SharedMemoryStore(db, user.id)
+        ctx = {**memory.get_full_context(), **request.context}
+        agent = TikTokCreatorAgent(api_key=config_obj.anthropic_api_key)
+        result = agent.generate_weekly_calendar(ctx)
+        return result
+    except Exception as e:
+        logger.error(f"TikTok calendar agent error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en agente calendario TikTok: {str(e)}")
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
