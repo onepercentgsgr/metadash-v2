@@ -32,11 +32,19 @@ def _verify_token(token: str) -> dict:
     """Verify JWT token and return payload."""
     try:
         payload = jwt.decode(token, config.SECRET_KEY, algorithms=[config.ALGORITHM])
-        user_id: int = payload.get("sub")
-        if user_id is None:
+        sub = payload.get("sub")
+        if sub is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token"
+            )
+        # sub is stored as string in JWT, convert to int
+        try:
+            user_id = int(sub)
+        except (ValueError, TypeError):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token: bad user ID"
             )
         return {"user_id": user_id}
     except jwt.ExpiredSignatureError:

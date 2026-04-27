@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse
 from database import engine, get_db, Base
 from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog
 from agents.shared_memory import AgentMemory  # registers table with Base.metadata
+from security_middleware import SecurityHeadersMiddleware
 import config
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ except ImportError:
 Base.metadata.create_all(bind=engine)
 
 # Create FastAPI app
-app = FastAPI(title="MetaDash API", version="2.0.0")
+app = FastAPI(title="MetaDash API", version="3.5.0")
 
 # Setup rate limiting
 limiter = Limiter(key_func=get_remote_address)
@@ -88,6 +89,7 @@ class SecureCORSMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(SecureCORSMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Include payment routes
 if PAYMENTS_AVAILABLE:
@@ -534,7 +536,7 @@ async def health_check():
     return {
         "status": "ok",
         "service": "MetaDash API",
-        "version": "1.0.0",
+        "version": "3.5.0",
     }
 
 
@@ -667,7 +669,7 @@ async def get_config(
     config_obj = get_tenant_config(user.id, db)
     
     # Mask sensitive fields
-    response = TenantConfigResponse.from_orm(config_obj)
+    response = TenantConfigResponse.model_validate(config_obj)
     if response.meta_access_token:
         response.meta_access_token = response.meta_access_token[-10:] if len(response.meta_access_token) > 10 else "***"
     if response.anthropic_api_key:
@@ -694,7 +696,7 @@ async def update_config(
     db.commit()
     db.refresh(config_obj)
 
-    return TenantConfigResponse.from_orm(config_obj)
+    return TenantConfigResponse.model_validate(config_obj)
 
 
 @app.get("/tenant-config", response_model=TenantConfigResponse)
@@ -706,7 +708,7 @@ async def get_tenant_config_endpoint(
     config_obj = get_tenant_config(user.id, db)
 
     # Mask sensitive fields
-    response = TenantConfigResponse.from_orm(config_obj)
+    response = TenantConfigResponse.model_validate(config_obj)
     if response.meta_access_token:
         response.meta_access_token = response.meta_access_token[-10:] if len(response.meta_access_token) > 10 else "***"
     if response.anthropic_api_key:
@@ -733,7 +735,7 @@ async def update_tenant_config_endpoint(
     db.commit()
     db.refresh(config_obj)
 
-    return TenantConfigResponse.from_orm(config_obj)
+    return TenantConfigResponse.model_validate(config_obj)
 
 
 # Subscription Endpoints
@@ -1013,7 +1015,7 @@ async def list_subscriptions(
         raise HTTPException(status_code=403, detail="Admin access required")
 
     subscriptions = db.query(Subscription).all()
-    return [SubscriptionResponse.from_orm(sub) for sub in subscriptions]
+    return [SubscriptionResponse.model_validate(sub) for sub in subscriptions]
 
 
 @app.put("/admin/subscriptions/{sub_id}", response_model=SubscriptionResponse)
@@ -1045,7 +1047,7 @@ async def update_subscription(
     db.commit()
     db.refresh(subscription)
 
-    return SubscriptionResponse.from_orm(subscription)
+    return SubscriptionResponse.model_validate(subscription)
 
 
 # Campaign Endpoints
@@ -1717,7 +1719,46 @@ async def run_agent(
         raise HTTPException(status_code=400, detail=f"Unknown agent type: {agent_type}")
 
     try:
-        result = f"{agent_handlers[agent_type]} analysis - placeholder"
+        # Real agent dispatch — no placeholders
+        from agents import (
+            analyze_campaigns, analyze_finances, generate_scripts,
+            analyze_creatives, get_growth_strategy, get_cro_advice,
+            audit_landing_page, run_full_audit,
+        )
+
+        api_key = config_obj.anthropic_api_key
+        negocio = config_obj.negocio_info or ""
+        ctx = request.context or {}
+
+        if agent_type == "optimizer":
+            campaigns_data = ctx.get("campaigns_data", [])
+            result = analyze_campaigns(campaigns_data, negocio, api_key)
+        elif agent_type == "finance":
+            financial_data = ctx.get("financial_data", {})
+            result = analyze_finances(financial_data, negocio, api_key)
+        elif agent_type == "script_gen":
+            result = generate_scripts(request.input or "Generate ad scripts", negocio, api_key)
+        elif agent_type == "creative_director":
+            creatives_data = ctx.get("creatives_data", [])
+            result = analyze_creatives(creatives_data, negocio, api_key)
+        elif agent_type == "advisor":
+            result = get_growth_strategy(ctx, negocio, api_key)
+        elif agent_type == "cro":
+            result = get_cro_advice(ctx, negocio, api_key)
+        elif agent_type == "landing_page_auditor":
+            landing_url = ctx.get("landing_page_url", "") or config_obj.landing_page_url or ""
+            result = audit_landing_page(landing_url, negocio, api_key)
+        elif agent_type == "orchestrator":
+            result = run_full_audit(
+                campaigns_data=ctx.get("campaigns_data", []),
+                creatives_data=ctx.get("creatives_data", []),
+                financial_data=ctx.get("financial_data", {}),
+                landing_url=config_obj.landing_page_url or "",
+                negocio_info=negocio,
+                api_key=api_key,
+            )
+        else:
+            result = f"Agent '{agent_type}' not implemented"
 
         # Log the result
         log_entry = AgentLog(
@@ -1734,8 +1775,8 @@ async def run_agent(
             agent=agent_handlers[agent_type],
         )
     except Exception as e:
-        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
-        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
+        logger.error(f"Agent run error ({agent_type}): {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error in {agent_type} agent: {str(e)}")
 
 
 # Finance Endpoints
@@ -1790,7 +1831,7 @@ async def get_financial_records(
         FinancialRecord.user_id == user.id,
     ).order_by(FinancialRecord.created_at.desc()).all()
 
-    return [FinancialRecordResponse.from_orm(record) for record in records]
+    return [FinancialRecordResponse.model_validate(record) for record in records]
 
 
 @app.get("/financials", response_model=List[FinancialRecordResponse])
@@ -1804,7 +1845,7 @@ async def get_financials(
         FinancialRecord.user_id == user.id,
     ).order_by(FinancialRecord.created_at.desc()).all()
 
-    return [FinancialRecordResponse.from_orm(record) for record in records]
+    return [FinancialRecordResponse.model_validate(record) for record in records]
 
 
 @app.post("/financials", response_model=FinancialRecordResponse)
@@ -1828,7 +1869,7 @@ async def create_financial_record(
     db.commit()
     db.refresh(record)
 
-    return FinancialRecordResponse.from_orm(record)
+    return FinancialRecordResponse.model_validate(record)
 
 
 @app.post("/financials/upload")
@@ -1893,7 +1934,7 @@ async def get_orders(
         ShopifyOrder.user_id == user.id,
     ).order_by(ShopifyOrder.created_at.desc()).all()
     
-    return [ShopifyOrderResponse.from_orm(order) for order in orders]
+    return [ShopifyOrderResponse.model_validate(order) for order in orders]
 
 
 # ── Shared Memory + Multi-Agent Endpoints ──

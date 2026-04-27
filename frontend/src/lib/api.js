@@ -164,10 +164,9 @@ export const api = {
   // Admin endpoints
   getUsers: () => apiFetch("/admin/users"),
 
-  toggleUser: (userId, active) =>
-    apiFetch(`/admin/users/${userId}`, {
-      method: "PATCH",
-      body: JSON.stringify({ active }),
+  toggleUser: (userId) =>
+    apiFetch(`/admin/users/${userId}/toggle`, {
+      method: "POST",
     }),
 
   extendTrial: (userId) =>
@@ -176,7 +175,7 @@ export const api = {
     }),
 
   setPlan: (userId, plan) =>
-    apiFetch(`/admin/users/${userId}/plan`, {
+    apiFetch(`/admin/users/${userId}/set-plan`, {
       method: "POST",
       body: JSON.stringify({ plan }),
     }),

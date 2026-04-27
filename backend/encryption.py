@@ -48,22 +48,37 @@ class CredentialEncryptor:
 
 
 # Global encryptor instance
+_is_dev = os.getenv("ENVIRONMENT", "development") != "production"
+
 try:
     encryptor = CredentialEncryptor()
 except ValueError as e:
-    logger.warning(f"Encryption not available: {e}. Using plaintext fallback.")
+    if not _is_dev:
+        raise  # In production, ENCRYPTION_KEY is mandatory
+    logger.warning(f"⚠️ ENCRYPTION DISABLED (dev mode): {e}. Credentials stored as plaintext.")
     encryptor = None
 
 
 def encrypt_credential(value: str) -> str:
-    """Encrypt credential value."""
-    if not encryptor or not value:
+    """Encrypt credential value. Fails in production if encryption unavailable."""
+    if not value:
+        return value
+    if not encryptor:
+        if not _is_dev:
+            raise RuntimeError("ENCRYPTION_KEY not set — cannot store credentials in production")
         return value
     return encryptor.encrypt(value)
 
 
 def decrypt_credential(value: str) -> str:
-    """Decrypt credential value."""
-    if not encryptor or not value:
+    """Decrypt credential value. Falls back to plaintext only in dev."""
+    if not value:
         return value
-    return encryptor.decrypt(value)
+    if not encryptor:
+        return value
+    try:
+        return encryptor.decrypt(value)
+    except Exception:
+        # Value may have been stored as plaintext before encryption was enabled
+        logger.warning("Decryption failed — returning raw value (possibly pre-encryption data)")
+        return value

@@ -6,6 +6,6 @@
   "deploy": {
     "startCommand": "python start.py",
     "restartPolicyType": "ON_FAILURE",
-    "healthcheckPath": "/docs"
+    "healthcheckPath": "/health"
   }
 }
