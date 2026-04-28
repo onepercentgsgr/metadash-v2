@@ -14,6 +14,7 @@ export function Layout({ children }) {
     { label: 'Dashboard', path: '/dashboard', icon: '📊' },
     { label: 'Campañas', path: '/campaigns', icon: '🎯' },
     { label: 'TikTok Orgánico', path: '/tiktok', icon: '🎵' },
+    { label: 'Videos del Día', path: '/videos', icon: '🎬' },
     { label: 'Infoproducto', path: '/infoproducto', icon: '🚀' },
     { label: 'Agentes IA', path: '/agents', icon: '🤖' },
     { label: 'Playbook Nivel Dios', path: '/playbook', icon: '📚' },
@@ -43,7 +44,7 @@ export function Layout({ children }) {
             {sidebarOpen && (
               <div>
                 <span className="text-white font-bold text-lg">MetaDash</span>
-                <div className="text-[10px] text-indigo-400 font-medium -mt-0.5">v2.0</div>
+                <div className="text-[10px] text-indigo-400 font-medium -mt-0.5">v3.5</div>
               </div>
             )}
           </Link>

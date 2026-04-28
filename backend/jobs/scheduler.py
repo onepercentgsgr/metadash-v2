@@ -101,25 +101,74 @@ def run_autonomous_audit_for_user(user_id: int):
         db.close()
 
 
+def generate_daily_tiktok_videos():
+    """Daily at 9 AM — generates 1 TikTok video for every paid active user."""
+    from models import GeneratedVideo
+    from agents.tiktok_creator import TikTokCreatorAgent
+    from agents.shared_memory import SharedMemoryStore
+    from datetime import date
+
+    db = SessionLocal()
+    try:
+        today = date.today().isoformat()
+        paid_users = db.query(User).filter(
+            User.is_active == True,
+            User.has_paid == True,
+        ).all()
+        logger.info(f"[Daily TikTok] {len(paid_users)} paid users — {today}")
+
+        angles = [
+            "dolor + agitación", "transformación before/after",
+            "detrás de escena / autenticidad", "mito vs. realidad del nicho",
+            "tutorial rápido de valor gratuito", "testimonial/resultado real",
+            "tendencia + nicho (trend hijacking)",
+        ]
+        angle = angles[date.today().weekday() % len(angles)]
+
+        for user in paid_users:
+            if db.query(GeneratedVideo).filter(
+                GeneratedVideo.user_id == user.id,
+                GeneratedVideo.date == today,
+            ).first():
+                continue
+
+            tenant_config = user.tenant_config
+            if not tenant_config or not tenant_config.anthropic_api_key:
+                continue
+            try:
+                memory = SharedMemoryStore(db, user.id)
+                ctx = {**memory.get_full_context(), "angulo": angle}
+                result = TikTokCreatorAgent(api_key=tenant_config.anthropic_api_key).generate_daily_video(ctx)
+                db.add(GeneratedVideo(
+                    user_id=user.id,
+                    content=result.get("content", ""),
+                    angle=result.get("angulo", angle),
+                    date=today,
+                ))
+                db.commit()
+                logger.info(f"[Daily TikTok] Generated for user {user.id}")
+            except Exception as e:
+                logger.error(f"[Daily TikTok] Error for user {user.id}: {e}")
+    except Exception as e:
+        logger.error(f"[Daily TikTok] Fatal: {e}")
+    finally:
+        db.close()
+
+
 def schedule_autonomous_audits():
     """
-    Schedule autonomous audits for all active users.
+    Schedule autonomous audits + daily TikTok videos.
     Called on app startup.
     """
     db = SessionLocal()
     try:
         active_users = db.query(User).filter(User.is_active == True).all()
-        logger.info(f"Scheduling autonomous audits for {len(active_users)} active users")
+        logger.info(f"Scheduling jobs for {len(active_users)} active users")
 
         for user in active_users:
-            # Schedule each user's audit to run every 6 hours
             job_id = f"autonomous_audit_{user.id}"
-
-            # Remove existing job if it exists
             if scheduler.get_job(job_id):
                 scheduler.remove_job(job_id)
-
-            # Schedule new job
             scheduler.add_job(
                 run_autonomous_audit_for_user,
                 IntervalTrigger(hours=6),
@@ -129,9 +178,18 @@ def schedule_autonomous_audits():
                 replace_existing=True,
             )
 
+        # Daily TikTok at 9 AM UTC
+        scheduler.add_job(
+            generate_daily_tiktok_videos,
+            "cron", hour=9, minute=0,
+            id="daily_tiktok_videos",
+            name="Daily TikTok Video Generation",
+            replace_existing=True,
+        )
+
         if not scheduler.running:
             scheduler.start()
-            logger.info("Scheduler started")
+            logger.info("Scheduler started (audits + daily TikTok 9 AM UTC)")
 
     except Exception as e:
         logger.error(f"Error scheduling audits: {type(e).__name__}: {str(e)}")
