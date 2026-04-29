@@ -35,6 +35,13 @@ try:
 except ImportError:
     PAYMENTS_AVAILABLE = False
 
+# Import v3.5 routes
+try:
+    from v35_routes import router as v35_router
+    V35_AVAILABLE = True
+except ImportError:
+    V35_AVAILABLE = False
+
 # Initialize database
 Base.metadata.create_all(bind=engine)
 
@@ -92,6 +99,10 @@ app.add_middleware(SecureCORSMiddleware)
 # Include payment routes
 if PAYMENTS_AVAILABLE:
     app.include_router(payment_router)
+
+# Include v3.5 routes
+if V35_AVAILABLE:
+    app.include_router(v35_router)
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -196,7 +207,15 @@ class AdminStats(BaseModel):
     total_users: int
     active_trials: int
     paid_users: int
-    revenue: float
+    revenue_ars: float
+    revenue_usd: float
+    trial_expiring_soon: int
+    expired_trials: int
+    mrr: float
+    avg_arpu: float
+    videos_generated: int
+    agents_runs: int
+    churn_rate: float
 
 
 class FinancialRecordCreate(BaseModel):
@@ -525,7 +544,6 @@ def shutdown_event():
         stop_scheduler()
     except:
         pass
-
 
 # Health Endpoints
 @app.get("/")
@@ -899,44 +917,134 @@ async def get_admin_stats(
     db: Session = Depends(get_db),
 ):
     admin = get_current_user_from_header(authorization, db)
-
     if admin.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
 
-    total_users = db.query(User).count()
+    plan_prices_ars = {"starter": 19900, "pro": 29900, "enterprise": 79900}
+    usd_rate = 1100
 
-    # Active trials
+    total_users = db.query(User).count()
     active_trials = db.query(Subscription).filter(
         Subscription.plan == "trial",
         Subscription.status == "active",
     ).count()
 
-    # Paid users
+    from datetime import timedelta
+    soon_expire = db.query(Subscription).filter(
+        Subscription.plan == "trial",
+        Subscription.status == "active",
+        Subscription.trial_end.between(datetime.utcnow(), datetime.utcnow() + timedelta(days=3))
+    ).count()
+
+    expired_trials = db.query(Subscription).filter(
+        Subscription.status == "expired"
+    ).count()
+
     paid_users = db.query(Subscription).filter(
         Subscription.plan.in_(["starter", "pro", "enterprise"]),
         Subscription.status == "active",
     ).count()
-
-    # Revenue calculation (assuming monthly subscription)
-    plan_prices = {
-        "starter": 29,
-        "pro": 99,
-        "enterprise": 299,
-    }
 
     paid_subscriptions = db.query(Subscription).filter(
         Subscription.plan.in_(["starter", "pro", "enterprise"]),
         Subscription.status == "active",
     ).all()
 
-    revenue = sum(plan_prices.get(sub.plan, 0) for sub in paid_subscriptions)
+    revenue_ars = sum(plan_prices_ars.get(sub.plan, 0) for sub in paid_subscriptions)
+    revenue_usd = revenue_ars / usd_rate
+    mrr = revenue_ars
+    arpu = (revenue_ars / paid_users) if paid_users > 0 else 0
+
+    try:
+        from models import GeneratedVideo
+        videos_count = db.query(GeneratedVideo).count()
+    except Exception:
+        videos_count = 0
+    try:
+        agents_count = db.query(AgentLog).count()
+    except Exception:
+        agents_count = 0
+    churn_rate = (expired_trials / (paid_users + expired_trials) * 100) if (paid_users + expired_trials) > 0 else 0
 
     return AdminStats(
         total_users=total_users,
         active_trials=active_trials,
         paid_users=paid_users,
-        revenue=float(revenue),
+        revenue_ars=float(revenue_ars),
+        revenue_usd=float(revenue_usd),
+        trial_expiring_soon=soon_expire,
+        expired_trials=expired_trials,
+        mrr=float(mrr),
+        avg_arpu=float(arpu),
+        videos_generated=videos_count,
+        agents_runs=agents_count,
+        churn_rate=float(churn_rate),
     )
+
+
+@app.get("/admin/analytics/detailed")
+async def get_detailed_analytics(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    admin = get_current_user_from_header(authorization, db)
+    if admin.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    plan_prices_ars = {"starter": 19900, "pro": 29900, "enterprise": 79900}
+    usd_rate = 1100
+
+    plans_data = {}
+    for plan in ["starter", "pro", "enterprise"]:
+        subs = db.query(Subscription).filter(
+            Subscription.plan == plan,
+            Subscription.status == "active"
+        ).all()
+        revenue = sum(plan_prices_ars.get(plan, 0) for _ in subs)
+        plans_data[plan] = {
+            "count": len(subs),
+            "revenue_ars": revenue,
+            "revenue_usd": revenue / usd_rate,
+        }
+
+    from sqlalchemy import func
+    try:
+        from models import GeneratedVideo
+        top_users = db.query(
+            User.id, User.email, User.name,
+            func.count(GeneratedVideo.id).label("videos_count")
+        ).outerjoin(GeneratedVideo).filter(
+            User.is_active == True
+        ).group_by(User.id, User.email, User.name).order_by(
+            func.count(GeneratedVideo.id).desc()
+        ).limit(10).all()
+
+        top_users_list = [
+            {"user_id": u[0], "email": u[1], "name": u[2], "videos_generated": u[3] or 0}
+            for u in top_users
+        ]
+        total_videos = db.query(GeneratedVideo).count()
+    except Exception:
+        top_users_list = []
+        total_videos = 0
+
+    try:
+        total_agent_runs = db.query(AgentLog).count()
+        total_agents = db.query(AgentLog).filter(AgentLog.status == "success").count()
+    except Exception:
+        total_agent_runs = 0
+        total_agents = 0
+
+    return {
+        "plans_breakdown": plans_data,
+        "top_users": top_users_list,
+        "usage_metrics": {
+            "total_videos": total_videos,
+            "total_agent_runs": total_agent_runs,
+            "successful_runs": total_agents,
+        },
+        "timestamp": datetime.utcnow().isoformat(),
+    }
 
 
 @app.put("/admin/users/{user_id}", response_model=UserResponse)
@@ -990,6 +1098,7 @@ async def delete_user(
 
     if admin.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
+
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -1589,6 +1698,7 @@ async def run_playbook_social_media(
     except Exception as e:
         logger.error(f"Playbook Social Media error: {type(e).__name__}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error en Social Media: {str(e)}")
+
 
 
 # ── Autonomous Actions Endpoints ──
