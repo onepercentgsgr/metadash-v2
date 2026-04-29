@@ -15,6 +15,9 @@ class User(Base):
     name = Column(String)
     role = Column(String, default="client")  # admin or client
     is_active = Column(Boolean, default=True)
+    has_paid = Column(Boolean, default=False)
+    paid_at = Column(DateTime, nullable=True)
+    onboarded_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     tenant_config = relationship("TenantConfig", back_populates="user", uselist=False)
@@ -164,6 +167,19 @@ class ShopifyOrder(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="shopify_orders")
+
+
+class GeneratedVideo(Base):
+    __tablename__ = "generated_videos"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    content = Column(Text)
+    angle = Column(String, nullable=True)
+    date = Column(String, index=True)  # YYYY-MM-DD
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
 
 
 class AutonomousActionLog(Base):
