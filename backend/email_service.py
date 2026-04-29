@@ -106,6 +106,88 @@ class EmailService:
 
         return self.send_email(email, "MetaDash Password Reset", html_content)
 
+    def send_trial_expires_soon_email(self, email: str, name: str, days_remaining: int) -> bool:
+        """Send email when trial expires in 3 or 1 day."""
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        checkout_url = f"{frontend_url}/dashboard/billing"
+
+        if days_remaining == 3:
+            subject = "Tu prueba gratuita vence en 3 días"
+            days_text = "3 días"
+            color = "#FF9800"
+        else:
+            subject = "Tu prueba gratuita vence mañana"
+            days_text = "mañana"
+            color = "#F44336"
+
+        html_content = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; background-color: #f5f5f5;">
+                <div style="max-width: 600px; margin: 0 auto; background-color: white; padding: 40px; border-radius: 8px;">
+                    <h2 style="color: #333;">¡Hola {name}!</h2>
+                    <p style="color: #666; font-size: 16px;">Tu prueba gratuita de MetaDash vence en <strong>{days_text}</strong>.</p>
+                    <p style="color: #666; font-size: 16px;">Para continuar usando MetaDash y acceder a:</p>
+                    <ul style="color: #666; font-size: 14px;">
+                        <li>✓ Videos TikTok automáticos</li>
+                        <li>✓ Landing pages optimizadas</li>
+                        <li>✓ Gestión de campañas</li>
+                        <li>✓ Análisis avanzado</li>
+                    </ul>
+                    <p>
+                        <a href="{checkout_url}"
+                           style="background-color: {color}; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">
+                            Activar Plan Ahora
+                        </a>
+                    </p>
+                    <p style="color: #999; font-size: 12px; margin-top: 30px;">
+                        Si tienes preguntas, responde a este email o contacta a nuestro equipo de soporte.
+                    </p>
+                </div>
+            </body>
+        </html>
+        """
+
+        return self.send_email(email, subject, html_content)
+
+    def send_trial_expired_email(self, email: str, name: str) -> bool:
+        """Send email when trial expires."""
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        checkout_url = f"{frontend_url}/dashboard/billing"
+
+        html_content = f"""
+        <html>
+            <body style="font-family: Arial, sans-serif; background-color: #f5f5f5;">
+                <div style="max-width: 600px; margin: 0 auto; background-color: white; padding: 40px; border-radius: 8px;">
+                    <h2 style="color: #333;">¡Hola {name}!</h2>
+                    <p style="color: #666; font-size: 16px;">Tu prueba gratuita de MetaDash ha expirado.</p>
+                    <p style="color: #666; font-size: 16px;">Hemos visto que lanzaste videos, optimizaste landing pages y llegaste a tus primeros clientes.</p>
+                    <p style="color: #666; font-size: 16px;">¿Listo para continuar?</p>
+                    <p style="margin: 30px 0;">
+                        <a href="{checkout_url}"
+                           style="background-color: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold; font-size: 16px;">
+                            Activar Plan Pro (ARS 29.900/mes)
+                        </a>
+                    </p>
+                    <div style="background-color: #f0f0f0; padding: 20px; border-radius: 5px; margin: 20px 0;">
+                        <h3 style="color: #333; margin-top: 0;">¿Qué incluye tu plan?</h3>
+                        <ul style="color: #666; font-size: 14px;">
+                            <li>✓ Videos TikTok ilimitados (1 por día automático)</li>
+                            <li>✓ Landing pages ilimitadas</li>
+                            <li>✓ Agentes IA 24/7 optimizando tus campañas</li>
+                            <li>✓ Dashboard analítico completo</li>
+                            <li>✓ Soporte prioritario</li>
+                        </ul>
+                    </div>
+                    <p style="color: #999; font-size: 12px; margin-top: 30px;">
+                        Si tienes preguntas, responde a este email o contacta a nuestro equipo de soporte.
+                    </p>
+                </div>
+            </body>
+        </html>
+        """
+
+        return self.send_email(email, "Tu prueba de MetaDash ha expirado - ¿Continuamos?", html_content)
+
 
 def create_verification_token(email: str, expires_in_hours: int = 24) -> str:
     """Create email verification token."""
