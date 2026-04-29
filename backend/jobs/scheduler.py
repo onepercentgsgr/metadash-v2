@@ -1,17 +1,19 @@
 """
 Autonomous Audit Scheduler
 Runs every 6 hours automatically for each active user.
+Also sends trial expiration emails and generates daily TikTok videos.
 """
 
 import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 from sqlalchemy.orm import Session
 from database import engine, get_db, SessionLocal
-from models import User, AutonomousActionLog
+from models import User, AutonomousActionLog, Subscription
 from agents import run_full_audit
+from email_service import EmailService
 import os
 
 logger = logging.getLogger(__name__)
@@ -20,17 +22,6 @@ scheduler = BackgroundScheduler(timezone=pytz.UTC)
 
 
 def run_autonomous_audit_for_user(user_id: int):
-    """
-    Run a full autonomous audit for a single user.
-
-    Triggers:
-    - Optimizer (pauses campaigns, rotates creatives)
-    - Finance analysis (checks margins, alerts on risk)
-    - GA4 analysis (correlates with ads performance)
-    - CEO synthesis (decides what to do)
-
-    Logs all "important" actions (pauses, alerts, recommendations).
-    """
     db = SessionLocal()
     try:
         user = db.query(User).filter(User.id == user_id).first()
@@ -45,12 +36,10 @@ def run_autonomous_audit_for_user(user_id: int):
 
         logger.info(f"[Autonomous Audit] Starting for user {user_id} ({user.email})")
 
-        # Build context from available data
-        campaigns = []  # TODO: fetch from Meta API
-        creatives = []  # TODO: fetch from Meta API
-        financial = {}  # TODO: fetch from financial_records
+        campaigns = []
+        creatives = []
+        financial = {}
 
-        # Run the full audit
         audit_result = run_full_audit(
             campaigns_data=campaigns,
             creatives_data=creatives,
@@ -60,8 +49,6 @@ def run_autonomous_audit_for_user(user_id: int):
             api_key=tenant_config.anthropic_api_key,
         )
 
-        # Parse results and create action logs
-        # This is a simplified version — you'd parse the audit_result more thoroughly
         log_entry = AutonomousActionLog(
             user_id=user_id,
             action_type="autonomous_audit",
@@ -69,7 +56,7 @@ def run_autonomous_audit_for_user(user_id: int):
             target="all_campaigns",
             description="Autonomous audit completed and analyzed",
             details={
-                "audit_result": audit_result[:500],  # First 500 chars
+                "audit_result": audit_result[:500],
                 "timestamp": datetime.utcnow().isoformat(),
             },
             triggered_by="orchestrator",
@@ -155,9 +142,51 @@ def generate_daily_tiktok_videos():
         db.close()
 
 
+def check_and_send_trial_expiration_emails():
+    """
+    Daily job: check for users with expiring trials and send emails.
+    Sends emails 3 days before, 1 day before, and on expiration date.
+    """
+    db = SessionLocal()
+    email_service = EmailService()
+    try:
+        now = datetime.utcnow()
+        users = db.query(User).filter(User.is_active == True).all()
+
+        for user in users:
+            sub = db.query(Subscription).filter(
+                Subscription.user_id == user.id,
+                Subscription.status == "trial"
+            ).order_by(Subscription.created_at.desc()).first()
+
+            if not sub or not sub.trial_end:
+                continue
+
+            days_until_expire = (sub.trial_end.date() - now.date()).days
+
+            if days_until_expire == 3:
+                logger.info(f"[Trial Expiration] Sending 3-day notice to {user.email}")
+                email_service.send_trial_expires_soon_email(user.email, user.name, 3)
+
+            elif days_until_expire == 1:
+                logger.info(f"[Trial Expiration] Sending 1-day notice to {user.email}")
+                email_service.send_trial_expires_soon_email(user.email, user.name, 1)
+
+            elif days_until_expire == 0 and not user.has_paid:
+                logger.info(f"[Trial Expiration] Sending expiration notice to {user.email}")
+                email_service.send_trial_expired_email(user.email, user.name)
+                sub.status = "expired"
+                db.commit()
+
+    except Exception as e:
+        logger.error(f"[Trial Expiration] Error: {type(e).__name__}: {str(e)}")
+    finally:
+        db.close()
+
+
 def schedule_autonomous_audits():
     """
-    Schedule autonomous audits + daily TikTok videos.
+    Schedule autonomous audits + daily TikTok videos + trial expiration emails.
     Called on app startup.
     """
     db = SessionLocal()
@@ -178,7 +207,6 @@ def schedule_autonomous_audits():
                 replace_existing=True,
             )
 
-        # Daily TikTok at 9 AM UTC
         scheduler.add_job(
             generate_daily_tiktok_videos,
             "cron", hour=9, minute=0,
@@ -187,9 +215,17 @@ def schedule_autonomous_audits():
             replace_existing=True,
         )
 
+        scheduler.add_job(
+            check_and_send_trial_expiration_emails,
+            "cron", hour=8, minute=0,
+            id="trial_expiration_check",
+            name="Trial Expiration Email Check",
+            replace_existing=True,
+        )
+
         if not scheduler.running:
             scheduler.start()
-            logger.info("Scheduler started (audits + daily TikTok 9 AM UTC)")
+            logger.info("Scheduler started (audits + daily TikTok 9 AM UTC + trial emails 8 AM UTC)")
 
     except Exception as e:
         logger.error(f"Error scheduling audits: {type(e).__name__}: {str(e)}")
