@@ -1,6 +1,5 @@
-"""v3.5 routes: Stripe checkout + daily videos. Mounted from main.py."""
+"""v3.5 routes: MercadoPago checkout + daily videos. Mounted from main.py."""
 import os
-import json
 import logging
 from datetime import datetime, date
 from typing import Optional, Any, Dict
@@ -11,19 +10,22 @@ from pydantic import BaseModel
 
 from database import get_db
 from models import User, Subscription, GeneratedVideo
+import payments
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
-class CheckoutRequest(BaseModel):
-    price_id: str = ""
-    success_url: str
-    cancel_url: str
+ARS_PLANS = {
+    "starter": 19900,
+    "pro": 29900,
+    "enterprise": 79900,
+}
 
 
 def _get_user(authorization: Optional[str], db: Session) -> User:
-    """Local copy of header auth — avoids circular import from main.py."""
+    """Extract user from Bearer token."""
     if not authorization:
         raise HTTPException(status_code=401, detail="No authorization header")
     import jwt
@@ -40,71 +42,41 @@ def _get_user(authorization: Optional[str], db: Session) -> User:
     return user
 
 
-@router.post("/checkout/session")
-async def create_checkout_session(
-    request: CheckoutRequest,
+@router.post("/checkout/mercadopago")
+async def create_mercadopago_checkout(
+    plan: str,
     authorization: Optional[str] = Header(None),
     db: Session = Depends(get_db),
 ):
     user = _get_user(authorization, db)
-    stripe_key = os.getenv("STRIPE_SECRET_KEY", "")
-    if not stripe_key:
-        raise HTTPException(status_code=400, detail="Stripe not configured")
-    price_id = request.price_id or os.getenv("STRIPE_PRICE_ID", "")
-    if not price_id:
-        raise HTTPException(status_code=400, detail="STRIPE_PRICE_ID not configured")
+
+    if plan not in ARS_PLANS:
+        raise HTTPException(status_code=400, detail=f"Plan '{plan}' not found")
+
     try:
-        import stripe as stripe_lib
-        stripe_lib.api_key = stripe_key
-        session = stripe_lib.checkout.Session.create(
-            customer_email=user.email,
-            payment_method_types=["card"],
-            line_items=[{"price": price_id, "quantity": 1}],
-            mode="subscription",
-            success_url=request.success_url + "?session_id={CHECKOUT_SESSION_ID}",
-            cancel_url=request.cancel_url,
-            metadata={"user_id": str(user.id)},
+        checkout_url = payments.create_checkout(
+            user_id=user.id,
+            plan=plan,
+            db=db,
+            frontend_url=FRONTEND_URL
         )
-        return {"session_url": session.url, "session_id": session.id}
+        if not checkout_url:
+            raise HTTPException(status_code=500, detail="Could not create checkout")
+        return {"success": True, "checkout_url": checkout_url, "plan": plan}
     except Exception as e:
-        logger.error(f"Stripe checkout error: {e}")
+        logger.error(f"MercadoPago checkout error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/webhooks/stripe")
-async def stripe_webhook_handler(request: Request, db: Session = Depends(get_db)):
-    payload = await request.body()
-    sig_header = request.headers.get("stripe-signature", "")
-    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+@router.post("/webhooks/mercadopago")
+async def mercadopago_webhook_handler(request: Request, db: Session = Depends(get_db)):
     try:
-        import stripe as stripe_lib
-        stripe_lib.api_key = os.getenv("STRIPE_SECRET_KEY", "")
-        if webhook_secret:
-            event = stripe_lib.Webhook.construct_event(payload, sig_header, webhook_secret)
-        else:
-            event = stripe_lib.Event.construct_from(json.loads(payload), stripe_lib.api_key)
+        body = await request.json()
+        success = payments.handle_webhook(body, db)
+        return {"received": True, "status": "success" if success else "processed"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-    if event["type"] in ("checkout.session.completed", "invoice.payment_succeeded"):
-        obj = event["data"]["object"]
-        user_id_str = obj.get("metadata", {}).get("user_id", "")
-        if user_id_str:
-            user_id = int(user_id_str)
-            user = db.query(User).filter(User.id == user_id).first()
-            if user:
-                user.has_paid = True
-                user.paid_at = datetime.utcnow()
-                sub = db.query(Subscription).filter(
-                    Subscription.user_id == user_id
-                ).order_by(Subscription.created_at.desc()).first()
-                if sub:
-                    sub.plan = "pro"
-                    sub.status = "active"
-                db.commit()
-                logger.info(f"User {user_id} marked as paid")
-
-    return {"received": True}
+        logger.error(f"MercadoPago webhook error: {e}")
+        return {"received": True, "status": "error"}
 
 
 @router.post("/auth/onboard")
