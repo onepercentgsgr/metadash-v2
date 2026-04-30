@@ -26,8 +26,7 @@ const SECTIONS = [
     accent: '#8b5cf6',
     description: 'Claves API para los agentes de inteligencia artificial',
     fields: [
-      { name: 'anthropic_api_key', label: 'Clave API Anthropic (Claude)', type: 'password', help: 'Necesaria para todos los agentes IA' },
-      { name: 'hf_api_key',        label: 'Clave API HuggingFace',        type: 'password', help: 'Opcional — para funciones avanzadas' },
+      { name: 'hf_api_key', label: 'Clave API HuggingFace', type: 'password', help: 'Opcional — para funciones de imagen y video con HuggingFace' },
     ],
   },
   {
@@ -71,6 +70,21 @@ const SECTIONS = [
     description: 'Integración de pagos con MercadoPago',
     fields: [
       { name: 'mercadopago_access_token', label: 'MercadoPago Access Token', type: 'password' },
+    ],
+  },
+  {
+    id: 'avanzado',
+    title: 'Configuración Avanzada',
+    icon: 'settings',
+    accent: '#6b7280',
+    description: 'Opciones para usuarios avanzados. Por defecto MetaDash usa su propia infraestructura de IA.',
+    fields: [
+      {
+        name: 'anthropic_api_key',
+        label: 'API Key Anthropic (override)',
+        type: 'password',
+        help: 'Opcional. Si configurás tu propia clave, MetaDash la usará en lugar de la infraestructura compartida. Útil para planes Enterprise con alto volumen.'
+      },
     ],
   },
 ];
@@ -178,7 +192,7 @@ export default function SettingsPage() {
             Integraciones &amp; APIs
           </p>
           <h1 className="text-2xl font-extrabold tracking-tight text-white">Configuración</h1>
-          <p className="text-sm mt-1" style={{ color: '#6b7280' }}>Conecta tus servicios y configura los agentes IA</p>
+          <p className="text-sm mt-1" style={{ color: '#6b7280' }}>Conecta tus servicios externos. Los agentes IA ya están listos — MetaDash gestiona la infraestructura por vos.</p>
         </div>
 
         {/* Messages */}

@@ -6,6 +6,7 @@ import { Icon } from './Icons';
 
 const NAV = [
   { label: 'Dashboard',      path: '/dashboard',    icon: 'dashboard'   },
+  { label: 'Lanzar',         path: '/lanzar',       icon: 'rocket'      },
   { label: 'Campañas',       path: '/campaigns',    icon: 'campaigns'   },
   { label: 'TikTok Orgánico',path: '/tiktok',       icon: 'tiktok'      },
   { label: 'Videos del Día', path: '/videos',       icon: 'videos'      },
@@ -69,26 +70,41 @@ export function Layout({ children }) {
           )}
           {NAV.map((item) => {
             const on = active(item.path);
+            const isLanzar = item.path === '/lanzar';
             return (
               <Link key={item.path} href={item.path}
                 className="flex items-center gap-3 rounded-lg transition-all duration-150 group relative"
                 style={{
                   padding: open ? '8px 10px' : '10px',
                   justifyContent: open ? 'flex-start' : 'center',
-                  color: on ? '#a5b4fc' : 'rgba(255,255,255,0.38)',
-                  background: on ? 'rgba(99,102,241,0.1)' : 'transparent',
-                  boxShadow: on ? 'inset 0 0 0 1px rgba(99,102,241,0.2)' : 'none',
+                  color: on ? (isLanzar ? '#fff' : '#a5b4fc') : (isLanzar ? 'rgba(255,255,255,0.85)' : 'rgba(255,255,255,0.38)'),
+                  background: on
+                    ? (isLanzar ? 'linear-gradient(135deg,#4f46e5,#7c3aed)' : 'rgba(99,102,241,0.1)')
+                    : (isLanzar ? 'linear-gradient(135deg,rgba(79,70,229,0.18),rgba(124,58,237,0.18))' : 'transparent'),
+                  boxShadow: on
+                    ? (isLanzar ? '0 2px 12px rgba(99,102,241,0.35), inset 0 0 0 1px rgba(255,255,255,0.1)' : 'inset 0 0 0 1px rgba(99,102,241,0.2)')
+                    : (isLanzar ? 'inset 0 0 0 1px rgba(99,102,241,0.2)' : 'none'),
                 }}
                 onMouseEnter={(e) => {
                   if (!on) {
-                    e.currentTarget.style.color = 'rgba(255,255,255,0.75)';
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+                    if (isLanzar) {
+                      e.currentTarget.style.background = 'linear-gradient(135deg,rgba(79,70,229,0.3),rgba(124,58,237,0.3))';
+                      e.currentTarget.style.color = '#fff';
+                    } else {
+                      e.currentTarget.style.color = 'rgba(255,255,255,0.75)';
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+                    }
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!on) {
-                    e.currentTarget.style.color = 'rgba(255,255,255,0.38)';
-                    e.currentTarget.style.background = 'transparent';
+                    if (isLanzar) {
+                      e.currentTarget.style.background = 'linear-gradient(135deg,rgba(79,70,229,0.18),rgba(124,58,237,0.18))';
+                      e.currentTarget.style.color = 'rgba(255,255,255,0.85)';
+                    } else {
+                      e.currentTarget.style.color = 'rgba(255,255,255,0.38)';
+                      e.currentTarget.style.background = 'transparent';
+                    }
                   }
                 }}
               >
