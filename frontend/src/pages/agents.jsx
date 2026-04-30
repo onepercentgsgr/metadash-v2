@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Layout } from '../components/Layout';
-import { ProtectedRoute } from '../components/ProtectedRoute';
 import { api } from '../lib/api';
 
 const AGENTS = [
@@ -11,7 +10,7 @@ const AGENTS = [
     name: 'Optimizador de Campañas',
     icon: '⚡',
     description: 'Analiza campañas activas y detecta automáticamente qué pausar, escalar o ajustar',
-    color: 'amber',
+    accent: '#f59e0b',
     endpoint: 'optimize',
     hasInput: false,
     tag: 'Auto',
@@ -22,7 +21,7 @@ const AGENTS = [
     name: 'Asesor de Crecimiento',
     icon: '📈',
     description: 'Estrategia de crecimiento personalizada basada en tus datos y objetivos',
-    color: 'indigo',
+    accent: '#6366f1',
     endpoint: 'growth',
     hasInput: true,
     tag: 'Estrategia',
@@ -34,7 +33,7 @@ const AGENTS = [
     name: 'Director Creativo',
     icon: '🎨',
     description: 'Analiza el rendimiento de tus creativos e identifica qué funciona y qué rotar',
-    color: 'pink',
+    accent: '#ec4899',
     endpoint: 'creatives',
     hasInput: false,
     tag: 'Auto',
@@ -45,7 +44,7 @@ const AGENTS = [
     name: 'Generador de Guiones',
     icon: '✍️',
     description: 'Crea guiones de video ads con ángulos de dolor, aspiración y prueba social',
-    color: 'purple',
+    accent: '#8b5cf6',
     endpoint: 'scripts',
     hasInput: true,
     tag: 'Creativo',
@@ -57,7 +56,7 @@ const AGENTS = [
     name: 'Analista Financiero',
     icon: '💰',
     description: 'Análisis de márgenes, MER, breakeven ROAS y proyecciones a 30 días',
-    color: 'emerald',
+    accent: '#10b981',
     endpoint: 'finance',
     hasInput: true,
     tag: 'Finanzas',
@@ -69,7 +68,7 @@ const AGENTS = [
     name: 'Auditor de Landing Page',
     icon: '🌐',
     description: 'Audita tu landing page para CRO: headlines, CTAs, fricción, trust signals',
-    color: 'sky',
+    accent: '#0ea5e9',
     endpoint: 'landing-audit',
     hasInput: false,
     tag: 'CRO',
@@ -79,8 +78,8 @@ const AGENTS = [
     id: 'analytics',
     name: 'Google Analytics Advisor',
     icon: '📊',
-    description: 'Analiza tráfico, conversiones, fuentes y comportamiento de usuarios con datos reales de GA4',
-    color: 'blue',
+    description: 'Analiza tráfico, conversiones y comportamiento de usuarios con datos reales de GA4',
+    accent: '#3b82f6',
     endpoint: 'analytics',
     hasInput: false,
     tag: 'Analytics',
@@ -88,63 +87,11 @@ const AGENTS = [
   },
 ];
 
-const colorMap = {
-  amber: {
-    card: 'hover:border-amber-700/50',
-    tag: 'bg-amber-900/30 text-amber-300 border-amber-700/30',
-    button: 'bg-amber-600 hover:bg-amber-500',
-    result: 'border-amber-700/40 bg-amber-950/20',
-    icon: 'bg-amber-900/30',
-  },
-  indigo: {
-    card: 'hover:border-indigo-700/50',
-    tag: 'bg-indigo-900/30 text-indigo-300 border-indigo-700/30',
-    button: 'bg-indigo-600 hover:bg-indigo-500',
-    result: 'border-indigo-700/40 bg-indigo-950/20',
-    icon: 'bg-indigo-900/30',
-  },
-  pink: {
-    card: 'hover:border-pink-700/50',
-    tag: 'bg-pink-900/30 text-pink-300 border-pink-700/30',
-    button: 'bg-pink-600 hover:bg-pink-500',
-    result: 'border-pink-700/40 bg-pink-950/20',
-    icon: 'bg-pink-900/30',
-  },
-  purple: {
-    card: 'hover:border-purple-700/50',
-    tag: 'bg-purple-900/30 text-purple-300 border-purple-700/30',
-    button: 'bg-purple-600 hover:bg-purple-500',
-    result: 'border-purple-700/40 bg-purple-950/20',
-    icon: 'bg-purple-900/30',
-  },
-  emerald: {
-    card: 'hover:border-emerald-700/50',
-    tag: 'bg-emerald-900/30 text-emerald-300 border-emerald-700/30',
-    button: 'bg-emerald-600 hover:bg-emerald-500',
-    result: 'border-emerald-700/40 bg-emerald-950/20',
-    icon: 'bg-emerald-900/30',
-  },
-  sky: {
-    card: 'hover:border-sky-700/50',
-    tag: 'bg-sky-900/30 text-sky-300 border-sky-700/30',
-    button: 'bg-sky-600 hover:bg-sky-500',
-    result: 'border-sky-700/40 bg-sky-950/20',
-    icon: 'bg-sky-900/30',
-  },
-  blue: {
-    card: 'hover:border-blue-700/50',
-    tag: 'bg-blue-900/30 text-blue-300 border-blue-700/30',
-    button: 'bg-blue-600 hover:bg-blue-500',
-    result: 'border-blue-700/40 bg-blue-950/20',
-    icon: 'bg-blue-900/30',
-  },
-};
-
 export default function AgentsPage() {
-  const [prompts, setPrompts] = useState({});
-  const [results, setResults] = useState({});
-  const [loading, setLoading] = useState({});
-  const [errors, setErrors] = useState({});
+  const [prompts, setPrompts]           = useState({});
+  const [results, setResults]           = useState({});
+  const [loading, setLoading]           = useState({});
+  const [errors, setErrors]             = useState({});
   const [expandedResult, setExpandedResult] = useState(null);
 
   async function runAgent(agent) {
@@ -154,30 +101,15 @@ export default function AgentsPage() {
     try {
       const prompt = prompts[agent.id] || '';
       let result;
-
       switch (agent.endpoint) {
-        case 'optimize':
-          result = await api.runOptimizer();
-          break;
-        case 'growth':
-          result = await api.runGrowth({ prompt });
-          break;
-        case 'creatives':
-          result = await api.runCreatives();
-          break;
-        case 'scripts':
-          result = await api.runScripts({ prompt });
-          break;
-        case 'finance':
-          result = await api.runFinance({ prompt });
-          break;
-        case 'landing-audit':
-          result = await api.runLandingAudit({ prompt });
-          break;
-        default:
-          throw new Error('Agente no disponible');
+        case 'optimize':      result = await api.runOptimizer();                break;
+        case 'growth':        result = await api.runGrowth({ prompt });         break;
+        case 'creatives':     result = await api.runCreatives();                break;
+        case 'scripts':       result = await api.runScripts({ prompt });        break;
+        case 'finance':       result = await api.runFinance({ prompt });        break;
+        case 'landing-audit': result = await api.runLandingAudit({ prompt });   break;
+        default: throw new Error('Agente no disponible');
       }
-
       setResults(prev => ({ ...prev, [agent.id]: result }));
       setExpandedResult(agent.id);
     } catch (err) {
@@ -189,63 +121,80 @@ export default function AgentsPage() {
 
   return (
     <Layout>
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-7">
+
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white">Agentes IA</h1>
-            <p className="text-gray-400 mt-1">
-              6 agentes especializados para analizar y optimizar tu negocio
+            <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: '#6366f1' }}>
+              Inteligencia Artificial
             </p>
+            <h1 className="text-2xl font-extrabold tracking-tight text-white">Agentes IA</h1>
+            <p className="text-sm mt-1" style={{ color: '#6b7280' }}>7 agentes especializados para analizar y optimizar tu negocio</p>
           </div>
           <a
             href="/audit"
-            className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg transition-all text-sm font-medium shadow-lg shadow-indigo-900/20"
+            className="px-4 py-2 text-sm font-semibold rounded-xl transition-all"
+            style={{
+              background: 'linear-gradient(135deg,#4f46e5,#7c3aed)',
+              color: 'white',
+              boxShadow: '0 4px 15px rgba(99,102,241,0.25)',
+            }}
           >
-            Ejecutar Auditoría Completa
+            Auditoría Completa
           </a>
         </div>
 
         {/* Agents Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {AGENTS.map((agent) => {
-            const isLoading = loading[agent.id];
-            const hasResult = results[agent.id];
-            const agentError = errors[agent.id];
-            const prompt = prompts[agent.id] || '';
-            const colors = colorMap[agent.color];
-            const isExpanded = expandedResult === agent.id;
+            const isLoading   = loading[agent.id];
+            const hasResult   = results[agent.id];
+            const agentError  = errors[agent.id];
+            const prompt      = prompts[agent.id] || '';
+            const isExpanded  = expandedResult === agent.id;
+            const accentRgb   = agent.accent;
 
             return (
               <div
                 key={agent.id}
-                className={`bg-gray-900/80 border border-gray-800 rounded-xl transition-all ${colors.card} ${
-                  hasResult ? 'md:col-span-2' : ''
-                }`}
+                className={`rounded-2xl overflow-hidden transition-all ${hasResult ? 'md:col-span-2' : ''}`}
+                style={{
+                  background: '#16161a',
+                  border: '1px solid #1e1e24',
+                  boxShadow: isExpanded ? `0 0 0 1px rgba(${hexToRgb(agent.accent)},0.15), 0 8px 32px rgba(0,0,0,0.4)` : 'none',
+                }}
               >
                 <div className="p-5">
                   {/* Header */}
-                  <div className="flex items-start justify-between mb-3">
+                  <div className="flex items-start justify-between mb-4">
                     <div className="flex items-start gap-3">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${colors.icon}`}>
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                        style={{ background: `${agent.accent}18`, border: `1px solid ${agent.accent}30` }}
+                      >
                         {agent.icon}
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-base font-semibold text-white">{agent.name}</h3>
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${colors.tag}`}>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <h3 className="text-sm font-bold text-white">{agent.name}</h3>
+                          <span
+                            className="text-[9px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider"
+                            style={{ background: `${agent.accent}18`, color: agent.accent, border: `1px solid ${agent.accent}30` }}
+                          >
                             {agent.tag}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-400 mt-0.5">{agent.description}</p>
+                        <p className="text-xs leading-relaxed" style={{ color: '#9ca3af' }}>{agent.description}</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Capabilities */}
-                  <div className="flex flex-wrap gap-2 mb-4">
+                  <div className="flex flex-wrap gap-1.5 mb-4">
                     {agent.examples.map((ex, i) => (
-                      <span key={i} className="text-[11px] px-2 py-1 bg-gray-800/60 text-gray-400 rounded-md">
+                      <span key={i} className="text-[10px] px-2 py-1 rounded-lg font-medium"
+                        style={{ background: '#0d0d11', color: '#9ca3af', border: '1px solid #1e1e24' }}>
                         {ex}
                       </span>
                     ))}
@@ -258,14 +207,19 @@ export default function AgentsPage() {
                       onChange={(e) => setPrompts(prev => ({ ...prev, [agent.id]: e.target.value }))}
                       placeholder={agent.placeholder || 'Describe qué quieres que analice...'}
                       rows={2}
-                      className="w-full bg-gray-800/60 border border-gray-700/50 rounded-lg px-3 py-2.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-indigo-500 mb-3 resize-none"
+                      className="w-full rounded-xl px-3 py-2.5 text-sm placeholder-gray-600 focus:outline-none mb-3 resize-none transition-colors"
+                      style={{
+                        background: '#0d0d11',
+                        border: '1px solid #2a2a35',
+                        color: 'white',
+                      }}
                     />
                   )}
 
                   {/* Error */}
                   {agentError && (
-                    <div className="bg-red-900/20 border border-red-700/40 rounded-lg p-3 mb-3">
-                      <p className="text-red-300 text-xs">{agentError}</p>
+                    <div className="rounded-xl p-3 mb-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                      <p className="text-xs" style={{ color: '#f87171' }}>{agentError}</p>
                     </div>
                   )}
 
@@ -273,33 +227,42 @@ export default function AgentsPage() {
                   <button
                     onClick={() => runAgent(agent)}
                     disabled={isLoading}
-                    className={`w-full ${colors.button} disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-all text-sm flex items-center justify-center gap-2`}
+                    className="w-full py-2.5 rounded-xl font-semibold transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+                    style={{
+                      background: `${agent.accent}22`,
+                      color: agent.accent,
+                      border: `1px solid ${agent.accent}35`,
+                    }}
                   >
                     {isLoading ? (
                       <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin opacity-60" />
                         Analizando...
                       </>
                     ) : (
-                      <>Ejecutar</>
+                      <>▶ Ejecutar {agent.name}</>
                     )}
                   </button>
                 </div>
 
                 {/* Result */}
                 {hasResult && (
-                  <div className={`border-t ${colors.result} rounded-b-xl`}>
+                  <div style={{ borderTop: `1px solid ${agent.accent}20`, background: `${agent.accent}06` }}>
                     <button
                       onClick={() => setExpandedResult(isExpanded ? null : agent.id)}
-                      className="w-full flex items-center justify-between px-5 py-3 text-sm"
+                      className="w-full flex items-center justify-between px-5 py-3 text-sm transition-colors hover:bg-white/[0.02]"
                     >
-                      <span className="font-medium text-gray-300">Resultado del análisis</span>
-                      <span className="text-gray-500">{isExpanded ? '▼' : '▶'}</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full" style={{ background: agent.accent }} />
+                        <span className="font-semibold" style={{ color: '#d1d5db' }}>Resultado del análisis</span>
+                      </div>
+                      <span style={{ color: '#6b7280' }}>{isExpanded ? '▼' : '▶'}</span>
                     </button>
                     {isExpanded && (
                       <div className="px-5 pb-5">
-                        <div className="bg-gray-950/60 rounded-lg p-4 max-h-[500px] overflow-y-auto">
-                          <pre className="whitespace-pre-wrap text-sm text-gray-300 leading-relaxed font-sans">
+                        <div className="rounded-xl p-4 max-h-[500px] overflow-y-auto"
+                          style={{ background: '#0d0d11', border: '1px solid #1e1e24' }}>
+                          <pre className="whitespace-pre-wrap text-sm leading-relaxed font-sans" style={{ color: '#d1d5db' }}>
                             {typeof hasResult === 'string' ? hasResult : JSON.stringify(hasResult, null, 2)}
                           </pre>
                         </div>
@@ -314,4 +277,11 @@ export default function AgentsPage() {
       </div>
     </Layout>
   );
+}
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `${r},${g},${b}`;
 }

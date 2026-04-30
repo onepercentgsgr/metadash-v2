@@ -11,80 +11,112 @@ export function Layout({ children }) {
   const isActive = (path) => router.pathname === path;
 
   const navItems = [
-    { label: 'Dashboard', path: '/dashboard', icon: '📊' },
-    { label: 'Campañas', path: '/campaigns', icon: '🎯' },
-    { label: 'TikTok Orgánico', path: '/tiktok', icon: '🎵' },
-    { label: 'Videos del Día', path: '/videos', icon: '🎬' },
-    { label: 'Infoproducto', path: '/infoproducto', icon: '🚀' },
-    { label: 'Agentes IA', path: '/agents', icon: '🤖' },
-    { label: 'Auditoría', path: '/audit', icon: '🔍' },
-    { label: 'Finanzas', path: '/financials', icon: '💰' },
-    { label: 'Configuración', path: '/settings', icon: '⚙️' },
+    { label: 'Dashboard',      path: '/dashboard',     icon: '◈',  emoji: '📊' },
+    { label: 'Campañas',       path: '/campaigns',     icon: '◎',  emoji: '🎯' },
+    { label: 'TikTok Orgánico',path: '/tiktok',        icon: '◉',  emoji: '🎵' },
+    { label: 'Videos del Día', path: '/videos',        icon: '◐',  emoji: '🎬' },
+    { label: 'Infoproducto',   path: '/infoproducto',  icon: '◆',  emoji: '🚀' },
+    { label: 'Agentes IA',     path: '/agents',        icon: '◇',  emoji: '🤖' },
+    { label: 'Auditoría',      path: '/audit',         icon: '◻',  emoji: '🔍' },
+    { label: 'Finanzas',       path: '/financials',    icon: '◑',  emoji: '💰' },
+    { label: 'Configuración',  path: '/settings',      icon: '◌',  emoji: '⚙️' },
   ];
 
   const adminItems = user?.role === 'admin' ? [
-    { label: 'Admin', path: '/admin', icon: '👑' },
+    { label: 'Admin', path: '/admin', emoji: '👑' },
   ] : [];
 
   return (
-    <div className="flex h-screen bg-gray-950">
+    <div className="flex h-screen" style={{ background: '#09090b' }}>
       {/* Sidebar */}
       <div
-        className={`bg-gray-900 border-r border-gray-800 flex flex-col transition-all duration-300 ${
-          sidebarOpen ? 'w-64' : 'w-20'
+        className={`flex flex-col transition-all duration-300 border-r ${
+          sidebarOpen ? 'w-64' : 'w-[72px]'
         }`}
+        style={{ background: '#0c0c0f', borderColor: '#1e1e24' }}
       >
         {/* Logo */}
-        <div className="p-5 border-b border-gray-800">
-          <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-indigo-900/30">
+        <div className="p-5 border-b" style={{ borderColor: '#1e1e24' }}>
+          <Link href="/dashboard" className="flex items-center gap-3 group">
+            <div
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-bold text-xs shadow-lg flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)', boxShadow: '0 0 20px rgba(79,70,229,0.35)' }}
+            >
               MD
             </div>
             {sidebarOpen && (
               <div>
-                <span className="text-white font-bold text-lg">MetaDash</span>
-                <div className="text-[10px] text-indigo-400 font-medium -mt-0.5">v3.5</div>
+                <div className="text-white font-extrabold text-base tracking-tight leading-none">MetaDash</div>
+                <div className="text-[10px] font-semibold tracking-widest uppercase mt-0.5" style={{ color: '#6366f1' }}>v3.5</div>
               </div>
             )}
           </Link>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-1">
-          <div className="px-3 py-2">
-            {sidebarOpen && <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Principal</span>}
-          </div>
-          {navItems.map((item) => (
-            <Link
-              key={item.path + item.label}
-              href={item.path}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm ${
-                isActive(item.path)
-                  ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-700/30'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'
-              }`}
-            >
-              <span className="text-lg">{item.icon}</span>
-              {sidebarOpen && <span className="font-medium">{item.label}</span>}
-            </Link>
-          ))}
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          {sidebarOpen && (
+            <div className="px-3 pb-3">
+              <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#3f3f50' }}>
+                Principal
+              </span>
+            </div>
+          )}
+          {navItems.map((item) => {
+            const active = isActive(item.path);
+            return (
+              <Link
+                key={item.path}
+                href={item.path}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-medium group relative ${
+                  active ? '' : 'hover:text-gray-200'
+                }`}
+                style={
+                  active
+                    ? {
+                        background: 'rgba(99,102,241,0.12)',
+                        color: '#a5b4fc',
+                        boxShadow: 'inset 0 0 0 1px rgba(99,102,241,0.25)',
+                      }
+                    : { color: '#6b7280' }
+                }
+              >
+                {active && (
+                  <span
+                    className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 rounded-r"
+                    style={{ background: 'linear-gradient(180deg,#6366f1,#8b5cf6)' }}
+                  />
+                )}
+                <span className="text-base flex-shrink-0 w-5 text-center">{item.emoji}</span>
+                {sidebarOpen && <span>{item.label}</span>}
+              </Link>
+            );
+          })}
+
           {adminItems.length > 0 && (
             <>
-              <div className="px-3 py-2 mt-3">
-                {sidebarOpen && <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Admin</span>}
-              </div>
+              {sidebarOpen && (
+                <div className="px-3 pb-2 pt-4">
+                  <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#3f3f50' }}>
+                    Admin
+                  </span>
+                </div>
+              )}
               {adminItems.map((item) => (
                 <Link
                   key={item.path}
                   href={item.path}
-                  className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm ${
-                    isActive(item.path)
-                      ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-700/30'
-                      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all text-sm font-medium ${
+                    isActive(item.path) ? '' : 'hover:text-gray-200'
                   }`}
+                  style={
+                    isActive(item.path)
+                      ? { background: 'rgba(99,102,241,0.12)', color: '#a5b4fc', boxShadow: 'inset 0 0 0 1px rgba(99,102,241,0.25)' }
+                      : { color: '#6b7280' }
+                  }
                 >
-                  <span className="text-lg">{item.icon}</span>
-                  {sidebarOpen && <span className="font-medium">{item.label}</span>}
+                  <span className="text-base">{item.emoji}</span>
+                  {sidebarOpen && <span>{item.label}</span>}
                 </Link>
               ))}
             </>
@@ -92,17 +124,20 @@ export function Layout({ children }) {
         </nav>
 
         {/* User Info */}
-        <div className="p-4 border-t border-gray-800">
+        <div className="p-3 border-t" style={{ borderColor: '#1e1e24' }}>
           {sidebarOpen ? (
             <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center text-sm text-gray-300">
+              <div className="flex items-center gap-3 px-1">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0"
+                  style={{ background: 'linear-gradient(135deg,#1e1e2e,#2d2d3f)', color: '#a5b4fc', border: '1px solid #2a2a35' }}
+                >
                   {user?.email?.[0]?.toUpperCase() || 'U'}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm text-gray-300 truncate">{user?.email}</div>
+                  <div className="text-sm font-medium text-gray-300 truncate">{user?.email}</div>
                   {user?.subscription_status && (
-                    <span className="text-[10px] text-indigo-400 font-medium">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: '#6366f1' }}>
                       {user.subscription_status}
                     </span>
                   )}
@@ -110,7 +145,10 @@ export function Layout({ children }) {
               </div>
               <button
                 onClick={logout}
-                className="w-full px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 rounded-lg transition-colors text-xs font-medium"
+                className="w-full px-3 py-2 rounded-lg transition-colors text-xs font-medium"
+                style={{ background: '#16161a', color: '#6b7280', border: '1px solid #1e1e24' }}
+                onMouseEnter={(e) => { e.target.style.color = '#e5e7eb'; e.target.style.background = '#1e1e24'; }}
+                onMouseLeave={(e) => { e.target.style.color = '#6b7280'; e.target.style.background = '#16161a'; }}
               >
                 Cerrar sesión
               </button>
@@ -118,7 +156,8 @@ export function Layout({ children }) {
           ) : (
             <button
               onClick={logout}
-              className="w-full p-2 bg-gray-800 hover:bg-gray-700 text-gray-400 rounded-lg transition-colors text-xs"
+              className="w-full p-2 rounded-lg transition-colors text-xs"
+              style={{ background: '#16161a', color: '#6b7280' }}
               title="Cerrar sesión"
             >
               ↩
@@ -129,17 +168,19 @@ export function Layout({ children }) {
         {/* Toggle */}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-3 text-gray-500 hover:text-gray-300 transition-colors border-t border-gray-800"
+          className="p-3 transition-colors border-t text-xs font-mono"
+          style={{ borderColor: '#1e1e24', color: '#3f3f50' }}
+          onMouseEnter={(e) => { e.target.style.color = '#6b7280'; }}
+          onMouseLeave={(e) => { e.target.style.color = '#3f3f50'; }}
         >
-          {sidebarOpen ? '‹' : '›'}
+          {sidebarOpen ? '‹‹' : '››'}
         </button>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Content Area */}
-        <div className="flex-1 overflow-auto bg-gray-950">
-          <div className="p-6 lg:p-8">{children}</div>
+        <div className="flex-1 overflow-auto" style={{ background: '#09090b' }}>
+          <div className="p-6 lg:p-8 max-w-[1400px]">{children}</div>
         </div>
       </div>
     </div>
