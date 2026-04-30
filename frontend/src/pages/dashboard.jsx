@@ -1,61 +1,82 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Layout } from '../components/Layout';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
-function MetricCard({ label, value, subtitle, icon, color = 'indigo', trend }) {
-  const colorMap = {
-    indigo: 'from-indigo-600/20 to-indigo-900/10 border-indigo-700/50',
-    green: 'from-green-600/20 to-green-900/10 border-green-700/50',
-    yellow: 'from-yellow-600/20 to-yellow-900/10 border-yellow-700/50',
-    red: 'from-red-600/20 to-red-900/10 border-red-700/50',
-    blue: 'from-blue-600/20 to-blue-900/10 border-blue-700/50',
-    purple: 'from-purple-600/20 to-purple-900/10 border-purple-700/50',
-  };
+const WIZARD_STEPS = [
+  { id: 'oferta', num: 0, icon: '🎯', name: 'Modelado de Oferta' },
+  { id: 'investigacion', num: 1, icon: '🔍', name: 'Investigación de Mercado' },
+  { id: 'avatares', num: 2, icon: '👥', name: 'Avatares + Ángulos' },
+  { id: 'brand', num: 3, icon: '🎨', name: 'Identidad Visual' },
+  { id: 'mockup', num: 4, icon: '📸', name: 'Mockup Principal' },
+  { id: 'ads', num: 5, icon: '🖼️', name: 'Prompts de ADS' },
+  { id: 'bonus_mockups', num: 6, icon: '🎁', name: 'Bonus Mockups' },
+  { id: 'bundle', num: 7, icon: '📦', name: 'Bundle Completo' },
+  { id: 'landing', num: 8, icon: '🚀', name: 'Landing Page' },
+  { id: 'copys', num: 9, icon: '✍️', name: 'Copys para Ads' },
+  { id: 'guiones', num: 10, icon: '🎬', name: 'Guiones Video Ads' },
+  { id: 'ugc', num: 11, icon: '📱', name: 'UGC Realistas' },
+  { id: 'producto', num: 12, icon: '📖', name: 'Generador de Producto' },
+  { id: 'lanzamiento', num: 13, icon: '🚀', name: 'Plan de Lanzamiento' },
+];
+
+function ConnectionPill({ icon, label, status }) {
+  const isOk = status === 'connected';
+  const isPartial = status === 'partial';
+  const dotColor = isOk
+    ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]'
+    : isPartial
+    ? 'bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.6)]'
+    : 'bg-gray-600';
+  const labelColor = isOk ? 'text-emerald-300' : isPartial ? 'text-amber-300' : 'text-gray-500';
+  const stateText = isOk ? 'Conectado' : isPartial ? 'Parcial' : 'Desconectado';
   return (
-    <div className={`bg-gradient-to-br ${colorMap[color]} border rounded-xl p-5`}>
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-2xl">{icon}</span>
-        {trend && (
-          <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-            trend > 0 ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'
-          }`}>
-            {trend > 0 ? '+' : ''}{trend}%
-          </span>
-        )}
+    <div className="flex items-center justify-between p-3 rounded-xl bg-[#111114] border border-[#1e1e24]">
+      <div className="flex items-center gap-3">
+        <span className="text-base">{icon}</span>
+        <span className="text-sm text-gray-300 font-medium tracking-tight">{label}</span>
       </div>
-      <div className="text-2xl font-bold text-white mb-1">{value}</div>
-      <div className="text-sm text-gray-400">{label}</div>
-      {subtitle && <div className="text-xs text-gray-500 mt-1">{subtitle}</div>}
+      <div className="flex items-center gap-2">
+        <span className={`h-1.5 w-1.5 rounded-full ${dotColor}`} />
+        <span className={`text-[10px] uppercase tracking-widest font-semibold ${labelColor}`}>
+          {stateText}
+        </span>
+      </div>
     </div>
   );
 }
 
-function StatusBadge({ status }) {
-  const map = {
-    connected: { bg: 'bg-green-900/40 text-green-300 border-green-700/50', label: 'Conectado' },
-    disconnected: { bg: 'bg-red-900/40 text-red-300 border-red-700/50', label: 'Desconectado' },
-    partial: { bg: 'bg-yellow-900/40 text-yellow-300 border-yellow-700/50', label: 'Parcial' },
-  };
-  const s = map[status] || map.disconnected;
+function QuickAction({ href, icon, title, subtitle, accent }) {
+  const accentClass = {
+    indigo: 'hover:border-indigo-700/50 hover:bg-indigo-600/5',
+    violet: 'hover:border-violet-700/50 hover:bg-violet-600/5',
+    emerald: 'hover:border-emerald-700/50 hover:bg-emerald-600/5',
+    amber: 'hover:border-amber-700/50 hover:bg-amber-600/5',
+  }[accent] || 'hover:border-gray-700/60';
   return (
-    <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${s.bg}`}>
-      {s.label}
-    </span>
+    <Link
+      href={href}
+      className={`group bg-[#16161a] border border-[#1e1e24] rounded-2xl p-6 transition-all ${accentClass}`}
+    >
+      <div className="flex items-start justify-between mb-4">
+        <span className="text-3xl">{icon}</span>
+        <span className="text-gray-600 group-hover:text-gray-300 transition-colors text-lg">→</span>
+      </div>
+      <div className="text-base font-bold text-gray-100 tracking-tight mb-1">{title}</div>
+      <div className="text-sm text-gray-400 leading-snug">{subtitle}</div>
+    </Link>
   );
 }
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const [config, setConfig] = useState(null);
-  const [campaigns, setCampaigns] = useState([]);
-  const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [ga4Data, setGa4Data] = useState(null);
-  const [autonomousActions, setAutonomousActions] = useState([]);
+  const [wizardState, setWizardState] = useState(null);
   const [configStatus, setConfigStatus] = useState({
     meta: 'disconnected',
     anthropic: 'disconnected',
@@ -65,50 +86,37 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadAll();
+    // Read wizard state from localStorage
+    try {
+      const raw = localStorage.getItem('metadash_infoproducto');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        setWizardState(parsed);
+      }
+    } catch (e) {
+      console.warn('No wizard state', e);
+    }
   }, []);
 
   async function loadAll() {
     setLoading(true);
     try {
-      const [configData, campaignData, financeData, autonomousData] = await Promise.allSettled([
-        api.getConfig(),
-        api.getCampaigns('last_7d'),
-        api.getRecords(),
-        api.getAutonomousActions(20),
-      ]);
-
-      if (configData.status === 'fulfilled') {
-        const c = configData.value;
-        setConfig(c);
+      const configData = await api.getConfig().catch(() => null);
+      if (configData) {
+        setConfig(configData);
+        const c = configData;
         const hasGa4 = !!(c.ga4_property_id && c.ga4_credentials_json);
         setConfigStatus({
-          meta: c.meta_access_token && c.meta_ad_account_id ? 'connected' : (c.meta_access_token || c.meta_ad_account_id ? 'partial' : 'disconnected'),
+          meta:
+            c.meta_access_token && c.meta_ad_account_id
+              ? 'connected'
+              : c.meta_access_token || c.meta_ad_account_id
+              ? 'partial'
+              : 'disconnected',
           anthropic: c.anthropic_api_key ? 'connected' : 'disconnected',
           landing: c.landing_page_url ? 'connected' : 'disconnected',
           ga4: hasGa4 ? 'connected' : 'disconnected',
         });
-
-        // Fetch GA4 data if configured
-        if (hasGa4) {
-          try {
-            const gaData = await api.apiFetch('/analytics/data?days=30');
-            setGa4Data(gaData);
-          } catch (gaErr) {
-            console.warn('GA4 data fetch failed:', gaErr);
-          }
-        }
-      }
-
-      if (campaignData.status === 'fulfilled' && Array.isArray(campaignData.value)) {
-        setCampaigns(campaignData.value);
-      }
-
-      if (financeData.status === 'fulfilled' && Array.isArray(financeData.value)) {
-        setRecords(financeData.value);
-      }
-
-      if (autonomousData.status === 'fulfilled' && Array.isArray(autonomousData.value)) {
-        setAutonomousActions(autonomousData.value);
       }
     } catch (err) {
       console.error('Dashboard load error:', err);
@@ -117,21 +125,33 @@ export default function DashboardPage() {
     }
   }
 
-  // Calculate metrics from campaigns
-  const totalSpend = campaigns.reduce((sum, c) => sum + (c.insights?.spend || 0), 0);
-  const totalRevenue = campaigns.reduce((sum, c) => sum + (c.insights?.revenue || 0), 0);
-  const totalPurchases = campaigns.reduce((sum, c) => sum + (c.insights?.purchases || 0), 0);
-  const avgRoas = totalSpend > 0 ? (totalRevenue / totalSpend).toFixed(2) : '—';
-  const avgCpa = totalPurchases > 0 ? (totalSpend / totalPurchases).toFixed(2) : '—';
-  const activeCampaigns = campaigns.filter(c => c.status === 'ACTIVE').length;
+  // Wizard progress derivation
+  const currentStepIndex =
+    wizardState && typeof wizardState.paso_actual === 'number' ? wizardState.paso_actual : null;
+  const completedSteps = Array.isArray(wizardState?.pasos_completos)
+    ? wizardState.pasos_completos.length
+    : 0;
+  const currentStep =
+    currentStepIndex !== null && WIZARD_STEPS[currentStepIndex]
+      ? WIZARD_STEPS[currentStepIndex]
+      : null;
+  const progressPct = Math.round((completedSteps / WIZARD_STEPS.length) * 100);
+  const hasWizardProgress = currentStepIndex !== null;
+
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Buen día';
+    if (h < 19) return 'Buenas tardes';
+    return 'Buenas noches';
+  })();
 
   if (loading) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center">
-            <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-400">Cargando dashboard...</p>
+            <div className="w-10 h-10 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-sm text-gray-400">Cargando…</p>
           </div>
         </div>
       </Layout>
@@ -140,332 +160,149 @@ export default function DashboardPage() {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-white">
-              Buen día{user?.name ? `, ${user.name}` : ''}
-            </h1>
-            <p className="text-gray-400 mt-1">Resumen de tu cuenta de Meta Ads y rendimiento</p>
+      <div className="max-w-6xl mx-auto space-y-10">
+        {/* Hero */}
+        <header className="pt-2">
+          <div className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-3">
+            Tu workspace · {new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })}
           </div>
-          <button
-            onClick={loadAll}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors text-sm border border-gray-700"
-          >
-            Actualizar
-          </button>
-        </div>
+          <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-gray-100">
+            {greeting}{user?.name ? `, ${user.name.split(' ')[0]}` : ''}.
+          </h1>
+          <p className="text-sm text-gray-400 mt-2 max-w-2xl">
+            Tu próximo paso para lanzar tu infoproducto. Sin distracciones, una sola misión hoy.
+          </p>
+        </header>
 
-        {/* Connection Status */}
-        <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Estado de Conexiones</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">📱</span>
-                <span className="text-sm text-gray-300">Meta Ads</span>
-              </div>
-              <StatusBadge status={configStatus.meta} />
-            </div>
-            <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">🤖</span>
-                <span className="text-sm text-gray-300">Agentes IA</span>
-              </div>
-              <StatusBadge status={configStatus.anthropic} />
-            </div>
-            <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">📊</span>
-                <span className="text-sm text-gray-300">Google Analytics</span>
-              </div>
-              <StatusBadge status={configStatus.ga4} />
-            </div>
-            <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">🌐</span>
-                <span className="text-sm text-gray-300">Landing Page</span>
-              </div>
-              <StatusBadge status={configStatus.landing} />
-            </div>
+        {/* Tu lanzamiento de hoy */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
+              Tu lanzamiento de hoy
+            </span>
+            {hasWizardProgress && (
+              <span className="text-[10px] uppercase tracking-widest text-indigo-400 font-semibold">
+                {progressPct}% completado
+              </span>
+            )}
           </div>
-          {configStatus.meta === 'disconnected' && (
-            <div className="mt-4 p-3 bg-yellow-900/20 border border-yellow-700/40 rounded-lg">
-              <p className="text-yellow-200 text-sm">
-                Conecta tu cuenta de Meta Ads en <a href="/settings" className="underline font-medium">Configuración</a> para ver métricas reales de tus campañas.
-              </p>
+
+          {hasWizardProgress ? (
+            <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600/10 to-violet-600/10 border border-indigo-700/30 rounded-2xl p-8">
+              <div className="absolute -top-24 -right-24 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 mb-3">
+                    <span className="text-3xl">{currentStep?.icon || '🚀'}</span>
+                    <span className="text-[10px] uppercase tracking-widest text-indigo-300 font-semibold">
+                      Paso {currentStepIndex} de {WIZARD_STEPS.length - 1}
+                    </span>
+                  </div>
+                  <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-100 mb-2">
+                    {currentStep?.name || 'Continuá tu lanzamiento'}
+                  </h2>
+                  <p className="text-sm text-gray-400 max-w-md">
+                    Retomá donde te quedaste. Cada paso te acerca al lanzamiento real de tu infoproducto.
+                  </p>
+                  {/* progress bar */}
+                  <div className="mt-5 h-1.5 bg-[#1e1e24] rounded-full overflow-hidden max-w-md">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all"
+                      style={{ width: `${progressPct}%` }}
+                    />
+                  </div>
+                </div>
+                <Link
+                  href="/infoproducto"
+                  className="self-start md:self-center bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl px-6 py-3.5 transition shadow-lg shadow-indigo-900/30 whitespace-nowrap"
+                >
+                  Continuar →
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600/15 to-violet-600/15 border border-indigo-700/40 rounded-2xl p-10 text-center">
+              <div className="absolute -top-32 -right-32 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="relative">
+                <div className="text-5xl mb-4">🚀</div>
+                <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight text-gray-100 mb-3">
+                  Empezá tu primer lanzamiento
+                </h2>
+                <p className="text-sm text-gray-400 max-w-lg mx-auto mb-6">
+                  Un wizard guiado de 14 pasos. Pasás de idea a infoproducto listo para vender —
+                  con copy, ads, landing y plan de lanzamiento.
+                </p>
+                <Link
+                  href="/infoproducto"
+                  className="inline-block bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl px-7 py-4 transition shadow-lg shadow-indigo-900/40 text-base"
+                >
+                  Empezar ahora →
+                </Link>
+              </div>
             </div>
           )}
-        </div>
+        </section>
 
-        {/* KPI Metrics */}
-        <div>
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Métricas Clave — Últimos 7 días</h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <MetricCard
-              icon="💰"
-              label="Inversión Total"
-              value={totalSpend > 0 ? `$${totalSpend.toLocaleString()}` : '—'}
-              color="red"
+        {/* Acciones rápidas */}
+        <section>
+          <div className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-4">
+            Acciones rápidas
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <QuickAction
+              href="/infoproducto"
+              icon="🚀"
+              title="Empezar Infoproducto"
+              subtitle="Wizard de 14 pasos guiado por agentes IA"
+              accent="indigo"
             />
-            <MetricCard
-              icon="📈"
-              label="Revenue"
-              value={totalRevenue > 0 ? `$${totalRevenue.toLocaleString()}` : '—'}
-              color="green"
+            <QuickAction
+              href="/tiktok"
+              icon="🎬"
+              title="Generar Video TikTok"
+              subtitle="Guiones y videos orgánicos en minutos"
+              accent="violet"
             />
-            <MetricCard
-              icon="🎯"
-              label="ROAS"
-              value={avgRoas !== '—' ? `${avgRoas}x` : '—'}
-              color="indigo"
+            <QuickAction
+              href="/audit"
+              icon="🤖"
+              title="Auditoría Completa"
+              subtitle="Análisis integral de tus campañas y métricas"
+              accent="emerald"
             />
-            <MetricCard
-              icon="🛒"
-              label="Compras"
-              value={totalPurchases > 0 ? totalPurchases.toLocaleString() : '—'}
-              subtitle={avgCpa !== '—' ? `CPA: $${avgCpa}` : ''}
-              color="purple"
+            <QuickAction
+              href="/settings"
+              icon="⚙️"
+              title="Configurar APIs"
+              subtitle="Meta Ads, Anthropic, GA4, Landing Page"
+              accent="amber"
             />
           </div>
-        </div>
+        </section>
 
-        {/* Google Analytics Section */}
-        {ga4Data && ga4Data.overview && (
-          <div>
-            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Google Analytics 4 — Últimos 30 días</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-              <MetricCard
-                icon="👥"
-                label="Sesiones"
-                value={ga4Data.overview.sessions?.toLocaleString() || '—'}
-                color="blue"
-              />
-              <MetricCard
-                icon="🧑"
-                label="Usuarios"
-                value={ga4Data.overview.totalUsers?.toLocaleString() || '—'}
-                subtitle={`${ga4Data.overview.newUsers?.toLocaleString() || 0} nuevos`}
-                color="indigo"
-              />
-              <MetricCard
-                icon="↩️"
-                label="Bounce Rate"
-                value={ga4Data.overview.bounceRate ? `${(ga4Data.overview.bounceRate * 100).toFixed(1)}%` : '—'}
-                color={ga4Data.overview.bounceRate > 0.6 ? 'red' : ga4Data.overview.bounceRate > 0.4 ? 'yellow' : 'green'}
-              />
-              <MetricCard
-                icon="🎯"
-                label="Conversiones"
-                value={ga4Data.overview.conversions?.toLocaleString() || '0'}
-                color="green"
-              />
-              <MetricCard
-                icon="📄"
-                label="PageViews"
-                value={ga4Data.overview.screenPageViews?.toLocaleString() || '—'}
-                color="purple"
-              />
-            </div>
-
-            {/* Traffic Sources */}
-            {ga4Data.traffic_sources && ga4Data.traffic_sources.length > 0 && (
-              <div className="mt-4 bg-gray-900/80 border border-gray-800 rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-gray-300 mb-3">Fuentes de Tráfico</h3>
-                <div className="space-y-2">
-                  {ga4Data.traffic_sources.slice(0, 5).map((src, i) => {
-                    const maxSessions = ga4Data.traffic_sources[0]?.sessions || 1;
-                    const pct = ((src.sessions / maxSessions) * 100).toFixed(0);
-                    return (
-                      <div key={i} className="flex items-center gap-3">
-                        <div className="w-32 text-sm text-gray-400 truncate">{src.channel}</div>
-                        <div className="flex-1 bg-gray-800 rounded-full h-2.5">
-                          <div
-                            className="bg-indigo-500 h-2.5 rounded-full transition-all"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <div className="text-xs text-gray-400 w-20 text-right">{src.sessions.toLocaleString()} ses.</div>
-                        <div className="text-xs text-gray-500 w-16 text-right">{src.conversions} conv</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+        {/* Conexiones */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
+              Conexiones
+            </span>
+            <Link
+              href="/settings"
+              className="text-[11px] text-gray-500 hover:text-gray-200 font-medium transition-colors"
+            >
+              Gestionar →
+            </Link>
           </div>
-        )}
-
-        {/* Campaigns Overview + Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Campaigns */}
-          <div className="lg:col-span-2 bg-gray-900/80 border border-gray-800 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Campañas Activas</h2>
-              <span className="text-xs text-gray-500">{activeCampaigns} activas de {campaigns.length}</span>
-            </div>
-            {campaigns.length > 0 ? (
-              <div className="space-y-3 max-h-80 overflow-y-auto">
-                {campaigns.slice(0, 8).map((campaign, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 bg-gray-800/40 rounded-lg hover:bg-gray-800/60 transition-colors">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-white truncate">{campaign.name}</div>
-                      <div className="text-xs text-gray-500">{campaign.objective || 'N/A'}</div>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs">
-                      <div className="text-right">
-                        <div className="text-gray-300">${campaign.insights?.spend?.toFixed(2) || '0'}</div>
-                        <div className="text-gray-500">gasto</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-gray-300">{campaign.insights?.roas?.toFixed(2) || '0'}x</div>
-                        <div className="text-gray-500">ROAS</div>
-                      </div>
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        campaign.status === 'ACTIVE' ? 'bg-green-900/40 text-green-300' : 'bg-gray-700/40 text-gray-400'
-                      }`}>
-                        {campaign.status === 'ACTIVE' ? 'Activa' : 'Pausada'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-gray-500">
-                <p className="text-4xl mb-3">📊</p>
-                <p className="text-sm">No hay campañas cargadas.</p>
-                <p className="text-xs mt-1">Conecta tu cuenta de Meta Ads para ver tus campañas aquí.</p>
-              </div>
-            )}
-          </div>
-
-          {/* Quick Actions */}
-          <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
-            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Acciones Rápidas</h2>
-            <div className="space-y-3">
-              <a href="/audit" className="flex items-center gap-3 p-3 bg-indigo-900/20 border border-indigo-700/30 rounded-lg hover:bg-indigo-900/30 transition-colors group">
-                <span className="text-xl">🔍</span>
-                <div>
-                  <div className="text-sm font-medium text-white group-hover:text-indigo-300">Auditoría Completa</div>
-                  <div className="text-xs text-gray-500">Análisis integral de todas tus campañas</div>
-                </div>
-              </a>
-              <a href="/agents" className="flex items-center gap-3 p-3 bg-purple-900/20 border border-purple-700/30 rounded-lg hover:bg-purple-900/30 transition-colors group">
-                <span className="text-xl">🤖</span>
-                <div>
-                  <div className="text-sm font-medium text-white group-hover:text-purple-300">Agentes IA</div>
-                  <div className="text-xs text-gray-500">Ejecuta agentes especializados</div>
-                </div>
-              </a>
-              <a href="/financials" className="flex items-center gap-3 p-3 bg-green-900/20 border border-green-700/30 rounded-lg hover:bg-green-900/30 transition-colors group">
-                <span className="text-xl">💰</span>
-                <div>
-                  <div className="text-sm font-medium text-white group-hover:text-green-300">Finanzas</div>
-                  <div className="text-xs text-gray-500">Control financiero y márgenes</div>
-                </div>
-              </a>
-              <a href="/settings" className="flex items-center gap-3 p-3 bg-gray-800/50 border border-gray-700/30 rounded-lg hover:bg-gray-800/70 transition-colors group">
-                <span className="text-xl">⚙️</span>
-                <div>
-                  <div className="text-sm font-medium text-white group-hover:text-gray-200">Configuración</div>
-                  <div className="text-xs text-gray-500">APIs, tokens y datos del negocio</div>
-                </div>
-              </a>
+          <div className="bg-[#16161a] border border-[#1e1e24] rounded-2xl p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <ConnectionPill icon="📱" label="Meta Ads" status={configStatus.meta} />
+              <ConnectionPill icon="🤖" label="Anthropic" status={configStatus.anthropic} />
+              <ConnectionPill icon="📊" label="Google Analytics 4" status={configStatus.ga4} />
+              <ConnectionPill icon="🌐" label="Landing Page" status={configStatus.landing} />
             </div>
           </div>
-        </div>
-
-        {/* Financial Summary */}
-        {records.length > 0 && (
-          <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
-            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Resumen Financiero</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-              {records.slice(-1).map((r, i) => (
-                <>
-                  <div key={`ing-${i}`} className="text-center p-3 bg-gray-800/40 rounded-lg">
-                    <div className="text-lg font-bold text-green-400">${(r.ingresos || 0).toLocaleString()}</div>
-                    <div className="text-xs text-gray-500">Ingresos</div>
-                  </div>
-                  <div key={`cos-${i}`} className="text-center p-3 bg-gray-800/40 rounded-lg">
-                    <div className="text-lg font-bold text-red-400">${(r.costos || 0).toLocaleString()}</div>
-                    <div className="text-xs text-gray-500">Costos</div>
-                  </div>
-                  <div key={`ads-${i}`} className="text-center p-3 bg-gray-800/40 rounded-lg">
-                    <div className="text-lg font-bold text-yellow-400">${(r.ad_spend || 0).toLocaleString()}</div>
-                    <div className="text-xs text-gray-500">Ad Spend</div>
-                  </div>
-                  <div key={`dev-${i}`} className="text-center p-3 bg-gray-800/40 rounded-lg">
-                    <div className="text-lg font-bold text-orange-400">${(r.devoluciones || 0).toLocaleString()}</div>
-                    <div className="text-xs text-gray-500">Devoluciones</div>
-                  </div>
-                  <div key={`ord-${i}`} className="text-center p-3 bg-gray-800/40 rounded-lg">
-                    <div className="text-lg font-bold text-indigo-400">{(r.ordenes || 0).toLocaleString()}</div>
-                    <div className="text-xs text-gray-500">Órdenes</div>
-                  </div>
-                </>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Autonomous Actions */}
-        {autonomousActions.length > 0 && (
-          <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
-            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
-              🤖 Acciones Autónomas — Últimas 24h
-            </h2>
-            <div className="space-y-3 max-h-64 overflow-y-auto">
-              {autonomousActions.slice(0, 10).map((action) => {
-                const statusColors = {
-                  pending: 'bg-yellow-900/30 border-yellow-700/40 text-yellow-300',
-                  approved: 'bg-blue-900/30 border-blue-700/40 text-blue-300',
-                  executed: 'bg-green-900/30 border-green-700/40 text-green-300',
-                  failed: 'bg-red-900/30 border-red-700/40 text-red-300',
-                  cancelled: 'bg-gray-700/30 border-gray-600/40 text-gray-400',
-                };
-
-                return (
-                  <div
-                    key={action.id}
-                    className={`border rounded-lg p-3 ${statusColors[action.status] || 'bg-gray-800/40 border-gray-700/40 text-gray-300'}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="text-sm font-medium">{action.description}</div>
-                        <div className="text-xs opacity-75 mt-0.5">{action.triggered_by} • {action.target}</div>
-                      </div>
-                      <span className="text-xs font-medium px-2 py-1 bg-black/30 rounded">
-                        {action.status === 'pending' ? '⏳' : '✓'} {action.status.toUpperCase()}
-                      </span>
-                    </div>
-
-                    {action.status === 'pending' && action.requires_approval && (
-                      <div className="flex gap-2 mt-2">
-                        <button
-                          onClick={() => {
-                            api.approveAutonomousAction(action.id).then(() => loadAll());
-                          }}
-                          className="flex-1 text-xs px-2 py-1 bg-green-600 hover:bg-green-500 rounded transition-colors"
-                        >
-                          ✓ Aprobar
-                        </button>
-                        <button
-                          onClick={() => {
-                            api.rejectAutonomousAction(action.id).then(() => loadAll());
-                          }}
-                          className="flex-1 text-xs px-2 py-1 bg-red-600 hover:bg-red-500 rounded transition-colors"
-                        >
-                          ✕ Rechazar
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        </section>
       </div>
     </Layout>
   );
