@@ -2,39 +2,53 @@
 
 import { useState } from 'react';
 import { Layout } from '../components/Layout';
-import { ProtectedRoute } from '../components/ProtectedRoute';
 import { api } from '../lib/api';
 
-function AuditSection({ title, icon, content, status }) {
+const SECTIONS_META = [
+  { key: 'campaigns', title: 'Análisis de Campañas',        icon: '📊', accent: '#6366f1' },
+  { key: 'creatives', title: 'Rendimiento Creativo',         icon: '🎨', accent: '#ec4899' },
+  { key: 'landing',   title: 'Auditoría de Landing Page',    icon: '🌐', accent: '#0ea5e9' },
+  { key: 'finance',   title: 'Análisis Financiero',          icon: '💰', accent: '#10b981' },
+  { key: 'scripts',   title: 'Guiones Sugeridos',            icon: '✍️', accent: '#8b5cf6' },
+  { key: 'synthesis', title: 'Síntesis CEO — Plan de Acción',icon: '🎯', accent: '#f59e0b' },
+];
+
+function AuditSection({ title, icon, accent, content, status }) {
   const [expanded, setExpanded] = useState(true);
 
+  const statusConfig = {
+    done:    { label: 'Completado', bg: 'rgba(16,185,129,0.1)',  color: '#34d399', border: 'rgba(16,185,129,0.25)' },
+    running: { label: 'Analizando…',bg: 'rgba(234,179,8,0.1)',  color: '#fbbf24', border: 'rgba(234,179,8,0.25)' },
+    error:   { label: 'Error',      bg: 'rgba(239,68,68,0.1)',  color: '#f87171', border: 'rgba(239,68,68,0.25)' },
+    pending: { label: 'Pendiente',  bg: 'rgba(107,114,128,0.1)',color: '#9ca3af', border: 'rgba(107,114,128,0.25)' },
+  };
+  const sc = statusConfig[status] || statusConfig.pending;
+
   return (
-    <div className="bg-gray-900/80 border border-gray-800 rounded-xl overflow-hidden">
+    <div className="rounded-2xl overflow-hidden transition-all"
+      style={{ background: '#16161a', border: '1px solid #1e1e24' }}>
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-5 hover:bg-gray-800/30 transition-colors"
+        className="w-full flex items-center justify-between p-5 transition-colors hover:bg-white/[0.02]"
       >
         <div className="flex items-center gap-3">
-          <span className="text-2xl">{icon}</span>
-          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+            style={{ background: `${accent}18`, border: `1px solid ${accent}30` }}>
+            {icon}
+          </div>
+          <h3 className="text-sm font-bold text-white">{title}</h3>
           {status && (
-            <span className={`text-xs px-2 py-1 rounded-full ${
-              status === 'done' ? 'bg-green-900/50 text-green-300' :
-              status === 'running' ? 'bg-yellow-900/50 text-yellow-300' :
-              status === 'error' ? 'bg-red-900/50 text-red-300' :
-              'bg-gray-700/50 text-gray-400'
-            }`}>
-              {status === 'done' ? 'Completado' :
-               status === 'running' ? 'Analizando...' :
-               status === 'error' ? 'Error' : 'Pendiente'}
+            <span className="text-[9px] px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider"
+              style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}>
+              {sc.label}
             </span>
           )}
         </div>
-        <span className="text-gray-400 text-sm">{expanded ? '▼' : '▶'}</span>
+        <span className="text-xs" style={{ color: '#6b7280' }}>{expanded ? '▼' : '▶'}</span>
       </button>
       {expanded && content && (
-        <div className="px-5 pb-5 border-t border-gray-800/50">
-          <div className="prose prose-invert prose-sm max-w-none mt-4 whitespace-pre-wrap text-gray-300 leading-relaxed">
+        <div className="px-5 pb-5" style={{ borderTop: '1px solid #1e1e24' }}>
+          <div className="mt-4 whitespace-pre-wrap text-sm leading-relaxed" style={{ color: '#d1d5db' }}>
             {content}
           </div>
         </div>
@@ -44,16 +58,16 @@ function AuditSection({ title, icon, content, status }) {
 }
 
 export default function AuditPage() {
-  const [running, setRunning] = useState(false);
+  const [running, setRunning]     = useState(false);
   const [auditResult, setAuditResult] = useState(null);
-  const [error, setError] = useState('');
-  const [progress, setProgress] = useState(0);
-  const [sections, setSections] = useState({
+  const [error, setError]         = useState('');
+  const [progress, setProgress]   = useState(0);
+  const [sections, setSections]   = useState({
     campaigns: { status: 'pending', data: null },
     creatives: { status: 'pending', data: null },
-    landing: { status: 'pending', data: null },
-    finance: { status: 'pending', data: null },
-    scripts: { status: 'pending', data: null },
+    landing:   { status: 'pending', data: null },
+    finance:   { status: 'pending', data: null },
+    scripts:   { status: 'pending', data: null },
     synthesis: { status: 'pending', data: null },
   });
 
@@ -63,58 +77,40 @@ export default function AuditPage() {
     setAuditResult(null);
     setProgress(0);
 
-    // Reset sections
     setSections({
       campaigns: { status: 'running', data: null },
       creatives: { status: 'pending', data: null },
-      landing: { status: 'pending', data: null },
-      finance: { status: 'pending', data: null },
-      scripts: { status: 'pending', data: null },
+      landing:   { status: 'pending', data: null },
+      finance:   { status: 'pending', data: null },
+      scripts:   { status: 'pending', data: null },
       synthesis: { status: 'pending', data: null },
     });
 
     try {
-      // Run individual agents progressively for better UX
       const steps = [
-        { key: 'campaigns', label: 'Campañas', fn: () => api.runOptimizer() },
-        { key: 'creatives', label: 'Creativos', fn: () => api.runCreatives() },
-        { key: 'landing', label: 'Landing Page', fn: () => api.runLandingAudit({}) },
-        { key: 'finance', label: 'Finanzas', fn: () => api.runFinance({ prompt: 'Analiza el estado financiero completo' }) },
-        { key: 'scripts', label: 'Guiones', fn: () => api.runScripts({ prompt: 'Genera 3 guiones basados en los datos disponibles' }) },
+        { key: 'campaigns', fn: () => api.runOptimizer() },
+        { key: 'creatives', fn: () => api.runCreatives() },
+        { key: 'landing',   fn: () => api.runLandingAudit({}) },
+        { key: 'finance',   fn: () => api.runFinance({ prompt: 'Analiza el estado financiero completo' }) },
+        { key: 'scripts',   fn: () => api.runScripts({ prompt: 'Genera 3 guiones basados en los datos disponibles' }) },
       ];
-
-      const results = {};
 
       for (let i = 0; i < steps.length; i++) {
         const step = steps[i];
-        setSections(prev => ({
-          ...prev,
-          [step.key]: { status: 'running', data: null },
-        }));
-
+        setSections(prev => ({ ...prev, [step.key]: { status: 'running', data: null } }));
         try {
           const result = await step.fn();
-          results[step.key] = result;
           setSections(prev => ({
             ...prev,
             [step.key]: { status: 'done', data: typeof result === 'string' ? result : JSON.stringify(result, null, 2) },
           }));
         } catch (err) {
-          setSections(prev => ({
-            ...prev,
-            [step.key]: { status: 'error', data: `Error: ${err.message}` },
-          }));
+          setSections(prev => ({ ...prev, [step.key]: { status: 'error', data: `Error: ${err.message}` } }));
         }
-
         setProgress(Math.round(((i + 1) / (steps.length + 1)) * 100));
       }
 
-      // Final synthesis via full-audit endpoint
-      setSections(prev => ({
-        ...prev,
-        synthesis: { status: 'running', data: null },
-      }));
-
+      setSections(prev => ({ ...prev, synthesis: { status: 'running', data: null } }));
       try {
         const synthesis = await api.runFullAudit();
         setSections(prev => ({
@@ -123,10 +119,7 @@ export default function AuditPage() {
         }));
         setAuditResult(synthesis);
       } catch (err) {
-        setSections(prev => ({
-          ...prev,
-          synthesis: { status: 'error', data: `Error en síntesis: ${err.message}` },
-        }));
+        setSections(prev => ({ ...prev, synthesis: { status: 'error', data: `Error en síntesis: ${err.message}` } }));
       }
 
       setProgress(100);
@@ -137,98 +130,115 @@ export default function AuditPage() {
     }
   }
 
-  const allSectionsList = [
-    { key: 'campaigns', title: 'Análisis de Campañas', icon: '📊' },
-    { key: 'creatives', title: 'Rendimiento Creativo', icon: '🎨' },
-    { key: 'landing', title: 'Auditoría de Landing Page', icon: '🌐' },
-    { key: 'finance', title: 'Análisis Financiero', icon: '💰' },
-    { key: 'scripts', title: 'Guiones Sugeridos', icon: '✍️' },
-    { key: 'synthesis', title: 'Síntesis CEO — Plan de Acción', icon: '🎯' },
-  ];
+  const hasSectionData = Object.values(sections).some(s => s.data || s.status !== 'pending');
 
   return (
     <Layout>
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="max-w-5xl mx-auto space-y-7">
+
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white">Auditoría Completa</h1>
-            <p className="text-gray-400 mt-1">
-              Análisis integral de campañas, creativos, landing page, finanzas y plan de acción
+            <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: '#6366f1' }}>
+              6 Agentes · Análisis completo
+            </p>
+            <h1 className="text-2xl font-extrabold tracking-tight text-white">Auditoría Completa</h1>
+            <p className="text-sm mt-1" style={{ color: '#6b7280' }}>
+              Análisis integral de campañas, creativos, landing, finanzas y plan de acción
             </p>
           </div>
           <button
             onClick={runFullAudit}
             disabled={running}
-            className={`px-6 py-3 rounded-xl font-semibold transition-all text-sm ${
-              running
-                ? 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-900/30'
-            }`}
+            className="px-5 py-2.5 rounded-xl font-semibold transition-all text-sm disabled:opacity-50"
+            style={running ? {
+              background: '#1e1e24',
+              color: '#6b7280',
+              border: '1px solid #2a2a35',
+            } : {
+              background: 'linear-gradient(135deg,#4f46e5,#7c3aed)',
+              color: 'white',
+              boxShadow: '0 4px 20px rgba(99,102,241,0.3)',
+            }}
           >
-            {running ? 'Ejecutando auditoría...' : 'Ejecutar Auditoría Completa'}
+            {running ? 'Ejecutando auditoría...' : '▶ Ejecutar Auditoría Completa'}
           </button>
         </div>
 
         {/* Progress Bar */}
         {running && (
-          <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-300">Progreso de auditoría</span>
-              <span className="text-sm font-medium text-indigo-300">{progress}%</span>
+          <div className="rounded-2xl p-5" style={{ background: '#16161a', border: '1px solid #1e1e24' }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#6366f1' }} />
+                <span className="text-sm font-medium text-white">Auditoría en progreso</span>
+              </div>
+              <span className="text-sm font-bold" style={{ color: '#a5b4fc' }}>{progress}%</span>
             </div>
-            <div className="w-full bg-gray-800 rounded-full h-2">
+            <div className="w-full rounded-full h-1.5" style={{ background: '#1e1e24' }}>
               <div
-                className="bg-gradient-to-r from-indigo-500 to-purple-500 h-2 rounded-full transition-all duration-500"
-                style={{ width: `${progress}%` }}
+                className="h-1.5 rounded-full transition-all duration-700"
+                style={{
+                  width: `${progress}%`,
+                  background: 'linear-gradient(90deg,#4f46e5,#7c3aed)',
+                  boxShadow: '0 0 8px rgba(99,102,241,0.5)',
+                }}
               />
             </div>
-            <p className="text-xs text-gray-500 mt-2">
-              Los agentes están analizando tu cuenta. Esto puede tomar 1-2 minutos.
+            <p className="text-xs mt-2" style={{ color: '#6b7280' }}>
+              Los agentes están analizando tu cuenta. Esto puede tomar 1–2 minutos.
             </p>
           </div>
         )}
 
         {/* Error */}
         {error && (
-          <div className="bg-red-900/30 border border-red-700 rounded-xl p-4">
-            <p className="text-red-200 text-sm">{error}</p>
+          <div className="rounded-2xl p-4" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+            <p className="text-sm" style={{ color: '#fca5a5' }}>{error}</p>
           </div>
         )}
 
-        {/* How it works (before running) */}
-        {!running && !auditResult && !Object.values(sections).some(s => s.data) && (
-          <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-8 text-center">
-            <div className="text-5xl mb-4">🔍</div>
-            <h2 className="text-xl font-bold text-white mb-3">¿Cómo funciona?</h2>
-            <p className="text-gray-400 max-w-2xl mx-auto mb-6">
-              La auditoría completa ejecuta 6 agentes especializados en secuencia. Cada agente analiza un aspecto
-              diferente de tu negocio y al final un agente CEO sintetiza todo en un plan de acción priorizado.
+        {/* Empty State */}
+        {!running && !hasSectionData && (
+          <div className="rounded-2xl p-8 text-center" style={{ background: '#16161a', border: '1px solid #1e1e24' }}>
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4"
+              style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>
+              🔍
+            </div>
+            <h2 className="text-lg font-bold text-white mb-2">¿Cómo funciona?</h2>
+            <p className="text-sm max-w-xl mx-auto mb-6" style={{ color: '#9ca3af' }}>
+              La auditoría ejecuta 6 agentes especializados en secuencia. Cada uno analiza un aspecto diferente
+              de tu negocio y al final un agente CEO sintetiza todo en un plan de acción priorizado.
             </p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
-              {allSectionsList.map(s => (
-                <div key={s.key} className="flex items-center gap-2 p-3 bg-gray-800/50 rounded-lg">
-                  <span className="text-xl">{s.icon}</span>
-                  <span className="text-sm text-gray-300">{s.title}</span>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-w-xl mx-auto mb-6">
+              {SECTIONS_META.map(s => (
+                <div key={s.key} className="flex items-center gap-2 p-3 rounded-xl"
+                  style={{ background: '#0d0d11', border: '1px solid #1e1e24' }}>
+                  <span className="text-base">{s.icon}</span>
+                  <span className="text-xs font-medium" style={{ color: '#d1d5db' }}>{s.title.split(' — ')[0]}</span>
                 </div>
               ))}
             </div>
-            <div className="mt-6 p-4 bg-yellow-900/20 border border-yellow-700/30 rounded-lg max-w-lg mx-auto">
-              <p className="text-yellow-200 text-sm">
-                Asegurate de tener configuradas las APIs en <a href="/settings" className="underline">Configuración</a> antes de ejecutar la auditoría.
+            <div className="rounded-xl p-4 max-w-md mx-auto"
+              style={{ background: 'rgba(234,179,8,0.07)', border: '1px solid rgba(234,179,8,0.2)' }}>
+              <p className="text-xs" style={{ color: '#fcd34d' }}>
+                Asegurate de tener configuradas las APIs en{' '}
+                <a href="/settings" style={{ textDecoration: 'underline' }}>Configuración</a>
+                {' '}antes de ejecutar la auditoría.
               </p>
             </div>
           </div>
         )}
 
         {/* Audit Sections */}
-        {Object.values(sections).some(s => s.data || s.status !== 'pending') && (
-          <div className="space-y-4">
-            {allSectionsList.map(s => (
+        {hasSectionData && (
+          <div className="space-y-3">
+            {SECTIONS_META.map(s => (
               <AuditSection
                 key={s.key}
                 title={s.title}
                 icon={s.icon}
+                accent={s.accent}
                 content={sections[s.key].data}
                 status={sections[s.key].status}
               />
@@ -240,6 +250,6 @@ export default function AuditPage() {
   );
 }
 
-export function getServerSideProps(context) {
+export function getServerSideProps() {
   return { props: {} };
 }

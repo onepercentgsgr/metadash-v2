@@ -2,147 +2,206 @@ import { useAuth } from '../context/AuthContext';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
+import { Icon } from './Icons';
+
+const NAV = [
+  { label: 'Dashboard',      path: '/dashboard',    icon: 'dashboard'   },
+  { label: 'Campañas',       path: '/campaigns',    icon: 'campaigns'   },
+  { label: 'TikTok Orgánico',path: '/tiktok',       icon: 'tiktok'      },
+  { label: 'Videos del Día', path: '/videos',       icon: 'videos'      },
+  { label: 'Infoproducto',   path: '/infoproducto', icon: 'rocket'      },
+  { label: 'Agentes IA',     path: '/agents',       icon: 'agents'      },
+  { label: 'Auditoría',      path: '/audit',        icon: 'audit'       },
+  { label: 'Finanzas',       path: '/financials',   icon: 'financials'  },
+  { label: 'Configuración',  path: '/settings',     icon: 'settings'    },
+];
 
 export function Layout({ children }) {
   const { user, logout } = useAuth();
   const router = useRouter();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [open, setOpen] = useState(true);
 
-  const isActive = (path) => router.pathname === path;
-
-  const navItems = [
-    { label: 'Dashboard', path: '/dashboard', icon: '📊' },
-    { label: 'Campañas', path: '/campaigns', icon: '🎯' },
-    { label: 'TikTok Orgánico', path: '/tiktok', icon: '🎵' },
-    { label: 'Videos del Día', path: '/videos', icon: '🎬' },
-    { label: 'Infoproducto', path: '/infoproducto', icon: '🚀' },
-    { label: 'Agentes IA', path: '/agents', icon: '🤖' },
-    { label: 'Playbook Nivel Dios', path: '/playbook', icon: '📚' },
-    { label: 'Auditoría', path: '/audit', icon: '🔍' },
-    { label: 'Finanzas', path: '/financials', icon: '💰' },
-    { label: 'Configuración', path: '/settings', icon: '⚙️' },
-  ];
-
-  const adminItems = user?.role === 'admin' ? [
-    { label: 'Admin', path: '/admin', icon: '👑' },
-  ] : [];
+  const active = (path) => router.pathname === path;
+  const initial = user?.email?.[0]?.toUpperCase() || 'U';
 
   return (
-    <div className="flex h-screen bg-gray-950">
-      {/* Sidebar */}
-      <div
-        className={`bg-gray-900 border-r border-gray-800 flex flex-col transition-all duration-300 ${
-          sidebarOpen ? 'w-64' : 'w-20'
-        }`}
+    <div className="flex h-screen font-sans" style={{ background: '#09090b' }}>
+
+      {/* ── Sidebar ─────────────────────────────────────────────────── */}
+      <aside
+        className="flex flex-col shrink-0 transition-all duration-200"
+        style={{
+          width: open ? 232 : 64,
+          background: '#0f0f12',
+          borderRight: '1px solid rgba(255,255,255,0.05)',
+        }}
       >
         {/* Logo */}
-        <div className="p-5 border-b border-gray-800">
-          <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-indigo-900/30">
-              MD
+        <div className="flex items-center gap-3 px-4 py-5"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <div
+            className="flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-black tracking-tight select-none"
+            style={{
+              background: 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)',
+              boxShadow: '0 0 20px rgba(79,70,229,0.4), inset 0 1px 0 rgba(255,255,255,0.15)',
+            }}
+          >
+            MD
+          </div>
+          {open && (
+            <div className="min-w-0">
+              <div className="text-sm font-extrabold text-white tracking-tight leading-none">MetaDash</div>
+              <div className="text-[10px] font-semibold tracking-widest uppercase mt-0.5"
+                style={{ color: '#6366f1' }}>v3.5</div>
             </div>
-            {sidebarOpen && (
-              <div>
-                <span className="text-white font-bold text-lg">MetaDash</span>
-                <div className="text-[10px] text-indigo-400 font-medium -mt-0.5">v3.5</div>
-              </div>
-            )}
-          </Link>
+          )}
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-1">
-          <div className="px-3 py-2">
-            {sidebarOpen && <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Principal</span>}
-          </div>
-          {navItems.map((item) => (
-            <Link
-              key={item.path + item.label}
-              href={item.path}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm ${
-                isActive(item.path)
-                  ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-700/30'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'
-              }`}
-            >
-              <span className="text-lg">{item.icon}</span>
-              {sidebarOpen && <span className="font-medium">{item.label}</span>}
-            </Link>
-          ))}
-          {adminItems.length > 0 && (
+        {/* Nav */}
+        <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
+          {open && (
+            <div className="px-2 pt-1 pb-2">
+              <span className="text-[9px] font-bold uppercase tracking-[0.12em]"
+                style={{ color: 'rgba(255,255,255,0.2)' }}>
+                Principal
+              </span>
+            </div>
+          )}
+          {NAV.map((item) => {
+            const on = active(item.path);
+            return (
+              <Link key={item.path} href={item.path}
+                className="flex items-center gap-3 rounded-lg transition-all duration-150 group relative"
+                style={{
+                  padding: open ? '8px 10px' : '10px',
+                  justifyContent: open ? 'flex-start' : 'center',
+                  color: on ? '#a5b4fc' : 'rgba(255,255,255,0.38)',
+                  background: on ? 'rgba(99,102,241,0.1)' : 'transparent',
+                  boxShadow: on ? 'inset 0 0 0 1px rgba(99,102,241,0.2)' : 'none',
+                }}
+                onMouseEnter={(e) => {
+                  if (!on) {
+                    e.currentTarget.style.color = 'rgba(255,255,255,0.75)';
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!on) {
+                    e.currentTarget.style.color = 'rgba(255,255,255,0.38)';
+                    e.currentTarget.style.background = 'transparent';
+                  }
+                }}
+              >
+                {on && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-4 rounded-r"
+                    style={{ background: 'linear-gradient(180deg,#818cf8,#6366f1)' }} />
+                )}
+                <Icon name={item.icon} size={16} strokeWidth={on ? 2 : 1.75} />
+                {open && (
+                  <span className="text-[13px] font-medium leading-none truncate"
+                    style={{ fontWeight: on ? 600 : 450 }}>
+                    {item.label}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+
+          {user?.role === 'admin' && (
             <>
-              <div className="px-3 py-2 mt-3">
-                {sidebarOpen && <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Admin</span>}
-              </div>
-              {adminItems.map((item) => (
-                <Link
-                  key={item.path}
-                  href={item.path}
-                  className={`flex items-center gap-3 px-4 py-2.5 rounded-lg transition-all text-sm ${
-                    isActive(item.path)
-                      ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-700/30'
-                      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/60'
-                  }`}
-                >
-                  <span className="text-lg">{item.icon}</span>
-                  {sidebarOpen && <span className="font-medium">{item.label}</span>}
-                </Link>
-              ))}
+              {open && (
+                <div className="px-2 pt-4 pb-2">
+                  <span className="text-[9px] font-bold uppercase tracking-[0.12em]"
+                    style={{ color: 'rgba(255,255,255,0.2)' }}>
+                    Admin
+                  </span>
+                </div>
+              )}
+              <Link href="/admin"
+                className="flex items-center gap-3 rounded-lg transition-all"
+                style={{
+                  padding: open ? '8px 10px' : '10px',
+                  justifyContent: open ? 'flex-start' : 'center',
+                  color: active('/admin') ? '#a5b4fc' : 'rgba(255,255,255,0.38)',
+                  background: active('/admin') ? 'rgba(99,102,241,0.1)' : 'transparent',
+                }}
+              >
+                <Icon name="crown" size={16} />
+                {open && <span className="text-[13px] font-medium">Admin</span>}
+              </Link>
             </>
           )}
         </nav>
 
-        {/* User Info */}
-        <div className="p-4 border-t border-gray-800">
-          {sidebarOpen ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gray-700 rounded-lg flex items-center justify-center text-sm text-gray-300">
-                  {user?.email?.[0]?.toUpperCase() || 'U'}
+        {/* User */}
+        <div className="p-2" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          {open ? (
+            <div className="rounded-lg p-3 space-y-3"
+              style={{ background: 'rgba(255,255,255,0.03)' }}>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0"
+                  style={{
+                    background: 'linear-gradient(135deg,#312e81,#4c1d95)',
+                    color: '#a5b4fc',
+                    border: '1px solid rgba(99,102,241,0.3)',
+                  }}>
+                  {initial}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="text-sm text-gray-300 truncate">{user?.email}</div>
+                  <div className="text-[11px] font-semibold text-white truncate leading-none">{user?.email}</div>
                   {user?.subscription_status && (
-                    <span className="text-[10px] text-indigo-400 font-medium">
+                    <div className="text-[9px] font-bold uppercase tracking-widest mt-0.5"
+                      style={{ color: '#6366f1' }}>
                       {user.subscription_status}
-                    </span>
+                    </div>
                   )}
                 </div>
               </div>
-              <button
-                onClick={logout}
-                className="w-full px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 rounded-lg transition-colors text-xs font-medium"
+              <button onClick={logout}
+                className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md text-[11px] font-medium transition-all"
+                style={{ color: 'rgba(255,255,255,0.35)', background: 'rgba(255,255,255,0.04)' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.color = 'rgba(255,255,255,0.7)';
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.08)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.color = 'rgba(255,255,255,0.35)';
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+                }}
               >
+                <Icon name="logout" size={12} />
                 Cerrar sesión
               </button>
             </div>
           ) : (
-            <button
-              onClick={logout}
-              className="w-full p-2 bg-gray-800 hover:bg-gray-700 text-gray-400 rounded-lg transition-colors text-xs"
-              title="Cerrar sesión"
+            <button onClick={logout} title="Cerrar sesión"
+              className="w-full flex items-center justify-center p-2.5 rounded-lg transition-all"
+              style={{ color: 'rgba(255,255,255,0.3)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.7)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
             >
-              ↩
+              <Icon name="logout" size={15} />
             </button>
           )}
-        </div>
 
-        {/* Toggle */}
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="p-3 text-gray-500 hover:text-gray-300 transition-colors border-t border-gray-800"
-        >
-          {sidebarOpen ? '‹' : '›'}
-        </button>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Content Area */}
-        <div className="flex-1 overflow-auto bg-gray-950">
-          <div className="p-6 lg:p-8">{children}</div>
+          {/* Toggle */}
+          <button onClick={() => setOpen(!open)}
+            className="w-full flex items-center justify-center mt-1 py-1.5 rounded-md transition-all"
+            style={{ color: 'rgba(255,255,255,0.2)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.5)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.2)'; }}
+          >
+            <Icon name={open ? 'chevronLeft' : 'chevronRight'} size={14} />
+          </button>
         </div>
-      </div>
+      </aside>
+
+      {/* ── Main ────────────────────────────────────────────────────── */}
+      <main className="flex-1 overflow-auto" style={{ background: '#09090b' }}>
+        <div className="px-6 py-7 lg:px-10 lg:py-8 max-w-[1280px]">
+          {children}
+        </div>
+      </main>
     </div>
   );
 }

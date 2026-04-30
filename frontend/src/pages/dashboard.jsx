@@ -1,138 +1,110 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Layout } from '../components/Layout';
-import { ProtectedRoute } from '../components/ProtectedRoute';
+import { Icon } from '../components/Icons';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
-function MetricCard({ label, value, subtitle, icon, color = 'indigo', trend }) {
-  const colorMap = {
-    indigo: 'from-indigo-600/20 to-indigo-900/10 border-indigo-700/50',
-    green: 'from-green-600/20 to-green-900/10 border-green-700/50',
-    yellow: 'from-yellow-600/20 to-yellow-900/10 border-yellow-700/50',
-    red: 'from-red-600/20 to-red-900/10 border-red-700/50',
-    blue: 'from-blue-600/20 to-blue-900/10 border-blue-700/50',
-    purple: 'from-purple-600/20 to-purple-900/10 border-purple-700/50',
-  };
-  return (
-    <div className={`bg-gradient-to-br ${colorMap[color]} border rounded-xl p-5`}>
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-2xl">{icon}</span>
-        {trend && (
-          <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-            trend > 0 ? 'bg-green-900/50 text-green-300' : 'bg-red-900/50 text-red-300'
-          }`}>
-            {trend > 0 ? '+' : ''}{trend}%
-          </span>
-        )}
-      </div>
-      <div className="text-2xl font-bold text-white mb-1">{value}</div>
-      <div className="text-sm text-gray-400">{label}</div>
-      {subtitle && <div className="text-xs text-gray-500 mt-1">{subtitle}</div>}
-    </div>
-  );
-}
+const WIZARD_STEPS = [
+  { id: 'oferta',        num: 0,  name: 'Modelado de Oferta'     },
+  { id: 'investigacion', num: 1,  name: 'Investigación de Mercado'},
+  { id: 'avatares',      num: 2,  name: 'Avatares + Ángulos'      },
+  { id: 'brand',         num: 3,  name: 'Identidad Visual'        },
+  { id: 'mockup',        num: 4,  name: 'Mockup Principal'        },
+  { id: 'ads',           num: 5,  name: 'Prompts de ADS'          },
+  { id: 'bonus_mockups', num: 6,  name: 'Bonus Mockups'           },
+  { id: 'bundle',        num: 7,  name: 'Bundle Completo'         },
+  { id: 'landing',       num: 8,  name: 'Landing Page'            },
+  { id: 'copys',         num: 9,  name: 'Copys para Ads'          },
+  { id: 'guiones',       num: 10, name: 'Guiones Video Ads'       },
+  { id: 'ugc',           num: 11, name: 'UGC Realistas'           },
+  { id: 'producto',      num: 12, name: 'Generador de Producto'   },
+  { id: 'lanzamiento',   num: 13, name: 'Plan de Lanzamiento'     },
+];
 
-function StatusBadge({ status }) {
-  const map = {
-    connected: { bg: 'bg-green-900/40 text-green-300 border-green-700/50', label: 'Conectado' },
-    disconnected: { bg: 'bg-red-900/40 text-red-300 border-red-700/50', label: 'Desconectado' },
-    partial: { bg: 'bg-yellow-900/40 text-yellow-300 border-yellow-700/50', label: 'Parcial' },
-  };
-  const s = map[status] || map.disconnected;
+const QUICK = [
+  { href: '/infoproducto', icon: 'rocket',     label: 'Infoproducto', desc: 'Wizard 14 pasos con IA',       accent: '#6366f1' },
+  { href: '/tiktok',       icon: 'tiktok',     label: 'TikTok',       desc: 'Guiones orgánicos con IA',     accent: '#ec4899' },
+  { href: '/audit',        icon: 'audit',      label: 'Auditoría',    desc: 'Análisis integral IA',         accent: '#10b981' },
+  { href: '/settings',     icon: 'settings',   label: 'Configurar',   desc: 'APIs y conexiones',            accent: '#f59e0b' },
+];
+
+const CONNECTIONS = [
+  { key: 'meta',      icon: 'campaigns', label: 'Meta Ads'           },
+  { key: 'anthropic', icon: 'agents',    label: 'Anthropic / Claude' },
+  { key: 'ga4',       icon: 'audit',     label: 'Google Analytics 4' },
+  { key: 'landing',   icon: 'rocket',    label: 'Landing Page'       },
+];
+
+function StatusDot({ status }) {
+  const s = {
+    connected:    { color: '#22c55e', shadow: 'rgba(34,197,94,0.5)',  label: 'Conectado'    },
+    partial:      { color: '#f59e0b', shadow: 'rgba(245,158,11,0.5)', label: 'Parcial'      },
+    disconnected: { color: 'rgba(255,255,255,0.15)', shadow: 'none',  label: 'Desconectado' },
+  }[status] || { color: 'rgba(255,255,255,0.15)', shadow: 'none', label: 'Desconectado' };
+
   return (
-    <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${s.bg}`}>
-      {s.label}
-    </span>
+    <div className="flex items-center gap-1.5">
+      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+        style={{ background: s.color, boxShadow: s.shadow !== 'none' ? `0 0 6px ${s.shadow}` : 'none' }} />
+      <span className="text-[10px] font-semibold uppercase tracking-wider"
+        style={{ color: status === 'connected' ? '#4ade80' : status === 'partial' ? '#fbbf24' : 'rgba(255,255,255,0.25)' }}>
+        {s.label}
+      </span>
+    </div>
   );
 }
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [config, setConfig] = useState(null);
-  const [campaigns, setCampaigns] = useState([]);
-  const [records, setRecords] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [ga4Data, setGa4Data] = useState(null);
-  const [autonomousActions, setAutonomousActions] = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [wizardState, setWizardState] = useState(null);
   const [configStatus, setConfigStatus] = useState({
-    meta: 'disconnected',
-    anthropic: 'disconnected',
-    landing: 'disconnected',
-    ga4: 'disconnected',
+    meta: 'disconnected', anthropic: 'disconnected',
+    landing: 'disconnected', ga4: 'disconnected',
   });
 
   useEffect(() => {
-    loadAll();
+    (async () => {
+      setLoading(true);
+      try {
+        const c = await api.getConfig().catch(() => null);
+        if (c) {
+          setConfigStatus({
+            meta:      (c.meta_access_token && c.meta_ad_account_id) ? 'connected' : (c.meta_access_token || c.meta_ad_account_id) ? 'partial' : 'disconnected',
+            anthropic: c.anthropic_api_key ? 'connected' : 'disconnected',
+            landing:   c.landing_page_url  ? 'connected' : 'disconnected',
+            ga4:       (c.ga4_property_id && c.ga4_credentials_json) ? 'connected' : 'disconnected',
+          });
+        }
+        try {
+          const raw = localStorage.getItem('metadash_infoproducto');
+          if (raw) setWizardState(JSON.parse(raw));
+        } catch (e) {}
+      } finally { setLoading(false); }
+    })();
   }, []);
 
-  async function loadAll() {
-    setLoading(true);
-    try {
-      const [configData, campaignData, financeData, autonomousData] = await Promise.allSettled([
-        api.getConfig(),
-        api.getCampaigns('last_7d'),
-        api.getRecords(),
-        api.getAutonomousActions(20),
-      ]);
+  const completedSteps  = Array.isArray(wizardState?.pasos_completos) ? wizardState.pasos_completos.length : 0;
+  const currentIdx      = wizardState?.paso_actual ?? null;
+  const currentStep     = currentIdx !== null ? WIZARD_STEPS[currentIdx] : null;
+  const progressPct     = Math.round((completedSteps / WIZARD_STEPS.length) * 100);
+  const hasProgress     = currentIdx !== null;
 
-      if (configData.status === 'fulfilled') {
-        const c = configData.value;
-        setConfig(c);
-        const hasGa4 = !!(c.ga4_property_id && c.ga4_credentials_json);
-        setConfigStatus({
-          meta: c.meta_access_token && c.meta_ad_account_id ? 'connected' : (c.meta_access_token || c.meta_ad_account_id ? 'partial' : 'disconnected'),
-          anthropic: c.anthropic_api_key ? 'connected' : 'disconnected',
-          landing: c.landing_page_url ? 'connected' : 'disconnected',
-          ga4: hasGa4 ? 'connected' : 'disconnected',
-        });
-
-        // Fetch GA4 data if configured
-        if (hasGa4) {
-          try {
-            const gaData = await api.apiFetch('/analytics/data?days=30');
-            setGa4Data(gaData);
-          } catch (gaErr) {
-            console.warn('GA4 data fetch failed:', gaErr);
-          }
-        }
-      }
-
-      if (campaignData.status === 'fulfilled' && Array.isArray(campaignData.value)) {
-        setCampaigns(campaignData.value);
-      }
-
-      if (financeData.status === 'fulfilled' && Array.isArray(financeData.value)) {
-        setRecords(financeData.value);
-      }
-
-      if (autonomousData.status === 'fulfilled' && Array.isArray(autonomousData.value)) {
-        setAutonomousActions(autonomousData.value);
-      }
-    } catch (err) {
-      console.error('Dashboard load error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Calculate metrics from campaigns
-  const totalSpend = campaigns.reduce((sum, c) => sum + (c.insights?.spend || 0), 0);
-  const totalRevenue = campaigns.reduce((sum, c) => sum + (c.insights?.revenue || 0), 0);
-  const totalPurchases = campaigns.reduce((sum, c) => sum + (c.insights?.purchases || 0), 0);
-  const avgRoas = totalSpend > 0 ? (totalRevenue / totalSpend).toFixed(2) : '—';
-  const avgCpa = totalPurchases > 0 ? (totalSpend / totalPurchases).toFixed(2) : '—';
-  const activeCampaigns = campaigns.filter(c => c.status === 'ACTIVE').length;
+  const greeting = (() => {
+    const h = new Date().getHours();
+    return h < 12 ? 'Buen día' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+  })();
+  const dateStr = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' });
+  const firstName = user?.name?.split(' ')[0] || user?.email?.split('@')[0] || '';
 
   if (loading) {
     return (
       <Layout>
         <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-400">Cargando dashboard...</p>
-          </div>
+          <div className="w-8 h-8 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
         </div>
       </Layout>
     );
@@ -140,337 +112,218 @@ export default function DashboardPage() {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-white">
-              Buen día{user?.name ? `, ${user.name}` : ''}
-            </h1>
-            <p className="text-gray-400 mt-1">Resumen de tu cuenta de Meta Ads y rendimiento</p>
-          </div>
-          <button
-            onClick={loadAll}
-            className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg transition-colors text-sm border border-gray-700"
-          >
-            Actualizar
-          </button>
-        </div>
+      <div className="space-y-8 max-w-5xl">
 
-        {/* Connection Status */}
-        <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Estado de Conexiones</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">📱</span>
-                <span className="text-sm text-gray-300">Meta Ads</span>
+        {/* ── Hero ── */}
+        <header>
+          <p className="text-[10px] font-bold uppercase tracking-[0.15em] mb-2"
+            style={{ color: 'rgba(255,255,255,0.3)' }}>
+            {dateStr}
+          </p>
+          <h1 className="text-3xl font-extrabold tracking-tight leading-none"
+            style={{
+              background: 'linear-gradient(135deg,#fff 30%,rgba(255,255,255,0.55) 100%)',
+              WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text',
+            }}>
+            {greeting}{firstName ? `, ${firstName}` : ''}.
+          </h1>
+          <p className="mt-2 text-sm" style={{ color: 'rgba(255,255,255,0.38)' }}>
+            Tu plataforma de lanzamiento de infoproductos. Una misión, cero distracción.
+          </p>
+        </header>
+
+        {/* ── Lanzamiento card ── */}
+        <section>
+          <SectionLabel>Tu lanzamiento de hoy</SectionLabel>
+          {hasProgress ? (
+            <div className="relative overflow-hidden rounded-2xl p-7"
+              style={{
+                background: 'linear-gradient(135deg,rgba(79,70,229,0.18) 0%,rgba(124,58,237,0.12) 100%)',
+                border: '1px solid rgba(99,102,241,0.25)',
+                boxShadow: '0 0 40px rgba(79,70,229,0.1)',
+              }}>
+              {/* Ambient blobs */}
+              <div className="pointer-events-none absolute -top-20 -right-20 w-64 h-64 rounded-full"
+                style={{ background: 'radial-gradient(circle,rgba(99,102,241,0.15) 0%,transparent 70%)' }} />
+              <div className="pointer-events-none absolute -bottom-20 -left-10 w-48 h-48 rounded-full"
+                style={{ background: 'radial-gradient(circle,rgba(139,92,246,0.1) 0%,transparent 70%)' }} />
+              <div className="relative flex flex-col md:flex-row md:items-center gap-6">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.15em]"
+                      style={{ color: '#818cf8' }}>
+                      Paso {currentIdx + 1} / {WIZARD_STEPS.length}
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                      style={{ background: 'rgba(99,102,241,0.2)', color: '#a5b4fc' }}>
+                      {progressPct}% completado
+                    </span>
+                  </div>
+                  <h2 className="text-2xl font-extrabold tracking-tight text-white mb-1">
+                    {currentStep?.name || 'Continuá tu lanzamiento'}
+                  </h2>
+                  <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                    Retomá donde lo dejaste. Cada paso te acerca al lanzamiento.
+                  </p>
+                  <div className="mt-5 max-w-sm">
+                    <div className="flex justify-between text-[10px] font-semibold mb-1.5"
+                      style={{ color: 'rgba(255,255,255,0.3)' }}>
+                      <span>Progreso</span><span>{completedSteps}/{WIZARD_STEPS.length} pasos</span>
+                    </div>
+                    <div className="h-1 rounded-full overflow-hidden"
+                      style={{ background: 'rgba(255,255,255,0.08)' }}>
+                      <div className="h-full rounded-full transition-all"
+                        style={{
+                          width: `${progressPct}%`,
+                          background: 'linear-gradient(90deg,#6366f1,#8b5cf6)',
+                          boxShadow: '0 0 8px rgba(99,102,241,0.6)',
+                        }} />
+                    </div>
+                  </div>
+                </div>
+                <Link href="/infoproducto"
+                  className="self-start md:self-center shrink-0 px-6 py-3 rounded-xl font-bold text-sm text-white transition-all"
+                  style={{
+                    background: 'linear-gradient(135deg,#4f46e5,#7c3aed)',
+                    boxShadow: '0 4px 20px rgba(79,70,229,0.4), inset 0 1px 0 rgba(255,255,255,0.15)',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 8px 28px rgba(79,70,229,0.55), inset 0 1px 0 rgba(255,255,255,0.15)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 4px 20px rgba(79,70,229,0.4), inset 0 1px 0 rgba(255,255,255,0.15)'; }}
+                >
+                  Continuar →
+                </Link>
               </div>
-              <StatusBadge status={configStatus.meta} />
             </div>
-            <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">🤖</span>
-                <span className="text-sm text-gray-300">Agentes IA</span>
+          ) : (
+            <div className="relative overflow-hidden rounded-2xl p-10 text-center"
+              style={{
+                background: 'linear-gradient(135deg,rgba(79,70,229,0.12) 0%,rgba(124,58,237,0.08) 100%)',
+                border: '1px solid rgba(99,102,241,0.2)',
+              }}>
+              <div className="pointer-events-none absolute inset-0"
+                style={{ background: 'radial-gradient(ellipse at 50% 0%,rgba(99,102,241,0.15) 0%,transparent 60%)' }} />
+              <div className="relative">
+                <div className="w-14 h-14 rounded-2xl mx-auto mb-5 flex items-center justify-center"
+                  style={{
+                    background: 'linear-gradient(135deg,rgba(79,70,229,0.3),rgba(124,58,237,0.2))',
+                    border: '1px solid rgba(99,102,241,0.35)',
+                  }}>
+                  <Icon name="rocket" size={24} className="text-indigo-300" />
+                </div>
+                <h2 className="text-2xl font-extrabold tracking-tight text-white mb-2">
+                  Empezá tu primer lanzamiento
+                </h2>
+                <p className="text-sm max-w-md mx-auto mb-7" style={{ color: 'rgba(255,255,255,0.4)' }}>
+                  Un wizard guiado de 14 pasos. De idea a infoproducto listo para vender —
+                  copy, ads, landing y plan de lanzamiento incluidos.
+                </p>
+                <Link href="/infoproducto"
+                  className="inline-flex items-center gap-2 px-7 py-3.5 rounded-xl font-bold text-sm text-white"
+                  style={{
+                    background: 'linear-gradient(135deg,#4f46e5,#7c3aed)',
+                    boxShadow: '0 4px 24px rgba(79,70,229,0.45), inset 0 1px 0 rgba(255,255,255,0.15)',
+                  }}
+                >
+                  <Icon name="rocket" size={16} />
+                  Empezar ahora
+                </Link>
               </div>
-              <StatusBadge status={configStatus.anthropic} />
-            </div>
-            <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">📊</span>
-                <span className="text-sm text-gray-300">Google Analytics</span>
-              </div>
-              <StatusBadge status={configStatus.ga4} />
-            </div>
-            <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">🌐</span>
-                <span className="text-sm text-gray-300">Landing Page</span>
-              </div>
-              <StatusBadge status={configStatus.landing} />
-            </div>
-          </div>
-          {configStatus.meta === 'disconnected' && (
-            <div className="mt-4 p-3 bg-yellow-900/20 border border-yellow-700/40 rounded-lg">
-              <p className="text-yellow-200 text-sm">
-                Conecta tu cuenta de Meta Ads en <a href="/settings" className="underline font-medium">Configuración</a> para ver métricas reales de tus campañas.
-              </p>
             </div>
           )}
-        </div>
+        </section>
 
-        {/* KPI Metrics */}
-        <div>
-          <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Métricas Clave — Últimos 7 días</h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <MetricCard
-              icon="💰"
-              label="Inversión Total"
-              value={totalSpend > 0 ? `$${totalSpend.toLocaleString()}` : '—'}
-              color="red"
-            />
-            <MetricCard
-              icon="📈"
-              label="Revenue"
-              value={totalRevenue > 0 ? `$${totalRevenue.toLocaleString()}` : '—'}
-              color="green"
-            />
-            <MetricCard
-              icon="🎯"
-              label="ROAS"
-              value={avgRoas !== '—' ? `${avgRoas}x` : '—'}
-              color="indigo"
-            />
-            <MetricCard
-              icon="🛒"
-              label="Compras"
-              value={totalPurchases > 0 ? totalPurchases.toLocaleString() : '—'}
-              subtitle={avgCpa !== '—' ? `CPA: $${avgCpa}` : ''}
-              color="purple"
-            />
-          </div>
-        </div>
-
-        {/* Google Analytics Section */}
-        {ga4Data && ga4Data.overview && (
-          <div>
-            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Google Analytics 4 — Últimos 30 días</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-              <MetricCard
-                icon="👥"
-                label="Sesiones"
-                value={ga4Data.overview.sessions?.toLocaleString() || '—'}
-                color="blue"
-              />
-              <MetricCard
-                icon="🧑"
-                label="Usuarios"
-                value={ga4Data.overview.totalUsers?.toLocaleString() || '—'}
-                subtitle={`${ga4Data.overview.newUsers?.toLocaleString() || 0} nuevos`}
-                color="indigo"
-              />
-              <MetricCard
-                icon="↩️"
-                label="Bounce Rate"
-                value={ga4Data.overview.bounceRate ? `${(ga4Data.overview.bounceRate * 100).toFixed(1)}%` : '—'}
-                color={ga4Data.overview.bounceRate > 0.6 ? 'red' : ga4Data.overview.bounceRate > 0.4 ? 'yellow' : 'green'}
-              />
-              <MetricCard
-                icon="🎯"
-                label="Conversiones"
-                value={ga4Data.overview.conversions?.toLocaleString() || '0'}
-                color="green"
-              />
-              <MetricCard
-                icon="📄"
-                label="PageViews"
-                value={ga4Data.overview.screenPageViews?.toLocaleString() || '—'}
-                color="purple"
-              />
-            </div>
-
-            {/* Traffic Sources */}
-            {ga4Data.traffic_sources && ga4Data.traffic_sources.length > 0 && (
-              <div className="mt-4 bg-gray-900/80 border border-gray-800 rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-gray-300 mb-3">Fuentes de Tráfico</h3>
-                <div className="space-y-2">
-                  {ga4Data.traffic_sources.slice(0, 5).map((src, i) => {
-                    const maxSessions = ga4Data.traffic_sources[0]?.sessions || 1;
-                    const pct = ((src.sessions / maxSessions) * 100).toFixed(0);
-                    return (
-                      <div key={i} className="flex items-center gap-3">
-                        <div className="w-32 text-sm text-gray-400 truncate">{src.channel}</div>
-                        <div className="flex-1 bg-gray-800 rounded-full h-2.5">
-                          <div
-                            className="bg-indigo-500 h-2.5 rounded-full transition-all"
-                            style={{ width: `${pct}%` }}
-                          />
-                        </div>
-                        <div className="text-xs text-gray-400 w-20 text-right">{src.sessions.toLocaleString()} ses.</div>
-                        <div className="text-xs text-gray-500 w-16 text-right">{src.conversions} conv</div>
-                      </div>
-                    );
-                  })}
+        {/* ── Quick actions ── */}
+        <section>
+          <SectionLabel>Acciones rápidas</SectionLabel>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {QUICK.map((q) => (
+              <Link key={q.href} href={q.href}
+                className="group flex flex-col gap-4 rounded-2xl p-5 transition-all duration-150"
+                style={{
+                  background: '#16161a',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.4)',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = '#1c1c22';
+                  e.currentTarget.style.border = `1px solid ${q.accent}30`;
+                  e.currentTarget.style.boxShadow = `0 4px 20px rgba(0,0,0,0.4), 0 0 0 1px ${q.accent}20`;
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = '#16161a';
+                  e.currentTarget.style.border = '1px solid rgba(255,255,255,0.05)';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.4)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+                    style={{ background: `${q.accent}18`, border: `1px solid ${q.accent}28`, color: q.accent }}>
+                    <Icon name={q.icon} size={16} strokeWidth={2} />
+                  </div>
+                  <span className="text-xs transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                    style={{ color: 'rgba(255,255,255,0.2)' }}>↗</span>
                 </div>
+                <div>
+                  <div className="text-sm font-bold text-white tracking-tight mb-0.5">{q.label}</div>
+                  <div className="text-xs leading-snug" style={{ color: 'rgba(255,255,255,0.35)' }}>{q.desc}</div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* ── Connections ── */}
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <SectionLabel>Conexiones</SectionLabel>
+            <Link href="/settings"
+              className="text-[11px] font-medium transition-colors"
+              style={{ color: 'rgba(255,255,255,0.3)' }}
+              onMouseEnter={(e) => { e.target.style.color = 'rgba(255,255,255,0.7)'; }}
+              onMouseLeave={(e) => { e.target.style.color = 'rgba(255,255,255,0.3)'; }}
+            >
+              Gestionar →
+            </Link>
+          </div>
+          <div className="rounded-2xl overflow-hidden"
+            style={{ background: '#16161a', border: '1px solid rgba(255,255,255,0.05)' }}>
+            {CONNECTIONS.map((c, i) => (
+              <div key={c.key}
+                className="flex items-center justify-between px-4 py-3.5 transition-colors hover:bg-white/[0.02]"
+                style={{ borderTop: i > 0 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+                    style={{ background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)' }}>
+                    <Icon name={c.icon} size={13} />
+                  </div>
+                  <span className="text-[13px] font-medium" style={{ color: 'rgba(255,255,255,0.65)' }}>
+                    {c.label}
+                  </span>
+                </div>
+                <StatusDot status={configStatus[c.key]} />
               </div>
-            )}
+            ))}
           </div>
-        )}
+        </section>
 
-        {/* Campaigns Overview + Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Campaigns */}
-          <div className="lg:col-span-2 bg-gray-900/80 border border-gray-800 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Campañas Activas</h2>
-              <span className="text-xs text-gray-500">{activeCampaigns} activas de {campaigns.length}</span>
-            </div>
-            {campaigns.length > 0 ? (
-              <div className="space-y-3 max-h-80 overflow-y-auto">
-                {campaigns.slice(0, 8).map((campaign, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 bg-gray-800/40 rounded-lg hover:bg-gray-800/60 transition-colors">
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium text-white truncate">{campaign.name}</div>
-                      <div className="text-xs text-gray-500">{campaign.objective || 'N/A'}</div>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs">
-                      <div className="text-right">
-                        <div className="text-gray-300">${campaign.insights?.spend?.toFixed(2) || '0'}</div>
-                        <div className="text-gray-500">gasto</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-gray-300">{campaign.insights?.roas?.toFixed(2) || '0'}x</div>
-                        <div className="text-gray-500">ROAS</div>
-                      </div>
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        campaign.status === 'ACTIVE' ? 'bg-green-900/40 text-green-300' : 'bg-gray-700/40 text-gray-400'
-                      }`}>
-                        {campaign.status === 'ACTIVE' ? 'Activa' : 'Pausada'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12 text-gray-500">
-                <p className="text-4xl mb-3">📊</p>
-                <p className="text-sm">No hay campañas cargadas.</p>
-                <p className="text-xs mt-1">Conecta tu cuenta de Meta Ads para ver tus campañas aquí.</p>
-              </div>
-            )}
-          </div>
-
-          {/* Quick Actions */}
-          <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
-            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Acciones Rápidas</h2>
-            <div className="space-y-3">
-              <a href="/audit" className="flex items-center gap-3 p-3 bg-indigo-900/20 border border-indigo-700/30 rounded-lg hover:bg-indigo-900/30 transition-colors group">
-                <span className="text-xl">🔍</span>
-                <div>
-                  <div className="text-sm font-medium text-white group-hover:text-indigo-300">Auditoría Completa</div>
-                  <div className="text-xs text-gray-500">Análisis integral de todas tus campañas</div>
-                </div>
-              </a>
-              <a href="/agents" className="flex items-center gap-3 p-3 bg-purple-900/20 border border-purple-700/30 rounded-lg hover:bg-purple-900/30 transition-colors group">
-                <span className="text-xl">🤖</span>
-                <div>
-                  <div className="text-sm font-medium text-white group-hover:text-purple-300">Agentes IA</div>
-                  <div className="text-xs text-gray-500">Ejecuta agentes especializados</div>
-                </div>
-              </a>
-              <a href="/financials" className="flex items-center gap-3 p-3 bg-green-900/20 border border-green-700/30 rounded-lg hover:bg-green-900/30 transition-colors group">
-                <span className="text-xl">💰</span>
-                <div>
-                  <div className="text-sm font-medium text-white group-hover:text-green-300">Finanzas</div>
-                  <div className="text-xs text-gray-500">Control financiero y márgenes</div>
-                </div>
-              </a>
-              <a href="/settings" className="flex items-center gap-3 p-3 bg-gray-800/50 border border-gray-700/30 rounded-lg hover:bg-gray-800/70 transition-colors group">
-                <span className="text-xl">⚙️</span>
-                <div>
-                  <div className="text-sm font-medium text-white group-hover:text-gray-200">Configuración</div>
-                  <div className="text-xs text-gray-500">APIs, tokens y datos del negocio</div>
-                </div>
-              </a>
-            </div>
-          </div>
-        </div>
-
-        {/* Financial Summary */}
-        {records.length > 0 && (
-          <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
-            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">Resumen Financiero</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-              {records.slice(-1).map((r, i) => (
-                <>
-                  <div key={`ing-${i}`} className="text-center p-3 bg-gray-800/40 rounded-lg">
-                    <div className="text-lg font-bold text-green-400">${(r.ingresos || 0).toLocaleString()}</div>
-                    <div className="text-xs text-gray-500">Ingresos</div>
-                  </div>
-                  <div key={`cos-${i}`} className="text-center p-3 bg-gray-800/40 rounded-lg">
-                    <div className="text-lg font-bold text-red-400">${(r.costos || 0).toLocaleString()}</div>
-                    <div className="text-xs text-gray-500">Costos</div>
-                  </div>
-                  <div key={`ads-${i}`} className="text-center p-3 bg-gray-800/40 rounded-lg">
-                    <div className="text-lg font-bold text-yellow-400">${(r.ad_spend || 0).toLocaleString()}</div>
-                    <div className="text-xs text-gray-500">Ad Spend</div>
-                  </div>
-                  <div key={`dev-${i}`} className="text-center p-3 bg-gray-800/40 rounded-lg">
-                    <div className="text-lg font-bold text-orange-400">${(r.devoluciones || 0).toLocaleString()}</div>
-                    <div className="text-xs text-gray-500">Devoluciones</div>
-                  </div>
-                  <div key={`ord-${i}`} className="text-center p-3 bg-gray-800/40 rounded-lg">
-                    <div className="text-lg font-bold text-indigo-400">{(r.ordenes || 0).toLocaleString()}</div>
-                    <div className="text-xs text-gray-500">Órdenes</div>
-                  </div>
-                </>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Autonomous Actions */}
-        {autonomousActions.length > 0 && (
-          <div className="bg-gray-900/80 border border-gray-800 rounded-xl p-5">
-            <h2 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-4">
-              🤖 Acciones Autónomas — Últimas 24h
-            </h2>
-            <div className="space-y-3 max-h-64 overflow-y-auto">
-              {autonomousActions.slice(0, 10).map((action) => {
-                const statusColors = {
-                  pending: 'bg-yellow-900/30 border-yellow-700/40 text-yellow-300',
-                  approved: 'bg-blue-900/30 border-blue-700/40 text-blue-300',
-                  executed: 'bg-green-900/30 border-green-700/40 text-green-300',
-                  failed: 'bg-red-900/30 border-red-700/40 text-red-300',
-                  cancelled: 'bg-gray-700/30 border-gray-600/40 text-gray-400',
-                };
-
-                return (
-                  <div
-                    key={action.id}
-                    className={`border rounded-lg p-3 ${statusColors[action.status] || 'bg-gray-800/40 border-gray-700/40 text-gray-300'}`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="text-sm font-medium">{action.description}</div>
-                        <div className="text-xs opacity-75 mt-0.5">{action.triggered_by} • {action.target}</div>
-                      </div>
-                      <span className="text-xs font-medium px-2 py-1 bg-black/30 rounded">
-                        {action.status === 'pending' ? '⏳' : '✓'} {action.status.toUpperCase()}
-                      </span>
-                    </div>
-
-                    {action.status === 'pending' && action.requires_approval && (
-                      <div className="flex gap-2 mt-2">
-                        <button
-                          onClick={() => {
-                            api.approveAutonomousAction(action.id).then(() => loadAll());
-                          }}
-                          className="flex-1 text-xs px-2 py-1 bg-green-600 hover:bg-green-500 rounded transition-colors"
-                        >
-                          ✓ Aprobar
-                        </button>
-                        <button
-                          onClick={() => {
-                            api.rejectAutonomousAction(action.id).then(() => loadAll());
-                          }}
-                          className="flex-1 text-xs px-2 py-1 bg-red-600 hover:bg-red-500 rounded transition-colors"
-                        >
-                          ✕ Rechazar
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
     </Layout>
   );
 }
 
-export function getServerSideProps(context) {
+function SectionLabel({ children }) {
+  return (
+    <p className="text-[10px] font-bold uppercase tracking-[0.15em] mb-3"
+      style={{ color: 'rgba(255,255,255,0.25)' }}>
+      {children}
+    </p>
+  );
+}
+
+export function getServerSideProps() {
   return { props: {} };
 }

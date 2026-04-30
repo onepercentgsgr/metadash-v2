@@ -7,14 +7,14 @@ import { useAuth } from '../context/AuthContext';
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 const AGENTS = [
-  { id: 'optimize',      label: 'Optimizador',        icon: '🤖', path: '/agent/optimize',       desc: 'Analiza campañas y da acciones inmediatas' },
-  { id: 'finance',       label: 'Finanzas',            icon: '💰', path: '/agent/finance',        desc: 'Márgenes, ROAS real y control de gasto' },
-  { id: 'scripts',       label: 'Scripts',             icon: '🎬', path: '/agent/scripts',        desc: 'Genera guiones de video ads listos para grabar' },
-  { id: 'creatives',     label: 'Creativos',           icon: '🎨', path: '/agent/creatives',      desc: 'Analiza y mejora creatividades actuales' },
-  { id: 'growth',        label: 'Growth',              icon: '📈', path: '/agent/growth',         desc: 'Estrategia de escala y nuevas audiencias' },
-  { id: 'cro',           label: 'CRO',                 icon: '🔄', path: '/agent/cro',            desc: 'Conversión en landing page y funnel' },
-  { id: 'landing-audit', label: 'Landing',             icon: '🏠', path: '/agent/landing-audit',  desc: 'Auditoría de landing page y mejoras' },
-  { id: 'full-audit',    label: 'Auditoría Total',     icon: '🔍', path: '/agent/full-audit',     desc: 'Análisis completo del negocio' },
+  { id: 'optimize',      label: 'Optimizador',    icon: '⚡', path: '/agent/optimize',      desc: 'Analiza campañas y da acciones inmediatas' },
+  { id: 'finance',       label: 'Finanzas',        icon: '💰', path: '/agent/finance',       desc: 'Márgenes, ROAS real y control de gasto' },
+  { id: 'scripts',       label: 'Scripts',         icon: '🎬', path: '/agent/scripts',       desc: 'Genera guiones de video ads listos para grabar' },
+  { id: 'creatives',     label: 'Creativos',       icon: '🎨', path: '/agent/creatives',     desc: 'Analiza y mejora creatividades actuales' },
+  { id: 'growth',        label: 'Growth',          icon: '📈', path: '/agent/growth',        desc: 'Estrategia de escala y nuevas audiencias' },
+  { id: 'cro',           label: 'CRO',             icon: '🔄', path: '/agent/cro',           desc: 'Conversión en landing page y funnel' },
+  { id: 'landing-audit', label: 'Landing',         icon: '🏠', path: '/agent/landing-audit', desc: 'Auditoría de landing page y mejoras' },
+  { id: 'full-audit',    label: 'Auditoría Total', icon: '🔍', path: '/agent/full-audit',    desc: 'Análisis completo del negocio' },
 ];
 
 function semaphoreColor(value, thresholds) {
@@ -40,28 +40,20 @@ function computeSemaphore(campaigns) {
   const spend = active.reduce((a, c) => a + parseFloat(c.spend || 0), 0);
 
   return {
-    roas: { value: roas, color: semaphoreColor(roas, { green: 2, yellow: 1 }), label: 'ROAS Prom.' },
-    ctr: { value: ctr, color: semaphoreColor(ctr, { green: 1, yellow: 0.5 }), label: 'CTR Prom. (%)' },
-    cpm: { value: cpm, color: semaphoreColor(cpm ? 20 - cpm : null, { green: 10, yellow: 0 }), label: 'CPM Prom.' },
-    spend: { value: spend, color: 'blue', label: 'Gasto Total' },
-    active: { value: active.length, color: 'blue', label: 'Campañas activas' },
+    roas:   { value: roas,   color: semaphoreColor(roas, { green: 2, yellow: 1 }),                    label: 'ROAS Prom.' },
+    ctr:    { value: ctr,    color: semaphoreColor(ctr, { green: 1, yellow: 0.5 }),                   label: 'CTR Prom. (%)' },
+    cpm:    { value: cpm,    color: semaphoreColor(cpm ? 20 - cpm : null, { green: 10, yellow: 0 }), label: 'CPM Prom.' },
+    spend:  { value: spend,  color: 'blue',                                                            label: 'Gasto Total' },
+    active: { value: active.length, color: 'blue',                                                    label: 'Campañas activas' },
   };
 }
 
 const colorMap = {
-  green: 'bg-emerald-900/40 border-emerald-600/40 text-emerald-300',
-  yellow: 'bg-yellow-900/40 border-yellow-600/40 text-yellow-300',
-  red: 'bg-red-900/40 border-red-600/40 text-red-300',
-  blue: 'bg-indigo-900/40 border-indigo-600/40 text-indigo-300',
-  gray: 'bg-gray-800/40 border-gray-600/40 text-gray-400',
-};
-
-const dotMap = {
-  green: 'bg-emerald-400',
-  yellow: 'bg-yellow-400',
-  red: 'bg-red-400',
-  blue: 'bg-indigo-400',
-  gray: 'bg-gray-500',
+  green:  { bg: 'rgba(16,185,129,0.08)', border: 'rgba(16,185,129,0.2)',  text: '#34d399', dot: '#10b981' },
+  yellow: { bg: 'rgba(234,179,8,0.08)',  border: 'rgba(234,179,8,0.2)',   text: '#fbbf24', dot: '#eab308' },
+  red:    { bg: 'rgba(239,68,68,0.08)',  border: 'rgba(239,68,68,0.2)',   text: '#f87171', dot: '#ef4444' },
+  blue:   { bg: 'rgba(99,102,241,0.08)', border: 'rgba(99,102,241,0.2)',  text: '#a5b4fc', dot: '#6366f1' },
+  gray:   { bg: 'rgba(107,114,128,0.08)',border: 'rgba(107,114,128,0.2)', text: '#9ca3af', dot: '#6b7280' },
 };
 
 export default function CampaignsPage() {
@@ -102,9 +94,7 @@ export default function CampaignsPage() {
     }
   }, [token]);
 
-  useEffect(() => {
-    fetchCampaigns();
-  }, [fetchCampaigns]);
+  useEffect(() => { fetchCampaigns(); }, [fetchCampaigns]);
 
   const runAgent = async (agentId, path) => {
     setAgentLoading((p) => ({ ...p, [agentId]: true }));
@@ -112,10 +102,7 @@ export default function CampaignsPage() {
       const res = await fetch(`${API}${path}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: '',
-          context: { campaigns_data: campaigns },
-        }),
+        body: JSON.stringify({ prompt: '', context: { campaigns_data: campaigns } }),
       });
       const data = await res.json();
       setAgentOutputs((p) => ({
@@ -150,19 +137,34 @@ export default function CampaignsPage() {
   const semaphore = computeSemaphore(campaigns);
   const currentAgent = AGENTS.find((a) => a.id === activeTab);
 
+  const card = {
+    background: '#16161a',
+    border: '1px solid #1e1e24',
+    borderRadius: '1rem',
+  };
+
   return (
     <Layout>
-      <div className="space-y-8">
+      <div className="space-y-7">
+
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white">Campañas &amp; Agentes IA</h1>
-            <p className="text-gray-400 text-sm mt-1">Meta Ads + TikTok Ads — control total del gasto</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest mb-1" style={{ color: '#6366f1' }}>
+              Meta Ads · TikTok Ads
+            </p>
+            <h1 className="text-2xl font-extrabold tracking-tight text-white">Campañas &amp; Agentes IA</h1>
+            <p className="text-sm mt-1" style={{ color: '#6b7280' }}>Control total del gasto publicitario en tiempo real</p>
           </div>
           <button
             onClick={fetchCampaigns}
             disabled={loadingCampaigns}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-semibold rounded-xl transition-all disabled:opacity-50"
+            style={{
+              background: 'rgba(99,102,241,0.12)',
+              color: '#a5b4fc',
+              border: '1px solid rgba(99,102,241,0.25)',
+            }}
           >
             {loadingCampaigns ? 'Actualizando...' : '↻ Actualizar'}
           </button>
@@ -171,27 +173,32 @@ export default function CampaignsPage() {
         {/* Semaphore */}
         {semaphore ? (
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            {Object.entries(semaphore).map(([key, { value, color, label }]) => (
-              <div key={key} className={`border rounded-xl p-4 ${colorMap[color]}`}>
-                <div className="flex items-center gap-2 mb-1">
-                  <div className={`w-2 h-2 rounded-full ${dotMap[color]}`} />
-                  <span className="text-xs font-medium opacity-80">{label}</span>
+            {Object.entries(semaphore).map(([key, { value, color, label }]) => {
+              const c = colorMap[color];
+              return (
+                <div key={key} style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: '1rem', padding: '1rem' }}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: c.dot }} />
+                    <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: c.text, opacity: 0.7 }}>{label}</span>
+                  </div>
+                  <div className="text-xl font-bold" style={{ color: c.text }}>
+                    {value === null ? '—' : typeof value === 'number' ? value.toFixed(2) : value}
+                  </div>
                 </div>
-                <div className="text-xl font-bold">
-                  {value === null ? '—' : typeof value === 'number' ? value.toFixed(2) : value}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 text-center">
+          <div style={{ ...card, padding: '1.25rem', textAlign: 'center' }}>
             {campaignError ? (
-              <p className="text-red-400 text-sm">{campaignError}</p>
+              <p className="text-sm" style={{ color: '#f87171' }}>{campaignError}</p>
             ) : loadingCampaigns ? (
-              <p className="text-gray-500 text-sm">Cargando métricas...</p>
+              <p className="text-sm" style={{ color: '#6b7280' }}>Cargando métricas...</p>
             ) : (
-              <p className="text-gray-500 text-sm">
-                Conectá Meta Ads en <a href="/settings" className="text-indigo-400 underline">Configuración</a> para ver el semáforo.
+              <p className="text-sm" style={{ color: '#6b7280' }}>
+                Conectá Meta Ads en{' '}
+                <a href="/settings" style={{ color: '#a5b4fc', textDecoration: 'underline' }}>Configuración</a>
+                {' '}para ver el semáforo.
               </p>
             )}
           </div>
@@ -199,16 +206,17 @@ export default function CampaignsPage() {
 
         {/* Campaign Table */}
         {campaigns.length > 0 && (
-          <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-800">
-              <h2 className="text-sm font-semibold text-white">Campañas activas (últimos 7 días)</h2>
+          <div style={{ ...card, overflow: 'hidden' }}>
+            <div className="px-5 py-4" style={{ borderBottom: '1px solid #1e1e24' }}>
+              <p className="text-[10px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: '#6b7280' }}>Últimos 7 días</p>
+              <h2 className="text-sm font-semibold text-white">Campañas activas</h2>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-800">
+                  <tr style={{ borderBottom: '1px solid #1e1e24' }}>
                     {['Campaña', 'Estado', 'Gasto', 'ROAS', 'CTR', 'CPM', 'Alcance'].map((h) => (
-                      <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                      <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#6b7280' }}>
                         {h}
                       </th>
                     ))}
@@ -217,20 +225,25 @@ export default function CampaignsPage() {
                 <tbody>
                   {campaigns.map((c, i) => {
                     const roas = parseFloat(c.roas || 0);
-                    const roasColor = roas >= 2 ? 'text-emerald-400' : roas >= 1 ? 'text-yellow-400' : 'text-red-400';
+                    const roasColor = roas >= 2 ? '#34d399' : roas >= 1 ? '#fbbf24' : '#f87171';
                     return (
-                      <tr key={c.id || i} className="border-b border-gray-800/50 hover:bg-gray-800/30 transition-colors">
-                        <td className="px-4 py-3 text-gray-200 font-medium max-w-[200px] truncate">{c.name || c.id}</td>
+                      <tr key={c.id || i} style={{ borderBottom: '1px solid rgba(30,30,36,0.8)' }}
+                        className="transition-colors hover:bg-white/[0.02]">
+                        <td className="px-4 py-3 font-medium max-w-[200px] truncate" style={{ color: '#e5e7eb' }}>{c.name || c.id}</td>
                         <td className="px-4 py-3">
-                          <span className={`px-2 py-0.5 rounded text-xs font-medium ${c.status === 'ACTIVE' ? 'bg-emerald-900/40 text-emerald-400' : 'bg-gray-700 text-gray-400'}`}>
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wide"
+                            style={c.status === 'ACTIVE'
+                              ? { background: 'rgba(16,185,129,0.1)', color: '#34d399' }
+                              : { background: 'rgba(107,114,128,0.1)', color: '#9ca3af' }
+                            }>
                             {c.status}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-gray-300">${parseFloat(c.spend || 0).toFixed(2)}</td>
-                        <td className={`px-4 py-3 font-semibold ${roasColor}`}>{roas.toFixed(2)}x</td>
-                        <td className="px-4 py-3 text-gray-300">{parseFloat(c.ctr || 0).toFixed(2)}%</td>
-                        <td className="px-4 py-3 text-gray-300">${parseFloat(c.cpm || 0).toFixed(2)}</td>
-                        <td className="px-4 py-3 text-gray-300">{(c.reach || 0).toLocaleString()}</td>
+                        <td className="px-4 py-3" style={{ color: '#d1d5db' }}>${parseFloat(c.spend || 0).toFixed(2)}</td>
+                        <td className="px-4 py-3 font-bold" style={{ color: roasColor }}>{roas.toFixed(2)}x</td>
+                        <td className="px-4 py-3" style={{ color: '#d1d5db' }}>{parseFloat(c.ctr || 0).toFixed(2)}%</td>
+                        <td className="px-4 py-3" style={{ color: '#d1d5db' }}>${parseFloat(c.cpm || 0).toFixed(2)}</td>
+                        <td className="px-4 py-3" style={{ color: '#d1d5db' }}>{(c.reach || 0).toLocaleString()}</td>
                       </tr>
                     );
                   })}
@@ -240,19 +253,19 @@ export default function CampaignsPage() {
           </div>
         )}
 
-        {/* 8 Agent Tabs */}
-        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-          <div className="border-b border-gray-800 overflow-x-auto">
+        {/* Agent Tabs */}
+        <div style={{ ...card, overflow: 'hidden' }}>
+          <div className="overflow-x-auto" style={{ borderBottom: '1px solid #1e1e24' }}>
             <div className="flex min-w-max">
               {AGENTS.map((a) => (
                 <button
                   key={a.id}
                   onClick={() => setActiveTab(a.id)}
-                  className={`px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
-                    activeTab === a.id
-                      ? 'text-indigo-300 border-b-2 border-indigo-500 bg-indigo-900/10'
-                      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/40'
-                  }`}
+                  className="px-4 py-3 text-sm font-medium whitespace-nowrap transition-all"
+                  style={activeTab === a.id
+                    ? { color: '#a5b4fc', borderBottom: '2px solid #6366f1', background: 'rgba(99,102,241,0.06)' }
+                    : { color: '#6b7280', borderBottom: '2px solid transparent' }
+                  }
                 >
                   {a.icon} {a.label}
                 </button>
@@ -265,13 +278,18 @@ export default function CampaignsPage() {
               <>
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h3 className="text-white font-semibold">{currentAgent.icon} {currentAgent.label}</h3>
-                    <p className="text-gray-400 text-sm mt-1">{currentAgent.desc}</p>
+                    <h3 className="font-semibold text-white">{currentAgent.icon} {currentAgent.label}</h3>
+                    <p className="text-sm mt-1" style={{ color: '#6b7280' }}>{currentAgent.desc}</p>
                   </div>
                   <button
                     onClick={() => runAgent(currentAgent.id, currentAgent.path)}
                     disabled={agentLoading[currentAgent.id]}
-                    className="shrink-0 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+                    className="shrink-0 px-4 py-2 text-sm font-semibold rounded-xl transition-all disabled:opacity-50"
+                    style={{
+                      background: 'linear-gradient(135deg,#4f46e5,#7c3aed)',
+                      color: 'white',
+                      boxShadow: '0 4px 15px rgba(99,102,241,0.25)',
+                    }}
                   >
                     {agentLoading[currentAgent.id] ? 'Ejecutando...' : '▶ Ejecutar agente'}
                   </button>
@@ -279,12 +297,14 @@ export default function CampaignsPage() {
 
                 {agentOutputs[currentAgent.id] && (
                   <div className="relative">
-                    <pre className="bg-gray-950 border border-gray-800 rounded-lg p-4 text-sm text-gray-300 whitespace-pre-wrap font-mono max-h-[500px] overflow-y-auto">
+                    <pre className="rounded-xl p-4 text-sm whitespace-pre-wrap font-mono max-h-[500px] overflow-y-auto leading-relaxed"
+                      style={{ background: '#0d0d11', border: '1px solid #1e1e24', color: '#d1d5db' }}>
                       {agentOutputs[currentAgent.id]}
                     </pre>
                     <button
                       onClick={() => navigator.clipboard.writeText(agentOutputs[currentAgent.id])}
-                      className="absolute top-3 right-3 text-xs text-gray-500 hover:text-gray-300 bg-gray-900 border border-gray-700 rounded px-2 py-1"
+                      className="absolute top-3 right-3 text-xs rounded-lg px-2 py-1 transition-colors"
+                      style={{ background: '#16161a', border: '1px solid #2a2a35', color: '#9ca3af' }}
                     >
                       Copiar
                     </button>
@@ -295,42 +315,46 @@ export default function CampaignsPage() {
           </div>
         </div>
 
-        {/* TikTok Ads Paid Section */}
-        <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-800 flex items-center gap-3">
-            <span className="text-xl">🎵</span>
+        {/* TikTok Ads Paid */}
+        <div style={{ ...card, overflow: 'hidden' }}>
+          <div className="px-5 py-4 flex items-center gap-4" style={{ borderBottom: '1px solid #1e1e24' }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+              style={{ background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.2)' }}>
+              🎵
+            </div>
             <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: '#ec4899', opacity: 0.7 }}>Paid</p>
               <h2 className="text-sm font-semibold text-white">TikTok Ads — Agente Pago</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Estrategia de lanzamiento u optimización diaria — sin quemar plata</p>
             </div>
           </div>
 
           <div className="p-6 space-y-4">
-            <div className="flex gap-3">
-              <button
-                onClick={() => setTiktokMode('strategy')}
-                className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                  tiktokMode === 'strategy'
-                    ? 'bg-pink-900/30 border-pink-600/40 text-pink-300'
-                    : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-gray-200'
-                }`}
-              >
-                🚀 Plan de Lanzamiento
-              </button>
-              <button
-                onClick={() => setTiktokMode('optimize')}
-                className={`px-4 py-2 text-sm font-medium rounded-lg border transition-colors ${
-                  tiktokMode === 'optimize'
-                    ? 'bg-pink-900/30 border-pink-600/40 text-pink-300'
-                    : 'bg-gray-800 border-gray-700 text-gray-400 hover:text-gray-200'
-                }`}
-              >
-                ⚡ Optimización Diaria
-              </button>
+            <div className="flex gap-3 flex-wrap">
+              {[
+                { id: 'strategy', label: '🚀 Plan de Lanzamiento' },
+                { id: 'optimize', label: '⚡ Optimización Diaria' },
+              ].map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setTiktokMode(m.id)}
+                  className="px-4 py-2 text-sm font-medium rounded-xl transition-all"
+                  style={tiktokMode === m.id
+                    ? { background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.3)', color: '#f9a8d4' }
+                    : { background: '#16161a', border: '1px solid #2a2a35', color: '#9ca3af' }
+                  }
+                >
+                  {m.label}
+                </button>
+              ))}
               <button
                 onClick={runTikTokAds}
                 disabled={tiktokLoading}
-                className="ml-auto px-4 py-2 bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors"
+                className="ml-auto px-5 py-2 text-sm font-semibold rounded-xl transition-all disabled:opacity-50"
+                style={{
+                  background: 'linear-gradient(135deg,#db2777,#ec4899)',
+                  color: 'white',
+                  boxShadow: '0 4px 15px rgba(236,72,153,0.2)',
+                }}
               >
                 {tiktokLoading ? 'Ejecutando...' : '▶ Ejecutar'}
               </button>
@@ -338,12 +362,14 @@ export default function CampaignsPage() {
 
             {tiktokOutput && (
               <div className="relative">
-                <pre className="bg-gray-950 border border-gray-800 rounded-lg p-4 text-sm text-gray-300 whitespace-pre-wrap font-mono max-h-[500px] overflow-y-auto">
+                <pre className="rounded-xl p-4 text-sm whitespace-pre-wrap font-mono max-h-[500px] overflow-y-auto"
+                  style={{ background: '#0d0d11', border: '1px solid #1e1e24', color: '#d1d5db' }}>
                   {tiktokOutput}
                 </pre>
                 <button
                   onClick={() => navigator.clipboard.writeText(tiktokOutput)}
-                  className="absolute top-3 right-3 text-xs text-gray-500 hover:text-gray-300 bg-gray-900 border border-gray-700 rounded px-2 py-1"
+                  className="absolute top-3 right-3 text-xs rounded-lg px-2 py-1"
+                  style={{ background: '#16161a', border: '1px solid #2a2a35', color: '#9ca3af' }}
                 >
                   Copiar
                 </button>

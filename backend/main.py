@@ -22,7 +22,6 @@ from fastapi.responses import JSONResponse
 from database import engine, get_db, Base
 from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog
 from agents.shared_memory import AgentMemory  # registers table with Base.metadata
-from security_middleware import SecurityHeadersMiddleware
 import config
 
 logger = logging.getLogger(__name__)
@@ -47,7 +46,7 @@ except ImportError:
 Base.metadata.create_all(bind=engine)
 
 # Create FastAPI app
-app = FastAPI(title="MetaDash API", version="3.5.0")
+app = FastAPI(title="MetaDash API", version="2.0.0")
 
 # Setup rate limiting
 limiter = Limiter(key_func=get_remote_address)
@@ -96,7 +95,6 @@ class SecureCORSMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(SecureCORSMiddleware)
-app.add_middleware(SecurityHeadersMiddleware)
 
 # Include payment routes
 if PAYMENTS_AVAILABLE:
@@ -547,6 +545,7 @@ def shutdown_event():
     except:
         pass
 
+
 # Health Endpoints
 @app.get("/")
 @app.get("/health")
@@ -554,7 +553,7 @@ async def health_check():
     return {
         "status": "ok",
         "service": "MetaDash API",
-        "version": "3.5.0",
+        "version": "1.0.0",
     }
 
 
@@ -1100,7 +1099,6 @@ async def delete_user(
 
     if admin.role != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
-
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -1702,7 +1700,6 @@ async def run_playbook_social_media(
         raise HTTPException(status_code=500, detail=f"Error en Social Media: {str(e)}")
 
 
-
 # ── Autonomous Actions Endpoints ──
 
 @app.get("/autonomous/actions")
@@ -1829,46 +1826,7 @@ async def run_agent(
         raise HTTPException(status_code=400, detail=f"Unknown agent type: {agent_type}")
 
     try:
-        # Real agent dispatch — no placeholders
-        from agents import (
-            analyze_campaigns, analyze_finances, generate_scripts,
-            analyze_creatives, get_growth_strategy, get_cro_advice,
-            audit_landing_page, run_full_audit,
-        )
-
-        api_key = config_obj.anthropic_api_key
-        negocio = config_obj.negocio_info or ""
-        ctx = request.context or {}
-
-        if agent_type == "optimizer":
-            campaigns_data = ctx.get("campaigns_data", [])
-            result = analyze_campaigns(campaigns_data, negocio, api_key)
-        elif agent_type == "finance":
-            financial_data = ctx.get("financial_data", {})
-            result = analyze_finances(financial_data, negocio, api_key)
-        elif agent_type == "script_gen":
-            result = generate_scripts(request.input or "Generate ad scripts", negocio, api_key)
-        elif agent_type == "creative_director":
-            creatives_data = ctx.get("creatives_data", [])
-            result = analyze_creatives(creatives_data, negocio, api_key)
-        elif agent_type == "advisor":
-            result = get_growth_strategy(ctx, negocio, api_key)
-        elif agent_type == "cro":
-            result = get_cro_advice(ctx, negocio, api_key)
-        elif agent_type == "landing_page_auditor":
-            landing_url = ctx.get("landing_page_url", "") or config_obj.landing_page_url or ""
-            result = audit_landing_page(landing_url, negocio, api_key)
-        elif agent_type == "orchestrator":
-            result = run_full_audit(
-                campaigns_data=ctx.get("campaigns_data", []),
-                creatives_data=ctx.get("creatives_data", []),
-                financial_data=ctx.get("financial_data", {}),
-                landing_url=config_obj.landing_page_url or "",
-                negocio_info=negocio,
-                api_key=api_key,
-            )
-        else:
-            result = f"Agent '{agent_type}' not implemented"
+        result = f"{agent_handlers[agent_type]} analysis - placeholder"
 
         # Log the result
         log_entry = AgentLog(
@@ -1885,8 +1843,8 @@ async def run_agent(
             agent=agent_handlers[agent_type],
         )
     except Exception as e:
-        logger.error(f"Agent run error ({agent_type}): {type(e).__name__}: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error in {agent_type} agent: {str(e)}")
+        logger.error(f"Unexpected error in agent call: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail="An error occurred while processing your request")
 
 
 # Finance Endpoints
