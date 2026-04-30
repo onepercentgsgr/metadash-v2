@@ -202,9 +202,9 @@ export default function AuditPage() {
         {/* Empty State */}
         {!running && !hasSectionData && (
           <div className="rounded-2xl p-8 text-center" style={{ background: '#16161a', border: '1px solid #1e1e24' }}>
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4"
-              style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>
-              🔍
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+              style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', color: '#6366f1' }}>
+              <Icon name="audit" size={28} strokeWidth={1.5} />
             </div>
             <h2 className="text-lg font-bold text-white mb-2">¿Cómo funciona?</h2>
             <p className="text-sm max-w-xl mx-auto mb-6" style={{ color: '#9ca3af' }}>
@@ -215,7 +215,7 @@ export default function AuditPage() {
               {SECTIONS_META.map(s => (
                 <div key={s.key} className="flex items-center gap-2 p-3 rounded-xl"
                   style={{ background: '#0d0d11', border: '1px solid #1e1e24' }}>
-                  <span className="text-base">{s.icon}</span>
+                  <span style={{ color: s.accent }}><Icon name={s.icon} size={14} strokeWidth={2} /></span>
                   <span className="text-xs font-medium" style={{ color: '#d1d5db' }}>{s.title.split(' — ')[0]}</span>
                 </div>
               ))}

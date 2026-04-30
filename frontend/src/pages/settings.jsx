@@ -185,14 +185,14 @@ export default function SettingsPage() {
         {error && (
           <div className="rounded-xl p-4 flex items-center gap-3"
             style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <span style={{ color: '#f87171' }}>⚠</span>
+            <span style={{ color: '#f87171' }}><Icon name="warning" size={14} strokeWidth={2} /></span>
             <p className="text-sm" style={{ color: '#fca5a5' }}>{error}</p>
           </div>
         )}
         {success && (
           <div className="rounded-xl p-4 flex items-center gap-3"
             style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
-            <span style={{ color: '#34d399' }}>✓</span>
+            <span style={{ color: '#34d399' }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
             <p className="text-sm" style={{ color: '#6ee7b7' }}>{success}</p>
           </div>
         )}

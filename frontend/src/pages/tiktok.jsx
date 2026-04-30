@@ -263,7 +263,7 @@ export default function TikTokPage() {
           <div className="space-y-3">
             {history.length === 0 ? (
               <div className="rounded-2xl p-10 text-center" style={{ background: '#16161a', border: '1px solid #1e1e24' }}>
-                <div className="text-3xl mb-3">🎬</div>
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: 'rgba(236,72,153,0.1)', border: '1px solid rgba(236,72,153,0.2)', color: '#ec4899' }}><Icon name="videos" size={22} strokeWidth={1.5} /></div>
                 <p className="text-sm" style={{ color: '#9ca3af' }}>No hay contenido generado todavía en esta sesión.</p>
                 <p className="text-xs mt-1" style={{ color: '#6b7280' }}>Generá un video o calendario para verlo aquí.</p>
               </div>
@@ -274,7 +274,7 @@ export default function TikTokPage() {
                   <div className="px-5 py-3 flex items-center justify-between"
                     style={{ borderBottom: '1px solid #1e1e24' }}>
                     <div className="flex items-center gap-3">
-                      <span className="text-base">{item.type === 'video' ? '🎬' : '📅'}</span>
+                      <span style={{ color: '#ec4899' }}><Icon name={item.type === 'video' ? 'videos' : 'calendar'} size={14} strokeWidth={2} /></span>
                       <div>
                         <span className="text-xs font-semibold text-white">
                           {item.type === 'video' ? `Video — ${item.angle}` : 'Calendario semanal'}
