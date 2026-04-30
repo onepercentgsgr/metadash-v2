@@ -1636,6 +1636,8 @@ async def run_playbook_copywriter(
 ):
     """Run Playbook Copywriter - Genera copy para landing page, anuncios y email sequence."""
     user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
 
     try:
         from agents import run_copywriter_analysis
@@ -1672,6 +1674,8 @@ async def run_playbook_design(
 ):
     """Run Playbook Design - Genera mockups, auditoría de conversión y estrategia de colores."""
     user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
 
     try:
         from agents import run_design_analysis
@@ -1708,6 +1712,8 @@ async def run_playbook_social_media(
 ):
     """Run Playbook Social Media - TikTok orgánico + variaciones de creativos para Meta Ads."""
     user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
 
     try:
         from agents import run_social_media_analysis
@@ -1840,9 +1846,12 @@ async def run_agent(
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
     config_obj = get_tenant_config(user.id, db)
 
-    if not config_obj.anthropic_api_key:
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
 
     agent_type = request.agent_type.lower()
