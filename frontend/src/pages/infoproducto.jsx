@@ -33,6 +33,7 @@ const STEPS = [
   { id: 'producto',       num: '10',  icon: '📖', name: 'Generador de Producto',   agent: 'EL INVESTIGADOR',  tag: 'Producto' },
   { id: 'upsells',        num: '11',  icon: '💎', name: 'Upsells + AOV',           agent: 'COPYWRITER DR',    tag: 'Monetización' },
   { id: 'email',          num: '12',  icon: '📧', name: 'Email Marketing',         agent: 'COPYWRITER DR',    tag: 'Retención' },
+  { id: 'lanzamiento',    num: '13',  icon: '🚀', name: 'Plan de Lanzamiento',     agent: 'ESTRATEGA',        tag: 'Lanzamiento' },
 ];
 
 const FIELDS_BY_STEP = {
@@ -112,6 +113,13 @@ const FIELDS_BY_STEP = {
     { k: 'trigger', label: 'Trigger', type: 'select', options: ['compra','abandono carrito','lead nuevo','postventa','reactivación'] },
     { k: 'notas', label: 'Notas', type: 'textarea' },
   ],
+  lanzamiento: [
+    { k: 'modo', label: '¿Cómo querés grabar tus videos?', type: 'select', options: ['Faceless (voz en off + b-roll)', 'A cámara', 'Mix (3 faceless + 2 cámara)'] },
+    { k: 'duracion', label: 'Duración promedio por video', type: 'select', options: ['15-30s', '30-60s', '60-90s'] },
+    { k: 'plataforma_principal', label: 'Plataforma principal', type: 'select', options: ['TikTok', 'Instagram Reels', 'YouTube Shorts', 'Multi'] },
+    { k: 'angulos', label: 'Ángulos a cubrir (opcional)', type: 'textarea' },
+    { k: 'notas', label: 'Notas / restricciones', type: 'textarea' },
+  ],
 };
 
 function emptyState() {
@@ -133,6 +141,7 @@ function emptyState() {
     producto: { formato:'ebook', capitulos:'', tono_contenido:'', notas:'', output:'' },
     upsells: { modelo:'OTO + bump', precio_up:'', precio_down:'', notas:'', output:'' },
     email: { secuencia:'7', trigger:'compra', notas:'', output:'' },
+    lanzamiento: { modo: 'Faceless (voz en off + b-roll)', duracion: '30-60s', plataforma_principal: 'TikTok', angulos: '', notas: '', output: '' },
   };
 }
 
@@ -200,12 +209,27 @@ export default function InfoproductoPage() {
     setPS(prev => ({ ...prev, pais: p, moneda: m, modismo: mo }));
   };
 
-  async function runAgent() {
+  async function runAgent(opts = {}) {
+    const { calendario = false } = opts;
     setRunning(true);
     try {
+      let stateToSend = PS;
+      if (calendario && step.id === 'lanzamiento') {
+        stateToSend = {
+          ...PS,
+          lanzamiento: { ...PS.lanzamiento, modo_calendario: true },
+        };
+        setPS(stateToSend);
+      } else if (step.id === 'lanzamiento' && PS.lanzamiento?.modo_calendario) {
+        stateToSend = {
+          ...PS,
+          lanzamiento: { ...PS.lanzamiento, modo_calendario: false },
+        };
+        setPS(stateToSend);
+      }
       const res = await api.apiFetch('/agents/infoproducto/run', {
         method: 'POST',
-        body: JSON.stringify({ step_id: step.id, state: PS }),
+        body: JSON.stringify({ step_id: step.id, state: stateToSend }),
         headers: { 'Content-Type': 'application/json' },
       });
       const output = res?.output || res?.content || '';
@@ -370,12 +394,26 @@ export default function InfoproductoPage() {
               El agente lee toda tu memoria compartida (todos los pasos anteriores, datos del producto, métricas si tenés campañas, etc.) y genera el output completo para este paso. Listo para copiar y usar.
             </p>
             <button
-              onClick={runAgent}
+              onClick={() => runAgent()}
               disabled={running}
               className="w-full px-5 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition shadow-lg shadow-indigo-900/30"
             >
               {running ? '⏳ Ejecutando agente...' : `▶ Ejecutar ${step.agent}`}
             </button>
+            {step.id === 'lanzamiento' && (
+              <>
+                <p className="text-[11px] text-gray-500 mt-3 leading-relaxed">
+                  El estratega genera hooks + script + b-roll + caption + hashtags. Si elegís Faceless, también te tira keywords para buscar b-roll en Pexels/Pixabay y sugerencias de música trending.
+                </p>
+                <button
+                  onClick={() => runAgent({ calendario: true })}
+                  disabled={running}
+                  className="w-full mt-3 px-5 py-2.5 bg-transparent border border-amber-600/50 hover:bg-amber-600/10 hover:border-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-amber-300 font-bold text-sm rounded-xl transition"
+                >
+                  {running ? '⏳ Generando calendario...' : '⚡ Generar calendario completo de 7 videos'}
+                </button>
+              </>
+            )}
           </div>
 
           {/* OUTPUT */}
@@ -391,7 +429,7 @@ export default function InfoproductoPage() {
                     📋 Copiar
                   </button>
                   <button
-                    onClick={runAgent}
+                    onClick={() => runAgent()}
                     disabled={running}
                     className="px-3 py-1.5 bg-transparent border border-[#27272f] hover:border-indigo-600 text-gray-400 hover:text-indigo-300 text-xs font-bold rounded-lg transition"
                   >
