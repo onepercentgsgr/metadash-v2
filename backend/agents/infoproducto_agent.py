@@ -8,6 +8,10 @@ Now uses the IP-protected 'Nivel Dios' Playbook prompts (see
 agents.playbook_prompts) as the system message, with Anthropic prompt
 caching enabled so repeated calls hit the cache (~90% cheaper). The
 volatile per-request user state goes in `messages`, not `system`.
+
+Default model is Sonnet 4.6 — cheaper, fast, and its prompt-cache
+threshold (1024 tokens) is reachable by our Playbook prompts so caching
+actually delivers savings. Reserve Opus for the final CEO synthesis.
 """
 
 import json
@@ -175,7 +179,7 @@ def run_infoproducto_step(
     step_id: str,
     state: dict,
     api_key: Optional[str] = None,
-    model: str = "claude-opus-4-7",
+    model: str = "claude-sonnet-4-6",
 ) -> str:
     """
     Run the infoproducto agent for a specific step.
@@ -188,6 +192,10 @@ def run_infoproducto_step(
     4. Saves the output to shared memory under key `infoproducto.{step_id}`
        and persists the full state under `infoproducto.state`.
     5. Returns the output text.
+
+    Default model is Sonnet 4.6 — fast, ~5x cheaper than Opus, and its
+    1024-token prompt-cache minimum is reachable by our Playbook prompts
+    so caching actually delivers cost savings (~90% on repeated calls).
     """
     if step_id not in STEP_META:
         raise ValueError(f"Unknown infoproducto step: {step_id}")
@@ -209,7 +217,7 @@ def run_infoproducto_step(
     # the same Playbook prompt hit the cache (~90% cheaper).
     create_kwargs: dict[str, Any] = {
         "model": model,
-        "max_tokens": 4096,
+        "max_tokens": 8192,
         "messages": [{"role": "user", "content": user_text}],
     }
     if system_text:
