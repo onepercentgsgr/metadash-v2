@@ -2,19 +2,20 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Layout } from '../components/Layout';
+import { Icon } from '../components/Icons';
 import { useAuth } from '../context/AuthContext';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 const AGENTS = [
-  { id: 'optimize',      label: 'Optimizador',    icon: '⚡', path: '/agent/optimize',      desc: 'Analiza campañas y da acciones inmediatas' },
-  { id: 'finance',       label: 'Finanzas',        icon: '💰', path: '/agent/finance',       desc: 'Márgenes, ROAS real y control de gasto' },
-  { id: 'scripts',       label: 'Scripts',         icon: '🎬', path: '/agent/scripts',       desc: 'Genera guiones de video ads listos para grabar' },
-  { id: 'creatives',     label: 'Creativos',       icon: '🎨', path: '/agent/creatives',     desc: 'Analiza y mejora creatividades actuales' },
-  { id: 'growth',        label: 'Growth',          icon: '📈', path: '/agent/growth',        desc: 'Estrategia de escala y nuevas audiencias' },
-  { id: 'cro',           label: 'CRO',             icon: '🔄', path: '/agent/cro',           desc: 'Conversión en landing page y funnel' },
-  { id: 'landing-audit', label: 'Landing',         icon: '🏠', path: '/agent/landing-audit', desc: 'Auditoría de landing page y mejoras' },
-  { id: 'full-audit',    label: 'Auditoría Total', icon: '🔍', path: '/agent/full-audit',    desc: 'Análisis completo del negocio' },
+  { id: 'optimize',      label: 'Optimizador',    icon: 'campaigns', path: '/agent/optimize',      desc: 'Analiza campañas y da acciones inmediatas' },
+  { id: 'finance',       label: 'Finanzas',        icon: 'financials',path: '/agent/finance',       desc: 'Márgenes, ROAS real y control de gasto' },
+  { id: 'scripts',       label: 'Scripts',         icon: 'tiktok',    path: '/agent/scripts',       desc: 'Genera guiones de video ads listos para grabar' },
+  { id: 'creatives',     label: 'Creativos',       icon: 'videos',    path: '/agent/creatives',     desc: 'Analiza y mejora creatividades actuales' },
+  { id: 'growth',        label: 'Growth',          icon: 'rocket',    path: '/agent/growth',        desc: 'Estrategia de escala y nuevas audiencias' },
+  { id: 'cro',           label: 'CRO',             icon: 'audit',     path: '/agent/cro',           desc: 'Conversión en landing page y funnel' },
+  { id: 'landing-audit', label: 'Landing',         icon: 'audit',     path: '/agent/landing-audit', desc: 'Auditoría de landing page y mejoras' },
+  { id: 'full-audit',    label: 'Auditoría Total', icon: 'crown',     path: '/agent/full-audit',    desc: 'Análisis completo del negocio' },
 ];
 
 function semaphoreColor(value, thresholds) {
@@ -261,13 +262,14 @@ export default function CampaignsPage() {
                 <button
                   key={a.id}
                   onClick={() => setActiveTab(a.id)}
-                  className="px-4 py-3 text-sm font-medium whitespace-nowrap transition-all"
+                  className="px-4 py-3 text-sm font-medium whitespace-nowrap transition-all flex items-center gap-2"
                   style={activeTab === a.id
                     ? { color: '#a5b4fc', borderBottom: '2px solid #6366f1', background: 'rgba(99,102,241,0.06)' }
                     : { color: '#6b7280', borderBottom: '2px solid transparent' }
                   }
                 >
-                  {a.icon} {a.label}
+                  <Icon name={a.icon} size={13} strokeWidth={2} />
+                  {a.label}
                 </button>
               ))}
             </div>
@@ -278,7 +280,7 @@ export default function CampaignsPage() {
               <>
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h3 className="font-semibold text-white">{currentAgent.icon} {currentAgent.label}</h3>
+                    <h3 className="font-semibold text-white flex items-center gap-2"><Icon name={currentAgent.icon} size={15} strokeWidth={2} style={{ color: '#a5b4fc' }} />{currentAgent.label}</h3>
                     <p className="text-sm mt-1" style={{ color: '#6b7280' }}>{currentAgent.desc}</p>
                   </div>
                   <button
@@ -318,9 +320,9 @@ export default function CampaignsPage() {
         {/* TikTok Ads Paid */}
         <div style={{ ...card, overflow: 'hidden' }}>
           <div className="px-5 py-4 flex items-center gap-4" style={{ borderBottom: '1px solid #1e1e24' }}>
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
-              style={{ background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.2)' }}>
-              🎵
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.2)', color: '#ec4899' }}>
+              <Icon name="tiktok" size={16} strokeWidth={1.75} />
             </div>
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-widest mb-0.5" style={{ color: '#ec4899', opacity: 0.7 }}>Paid</p>
@@ -331,18 +333,19 @@ export default function CampaignsPage() {
           <div className="p-6 space-y-4">
             <div className="flex gap-3 flex-wrap">
               {[
-                { id: 'strategy', label: '🚀 Plan de Lanzamiento' },
-                { id: 'optimize', label: '⚡ Optimización Diaria' },
+                { id: 'strategy', label: 'Plan de Lanzamiento', icon: 'rocket' },
+                { id: 'optimize', label: 'Optimización Diaria',  icon: 'campaigns' },
               ].map((m) => (
                 <button
                   key={m.id}
                   onClick={() => setTiktokMode(m.id)}
-                  className="px-4 py-2 text-sm font-medium rounded-xl transition-all"
+                  className="px-4 py-2 text-sm font-medium rounded-xl transition-all flex items-center gap-2"
                   style={tiktokMode === m.id
                     ? { background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.3)', color: '#f9a8d4' }
                     : { background: '#16161a', border: '1px solid #2a2a35', color: '#9ca3af' }
                   }
                 >
+                  <Icon name={m.icon} size={13} strokeWidth={2} />
                   {m.label}
                 </button>
               ))}

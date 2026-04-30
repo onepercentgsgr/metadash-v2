@@ -2,15 +2,16 @@
 
 import { useState } from 'react';
 import { Layout } from '../components/Layout';
+import { Icon } from '../components/Icons';
 import { api } from '../lib/api';
 
 const SECTIONS_META = [
-  { key: 'campaigns', title: 'Análisis de Campañas',        icon: '📊', accent: '#6366f1' },
-  { key: 'creatives', title: 'Rendimiento Creativo',         icon: '🎨', accent: '#ec4899' },
-  { key: 'landing',   title: 'Auditoría de Landing Page',    icon: '🌐', accent: '#0ea5e9' },
-  { key: 'finance',   title: 'Análisis Financiero',          icon: '💰', accent: '#10b981' },
-  { key: 'scripts',   title: 'Guiones Sugeridos',            icon: '✍️', accent: '#8b5cf6' },
-  { key: 'synthesis', title: 'Síntesis CEO — Plan de Acción',icon: '🎯', accent: '#f59e0b' },
+  { key: 'campaigns', title: 'Análisis de Campañas',        icon: 'campaigns', accent: '#6366f1' },
+  { key: 'creatives', title: 'Rendimiento Creativo',         icon: 'videos',    accent: '#ec4899' },
+  { key: 'landing',   title: 'Auditoría de Landing Page',    icon: 'audit',     accent: '#0ea5e9' },
+  { key: 'finance',   title: 'Análisis Financiero',          icon: 'financials',accent: '#10b981' },
+  { key: 'scripts',   title: 'Guiones Sugeridos',            icon: 'tiktok',    accent: '#8b5cf6' },
+  { key: 'synthesis', title: 'Síntesis CEO — Plan de Acción',icon: 'crown',     accent: '#f59e0b' },
 ];
 
 function AuditSection({ title, icon, accent, content, status }) {
@@ -32,9 +33,9 @@ function AuditSection({ title, icon, accent, content, status }) {
         className="w-full flex items-center justify-between p-5 transition-colors hover:bg-white/[0.02]"
       >
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
-            style={{ background: `${accent}18`, border: `1px solid ${accent}30` }}>
-            {icon}
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: `${accent}18`, border: `1px solid ${accent}30`, color: accent }}>
+            <Icon name={icon} size={16} strokeWidth={1.75} />
           </div>
           <h3 className="text-sm font-bold text-white">{title}</h3>
           {status && (

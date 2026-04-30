@@ -2,17 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import { Layout } from '../components/Layout';
+import { Icon } from '../components/Icons';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 const ANGLES = [
-  { id: 'dolor',     label: 'Dolor + agitación',               icon: '😤' },
-  { id: 'before',    label: 'Transformación before/after',     icon: '✨' },
-  { id: 'detras',    label: 'Detrás de escena / autenticidad', icon: '🎥' },
-  { id: 'mito',      label: 'Mito vs. realidad del nicho',     icon: '💡' },
-  { id: 'tutorial',  label: 'Tutorial rápido de valor',        icon: '📚' },
-  { id: 'testimonio',label: 'Testimonial / resultado real',    icon: '⭐' },
-  { id: 'trend',     label: 'Tendencia + nicho (trend hijack)',icon: '🔥' },
+  { id: 'dolor',     label: 'Dolor + agitación',               icon: 'rocket'    },
+  { id: 'before',    label: 'Transformación before/after',     icon: 'campaigns' },
+  { id: 'detras',    label: 'Detrás de escena / autenticidad', icon: 'videos'    },
+  { id: 'mito',      label: 'Mito vs. realidad del nicho',     icon: 'audit'     },
+  { id: 'tutorial',  label: 'Tutorial rápido de valor',        icon: 'agents'    },
+  { id: 'testimonio',label: 'Testimonial / resultado real',    icon: 'crown'     },
+  { id: 'trend',     label: 'Tendencia + nicho (trend hijack)',icon: 'rocket'    },
 ];
 
 export default function VideosPage() {
@@ -116,8 +117,8 @@ export default function VideosPage() {
                 <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(236,72,153,0.15)' }}>
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                      style={{ background: 'rgba(236,72,153,0.12)' }}>
-                      🎬
+                      style={{ background: 'rgba(236,72,153,0.12)', color: '#ec4899' }}>
+                      <Icon name="videos" size={15} strokeWidth={2} />
                     </div>
                     <div>
                       <span className="text-sm font-bold text-white">Video de Hoy</span>
@@ -137,7 +138,7 @@ export default function VideosPage() {
               </div>
             ) : (
               <div className="rounded-2xl p-8 text-center" style={{ background: '#16161a', border: '1px solid #1e1e24' }}>
-                <div className="text-4xl mb-3">🎬</div>
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: 'rgba(236,72,153,0.1)', border: '1px solid rgba(236,72,153,0.2)', color: '#ec4899' }}><Icon name="videos" size={22} strokeWidth={1.5} /></div>
                 <p className="text-sm mb-1 text-white font-semibold">No hay video generado para hoy todavía</p>
                 <p className="text-xs mb-0" style={{ color: '#9ca3af' }}>
                   El scheduler lo genera automáticamente a las 9 AM, o generalo ahora abajo.
@@ -159,7 +160,7 @@ export default function VideosPage() {
                       ? { background: 'rgba(236,72,153,0.12)', border: '1px solid rgba(236,72,153,0.35)', color: '#f9a8d4' }
                       : { background: '#0d0d11', border: '1px solid #2a2a35', color: '#9ca3af' }
                     }>
-                    <span>{a.icon}</span>
+                    <Icon name={a.icon} size={12} strokeWidth={2} />
                     <span className="leading-tight truncate">{a.label}</span>
                   </button>
                 ))}
@@ -176,7 +177,7 @@ export default function VideosPage() {
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     Generando...
                   </span>
-                ) : '🎬 Generar ahora'}
+                ) : <span className="flex items-center justify-center gap-2"><Icon name="play" size={15} strokeWidth={2} />Generar ahora</span>}
               </button>
             </div>
           </div>
@@ -187,7 +188,7 @@ export default function VideosPage() {
           <div className="space-y-3">
             {history.length === 0 ? (
               <div className="rounded-2xl p-10 text-center" style={{ background: '#16161a', border: '1px solid #1e1e24' }}>
-                <div className="text-3xl mb-3">🕐</div>
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', color: 'rgba(255,255,255,0.3)' }}><Icon name="dashboard" size={20} strokeWidth={1.5} /></div>
                 <p className="text-sm" style={{ color: '#9ca3af' }}>No hay videos generados todavía.</p>
               </div>
             ) : (
@@ -195,7 +196,7 @@ export default function VideosPage() {
                 <div key={i} className="rounded-2xl overflow-hidden" style={{ background: '#16161a', border: '1px solid #1e1e24' }}>
                   <div className="px-5 py-3 flex items-center justify-between" style={{ borderBottom: '1px solid #1e1e24' }}>
                     <div className="flex items-center gap-3">
-                      <span>🎬</span>
+                      <span style={{ color: '#ec4899' }}><Icon name="videos" size={14} strokeWidth={2} /></span>
                       <div>
                         <span className="text-xs font-semibold text-white">{v.date}</span>
                         <span className="text-xs ml-2" style={{ color: '#6b7280' }}>— {v.angle}</span>

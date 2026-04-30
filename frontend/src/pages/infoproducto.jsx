@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
+import { Icon } from '../components/Icons';
 
 const COUNTRIES = [
   { v: 'LATAM|USD|neutro latinoamericano', l: 'LATAM (USD)' },
@@ -334,7 +335,7 @@ export default function InfoproductoPage() {
           {/* HEADER */}
           <div className="mb-7">
             <div className="flex items-center gap-3 mb-2">
-              <span className="text-3xl">{step.icon}</span>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)', color: '#818cf8' }}><Icon name="agents" size={18} strokeWidth={1.75} /></div>
               <div>
                 <div className="text-[11px] uppercase tracking-widest text-gray-500 font-semibold">PASO {step.num}</div>
                 <h1 className="text-2xl font-extrabold text-gray-100 tracking-tight">{step.name}</h1>
@@ -350,7 +351,7 @@ export default function InfoproductoPage() {
 
           {/* INPUT FIELDS */}
           <div className="bg-[#16161a] border border-[#1e1e24] rounded-2xl p-5 mb-5">
-            <h2 className="text-xs uppercase tracking-widest font-bold text-gray-500 mb-4">📦 Datos para este paso</h2>
+            <h2 className="text-xs uppercase tracking-widest font-bold text-gray-500 mb-4 flex items-center gap-2"><Icon name="file" size={12} strokeWidth={2} />Datos para este paso</h2>
             <div className={`grid gap-3 ${fields.length > 4 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
               {fields.map((f) => (
                 <div key={f.k} className={f.type === 'textarea' ? 'md:col-span-2' : ''}>
@@ -385,9 +386,12 @@ export default function InfoproductoPage() {
           {/* RUN AGENT */}
           <div className="bg-[#0c0c0f] border border-indigo-700/30 rounded-2xl p-5 mb-5">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-xs uppercase tracking-widest font-bold text-indigo-300">🤖 Agente IA · Nivel Dios</h2>
+              <h2 className="text-xs uppercase tracking-widest font-bold text-indigo-300 flex items-center gap-2"><Icon name="brain" size={12} strokeWidth={2} />Agente IA · Nivel Dios</h2>
               {savedAt && (
-                <span className="text-[10px] text-green-400">✓ Guardado en memoria compartida</span>
+                <span className="text-[10px] text-green-400 flex items-center gap-1">
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                  Guardado
+                </span>
               )}
             </div>
             <p className="text-xs text-gray-500 mb-4">
@@ -398,7 +402,17 @@ export default function InfoproductoPage() {
               disabled={running}
               className="w-full px-5 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition shadow-lg shadow-indigo-900/30"
             >
-              {running ? '⏳ Ejecutando agente...' : `▶ Ejecutar ${step.agent}`}
+              {running ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Ejecutando agente...
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  <Icon name="play" size={15} strokeWidth={2} />
+                  Ejecutar {step.agent}
+                </span>
+              )}
             </button>
             {step.id === 'lanzamiento' && (
               <>
@@ -410,7 +424,17 @@ export default function InfoproductoPage() {
                   disabled={running}
                   className="w-full mt-3 px-5 py-2.5 bg-transparent border border-amber-600/50 hover:bg-amber-600/10 hover:border-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-amber-300 font-bold text-sm rounded-xl transition"
                 >
-                  {running ? '⏳ Generando calendario...' : '⚡ Generar calendario completo de 7 videos'}
+                  {running ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-4 h-4 border-2 border-amber-300/30 border-t-amber-300 rounded-full animate-spin" />
+                  Generando calendario...
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  <Icon name="calendar" size={14} strokeWidth={2} />
+                  Generar calendario completo de 7 videos
+                </span>
+              )}
                 </button>
               </>
             )}
@@ -420,13 +444,13 @@ export default function InfoproductoPage() {
           {stepData.output && (
             <div className="bg-[#0c0c0f] border border-[#1e1e24] rounded-2xl p-5">
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xs uppercase tracking-widest font-bold text-gray-500">📋 Output del agente</h2>
+                <h2 className="text-xs uppercase tracking-widest font-bold text-gray-500 flex items-center gap-2"><Icon name="copy" size={12} strokeWidth={2} />Output del agente</h2>
                 <div className="flex gap-2">
                   <button
                     onClick={copyOutput}
-                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition"
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition flex items-center gap-1.5"
                   >
-                    📋 Copiar
+                    <Icon name="copy" size={11} strokeWidth={2} />Copiar
                   </button>
                   <button
                     onClick={() => runAgent()}

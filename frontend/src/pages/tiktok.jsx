@@ -2,27 +2,28 @@
 
 import { useState } from 'react';
 import { Layout } from '../components/Layout';
+import { Icon } from '../components/Icons';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 const ANGLES = [
-  { id: 'dolor',     label: 'Dolor + agitación',              icon: '😤' },
-  { id: 'before',    label: 'Transformación before/after',    icon: '✨' },
-  { id: 'detras',    label: 'Detrás de escena / autenticidad',icon: '🎥' },
-  { id: 'mito',      label: 'Mito vs. realidad del nicho',    icon: '💡' },
-  { id: 'tutorial',  label: 'Tutorial rápido de valor',       icon: '📚' },
-  { id: 'testimonio',label: 'Testimonial / resultado real',   icon: '⭐' },
-  { id: 'trend',     label: 'Tendencia + nicho (trend hijack)',icon: '🔥' },
+  { id: 'dolor',     label: 'Dolor + agitación',              icon: 'rocket'     },
+  { id: 'before',    label: 'Transformación before/after',    icon: 'campaigns'  },
+  { id: 'detras',    label: 'Detrás de escena / autenticidad',icon: 'videos'     },
+  { id: 'mito',      label: 'Mito vs. realidad del nicho',    icon: 'audit'      },
+  { id: 'tutorial',  label: 'Tutorial rápido de valor',       icon: 'agents'     },
+  { id: 'testimonio',label: 'Testimonial / resultado real',   icon: 'crown'      },
+  { id: 'trend',     label: 'Tendencia + nicho (trend hijack)',icon: 'rocket'    },
 ];
 
 const CALENDAR_PLAN = [
-  ['Día 1', 'dolor + agitación',             '😤'],
-  ['Día 2', 'transformación before/after',   '✨'],
-  ['Día 3', 'detrás de escena',              '🎥'],
-  ['Día 4', 'mito vs. realidad',             '💡'],
-  ['Día 5', 'tutorial de valor',             '📚'],
-  ['Día 6', 'testimonial / resultado',       '⭐'],
-  ['Día 7', 'trend hijacking',               '🔥'],
+  ['Día 1', 'dolor + agitación'],
+  ['Día 2', 'transformación before/after'],
+  ['Día 3', 'detrás de escena'],
+  ['Día 4', 'mito vs. realidad'],
+  ['Día 5', 'tutorial de valor'],
+  ['Día 6', 'testimonial / resultado'],
+  ['Día 7', 'trend hijacking'],
 ];
 
 export default function TikTokPage() {
@@ -79,9 +80,9 @@ export default function TikTokPage() {
   };
 
   const TABS = [
-    { id: 'video',    label: 'Video de Hoy',      icon: '🎬' },
-    { id: 'calendar', label: 'Calendario 7 días', icon: '📅' },
-    { id: 'history',  label: `Historial (${history.length})`, icon: '🕐' },
+    { id: 'video',    label: 'Video de Hoy',                  icon: 'videos'    },
+    { id: 'calendar', label: 'Calendario 7 días',             icon: 'calendar'  },
+    { id: 'history',  label: `Historial (${history.length})`, icon: 'dashboard' },
   ];
 
   return (
@@ -108,12 +109,13 @@ export default function TikTokPage() {
         <div className="flex gap-1 p-1 rounded-xl" style={{ background: '#16161a', border: '1px solid #1e1e24', width: 'fit-content' }}>
           {TABS.map((s) => (
             <button key={s.id} onClick={() => setActiveSection(s.id)}
-              className="px-4 py-2 text-sm font-semibold rounded-lg transition-all"
+              className="px-4 py-2 text-sm font-semibold rounded-lg transition-all flex items-center gap-2"
               style={activeSection === s.id
                 ? { background: '#0d0d11', color: '#f9a8d4', boxShadow: '0 1px 4px rgba(0,0,0,0.4)' }
                 : { color: '#6b7280' }
               }>
-              {s.icon} {s.label}
+              <Icon name={s.icon} size={13} strokeWidth={2} />
+              {s.label}
             </button>
           ))}
         </div>
@@ -123,7 +125,7 @@ export default function TikTokPage() {
           <div className="space-y-5">
             <div className="rounded-2xl p-6 space-y-5" style={{ background: '#16161a', border: '1px solid #1e1e24' }}>
               <div>
-                <h2 className="text-sm font-bold text-white mb-1">🎬 Video de Hoy</h2>
+                <h2 className="text-sm font-bold text-white mb-1 flex items-center gap-2"><Icon name="videos" size={14} strokeWidth={2} style={{ color: '#ec4899' }} />Video de Hoy</h2>
                 <p className="text-xs" style={{ color: '#9ca3af' }}>
                   Seleccioná el ángulo y el agente genera hook, guion completo, caption y hashtags.
                 </p>
@@ -144,7 +146,7 @@ export default function TikTokPage() {
                         : { background: '#0d0d11', border: '1px solid #2a2a35', color: '#9ca3af' }
                       }
                     >
-                      <span>{a.icon}</span>
+                      <Icon name={a.icon} size={13} strokeWidth={2} />
                       <span className="leading-tight">{a.label}</span>
                     </button>
                   ))}
@@ -166,7 +168,7 @@ export default function TikTokPage() {
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     Generando guion...
                   </span>
-                ) : '🎬 Generar video de hoy'}
+                ) : <span className="flex items-center justify-center gap-2"><Icon name="play" size={15} strokeWidth={2} />Generar video de hoy</span>}
               </button>
             </div>
 
@@ -197,7 +199,7 @@ export default function TikTokPage() {
           <div className="space-y-5">
             <div className="rounded-2xl p-6 space-y-5" style={{ background: '#16161a', border: '1px solid #1e1e24' }}>
               <div>
-                <h2 className="text-sm font-bold text-white mb-1">📅 Calendario Semanal</h2>
+                <h2 className="text-sm font-bold text-white mb-1 flex items-center gap-2"><Icon name="calendar" size={14} strokeWidth={2} style={{ color: '#ec4899' }} />Calendario Semanal</h2>
                 <p className="text-xs" style={{ color: '#9ca3af' }}>
                   7 videos con ángulos rotativos, hooks, captions y horarios de publicación optimizados.
                   El agente lee tu producto de la memoria compartida.
@@ -205,11 +207,11 @@ export default function TikTokPage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {CALENDAR_PLAN.map(([day, ang, icon]) => (
+                {CALENDAR_PLAN.map(([day, ang]) => (
                   <div key={day} className="flex items-center gap-3 rounded-xl px-4 py-2.5"
                     style={{ background: '#0d0d11', border: '1px solid #1e1e24' }}>
-                    <span className="text-xs font-bold w-10" style={{ color: '#6b7280' }}>{day}</span>
-                    <span className="text-base">{icon}</span>
+                    <span className="text-xs font-bold w-10 shrink-0" style={{ color: '#6b7280' }}>{day}</span>
+                    <span style={{ color: '#ec4899', flexShrink: 0 }}><Icon name="tiktok" size={12} strokeWidth={2} /></span>
                     <span className="text-xs" style={{ color: '#d1d5db' }}>{ang}</span>
                   </div>
                 ))}
@@ -230,7 +232,7 @@ export default function TikTokPage() {
                     <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     Generando calendario...
                   </span>
-                ) : '📅 Generar calendario de 7 días'}
+                ) : <span className="flex items-center justify-center gap-2"><Icon name="calendar" size={15} strokeWidth={2} />Generar calendario de 7 días</span>}
               </button>
             </div>
 
