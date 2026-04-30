@@ -17,7 +17,6 @@ export function Layout({ children }) {
     { label: 'Videos del Día', path: '/videos', icon: '🎬' },
     { label: 'Infoproducto', path: '/infoproducto', icon: '🚀' },
     { label: 'Agentes IA', path: '/agents', icon: '🤖' },
-    { label: 'Playbook Nivel Dios', path: '/playbook', icon: '📚' },
     { label: 'Auditoría', path: '/audit', icon: '🔍' },
     { label: 'Finanzas', path: '/financials', icon: '💰' },
     { label: 'Configuración', path: '/settings', icon: '⚙️' },

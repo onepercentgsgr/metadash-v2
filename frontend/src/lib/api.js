@@ -130,25 +130,6 @@ export const api = {
 
   getAnalyticsData: (days = 30) => apiFetch(`/analytics/data?days=${days}`),
 
-  // Playbook Nivel Dios endpoints
-  runPlaybookCopywriter: (data) =>
-    apiFetch("/agent/playbook/copywriter", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  runPlaybookDesign: (data) =>
-    apiFetch("/agent/playbook/design", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
-  runPlaybookSocialMedia: (data) =>
-    apiFetch("/agent/playbook/social-media", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-
   // Autonomous actions endpoints
   getAutonomousActions: (limit = 50, status = null) => {
     const url = `/autonomous/actions?limit=${limit}${status ? `&status=${status}` : ''}`;
