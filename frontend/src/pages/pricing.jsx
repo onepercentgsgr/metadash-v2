@@ -1,326 +1,225 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Layout } from '../components/Layout';
 import { api } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/router';
 
-const CheckIcon = ({ className }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-  </svg>
-);
-
-const plans = [
+const PLANS = [
   {
-    id: 'trial',
-    name: 'Trial',
-    price: 0,
-    period: '14 días',
-    description: 'Ideal para probar la plataforma sin compromiso',
-    color: 'yellow',
-    features: [
-      'Acceso a 2 agentes de IA',
-      'Dashboard con métricas básicas',
-      'Conexión Meta Ads',
-      'Soporte por email',
-      'Válido por 14 días',
-    ],
-    cta: 'Comenzar Gratis',
-    popular: false,
+    id: 'trial', name: 'Trial', price: 0, period: '14 días',
+    desc: 'Probá sin compromiso, sin tarjeta',
+    accent: '#f59e0b',
+    features: ['2 agentes de IA', 'Dashboard con métricas', 'Conexión Meta Ads', 'Soporte por email'],
+    cta: 'Comenzar gratis',
   },
   {
-    id: 'starter',
-    name: 'Starter',
-    price: 29,
-    period: 'mes',
-    description: 'Para emprendedores y pequeños negocios',
-    color: 'blue',
-    features: [
-      'Hasta 5 agentes de IA',
-      'Optimización automática de campañas',
-      'Análisis financiero básico',
-      'Google Analytics integrado',
-      '1 cuenta de Meta Ads',
-      'Historial de 30 días',
-      'Soporte por email prioritario',
-    ],
+    id: 'starter', name: 'Starter', price: 29, period: 'mes',
+    desc: 'Para emprendedores que escalan',
+    accent: '#3b82f6',
+    features: ['5 agentes de IA', 'Optimización automática', 'Análisis financiero', 'GA4 integrado', '1 cuenta Meta Ads', 'Historial 30 días'],
     cta: 'Elegir Starter',
-    popular: false,
   },
   {
-    id: 'pro',
-    name: 'Pro',
-    price: 79,
-    period: 'mes',
-    description: 'Para agencias y negocios en crecimiento',
-    color: 'indigo',
-    features: [
-      'Agentes de IA ilimitados',
-      'Agentes autónomos 24/7',
-      'Optimización + CRO + Growth',
-      'Google Analytics avanzado',
-      'Auditoría de landing pages',
-      'Scripts y creativos con IA',
-      'Hasta 5 cuentas de Meta Ads',
-      'Historial de 1 año',
-      'Soporte prioritario',
-    ],
-    cta: 'Elegir Pro',
+    id: 'pro', name: 'Pro', price: 79, period: 'mes',
+    desc: 'Para agencias en crecimiento',
+    accent: '#6366f1',
     popular: true,
+    features: ['Agentes IA ilimitados', 'Agentes autónomos 24/7', 'CRO + Growth + Scripts', 'GA4 avanzado', 'Auditoría de landing', '5 cuentas Meta Ads', 'Historial 1 año', 'Soporte prioritario'],
+    cta: 'Elegir Pro',
   },
   {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: 199,
-    period: 'mes',
-    description: 'Para agencias y empresas con alto volumen',
-    color: 'purple',
-    features: [
-      'Todo lo del plan Pro',
-      'Cuentas de Meta Ads ilimitadas',
-      'API completa con SLA',
-      'Agentes personalizados',
-      'Dashboard white-label',
-      'Gestor de cuenta dedicado',
-      'Onboarding personalizado',
-      'Soporte 24/7 dedicado',
-      'Historial ilimitado',
-    ],
-    cta: 'Contactar Ventas',
-    popular: false,
+    id: 'enterprise', name: 'Enterprise', price: 199, period: 'mes',
+    desc: 'Para alto volumen y equipos',
+    accent: '#8b5cf6',
+    features: ['Todo lo de Pro', 'Cuentas Meta ilimitadas', 'API con SLA', 'Agentes personalizados', 'Dashboard white-label', 'Gestor dedicado', 'Onboarding personalizado', 'Soporte 24/7'],
+    cta: 'Contactar ventas',
   },
 ];
 
-const colorMap = {
-  yellow: {
-    badge: 'bg-yellow-900/30 text-yellow-300 border-yellow-700/40',
-    border: 'border-yellow-700/30 hover:border-yellow-600/60',
-    btn: 'bg-yellow-600 hover:bg-yellow-500',
-    glow: '',
-  },
-  blue: {
-    badge: 'bg-blue-900/30 text-blue-300 border-blue-700/40',
-    border: 'border-blue-700/30 hover:border-blue-600/60',
-    btn: 'bg-blue-600 hover:bg-blue-500',
-    glow: '',
-  },
-  indigo: {
-    badge: 'bg-indigo-900/30 text-indigo-300 border-indigo-700/40',
-    border: 'border-indigo-500/60 hover:border-indigo-400',
-    btn: 'bg-indigo-600 hover:bg-indigo-500',
-    glow: 'shadow-lg shadow-indigo-500/20',
-  },
-  purple: {
-    badge: 'bg-purple-900/30 text-purple-300 border-purple-700/40',
-    border: 'border-purple-700/30 hover:border-purple-600/60',
-    btn: 'bg-purple-600 hover:bg-purple-500',
-    glow: '',
-  },
-};
+const FAQS = [
+  { q: '¿Puedo cambiar de plan en cualquier momento?', a: 'Sí. Los cambios se aplican en el próximo ciclo de facturación.' },
+  { q: '¿Necesito tarjeta para el trial?', a: 'No, 14 días completamente gratis sin método de pago.' },
+  { q: '¿Qué pasa cuando termina mi trial?', a: 'Tu cuenta se pausa. Elegís un plan pago para continuar.' },
+  { q: '¿Puedo cancelar?', a: 'Sí, en cualquier momento. Seguís con acceso hasta fin del período facturado.' },
+];
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6L9 17l-5-5"/>
+    </svg>
+  );
+}
 
 export default function PricingPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const [selectedPayment, setSelectedPayment] = useState('mercadopago');
-  const [processingPlan, setProcessingPlan] = useState(null);
-  const [error, setError] = useState('');
-
+  const [payment, setPayment]         = useState('mercadopago');
+  const [processing, setProcessing]   = useState(null);
+  const [error, setError]             = useState('');
   const currentPlan = user?.subscription_plan || 'trial';
 
-  async function handleCheckout(planId) {
-    if (!user) {
-      router.push('/login?redirect=/pricing');
-      return;
-    }
-
-    if (planId === 'trial') {
-      router.push('/dashboard');
-      return;
-    }
-
+  async function checkout(planId) {
+    if (!user) { router.push('/login?redirect=/pricing'); return; }
+    if (planId === 'trial') { router.push('/dashboard'); return; }
     if (planId === currentPlan) return;
-
-    setProcessingPlan(planId);
-    setError('');
-
+    setProcessing(planId); setError('');
     try {
-      const endpoint = selectedPayment === 'stripe'
-        ? '/payments/stripe/create-checkout'
-        : '/payments/create-checkout';
-
-      const data = await api.apiFetch(endpoint, {
-        method: 'POST',
-        body: JSON.stringify({ plan: planId, user_id: user.id }),
-      });
-
-      if (data.checkout_url) {
-        window.location.href = data.checkout_url;
-      } else if (data.success && data.checkout_url) {
-        window.location.href = data.checkout_url;
-      } else {
-        setError('No se pudo crear la sesión de pago. Intenta de nuevo.');
-      }
-    } catch (err) {
-      setError(err.message || 'Error al procesar el pago');
-    } finally {
-      setProcessingPlan(null);
-    }
+      const endpoint = payment === 'stripe' ? '/payments/stripe/create-checkout' : '/payments/create-checkout';
+      const data = await api.apiFetch(endpoint, { method: 'POST', body: JSON.stringify({ plan: planId, user_id: user.id }) });
+      if (data.checkout_url) window.location.href = data.checkout_url;
+      else setError('No se pudo crear la sesión de pago.');
+    } catch (err) { setError(err.message || 'Error al procesar el pago'); }
+    finally { setProcessing(null); }
   }
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto space-y-8">
+      <div className="max-w-6xl mx-auto space-y-12">
+
         {/* Header */}
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-white">Planes y Precios</h1>
-          <p className="text-gray-400 mt-2 max-w-xl mx-auto">
-            Escala tu negocio con agentes de IA que optimizan tus campañas 24/7
+        <div className="text-center pt-4">
+          <p className="text-[10px] font-bold uppercase tracking-[0.15em] mb-3"
+            style={{ color: 'rgba(255,255,255,0.25)' }}>Planes y Precios</p>
+          <h1 style={{
+            fontSize: 32, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.1,
+            background: 'linear-gradient(135deg,#fff 40%,rgba(255,255,255,0.5) 100%)',
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text',
+            marginBottom: 12,
+          }}>
+            Escalá tu negocio con IA
+          </h1>
+          <p style={{ fontSize: 15, color: 'rgba(255,255,255,0.38)', maxWidth: 480, margin: '0 auto' }}>
+            Agentes que optimizan tus campañas 24/7 para que vos te enfoques en escalar
           </p>
         </div>
 
-        {/* Payment Method Toggle */}
+        {/* Payment toggle */}
         <div className="flex justify-center">
-          <div className="bg-gray-800/80 border border-gray-700 rounded-xl p-1 flex gap-1">
-            <button
-              onClick={() => setSelectedPayment('mercadopago')}
-              className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                selectedPayment === 'mercadopago'
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              MercadoPago
-            </button>
-            <button
-              onClick={() => setSelectedPayment('stripe')}
-              className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
-                selectedPayment === 'stripe'
-                  ? 'bg-indigo-600 text-white'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Stripe (USD)
-            </button>
+          <div className="flex gap-1 p-1 rounded-xl"
+            style={{ background: '#16161a', border: '1px solid rgba(255,255,255,0.06)' }}>
+            {[
+              { id: 'mercadopago', label: '🇦🇷 MercadoPago' },
+              { id: 'stripe',      label: '🌎 Stripe (USD)' },
+            ].map((m) => (
+              <button key={m.id} onClick={() => setPayment(m.id)}
+                className="px-5 py-2 rounded-lg text-sm font-semibold transition-all"
+                style={payment === m.id
+                  ? { background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', color: 'white', boxShadow: '0 2px 8px rgba(79,70,229,0.3)' }
+                  : { color: 'rgba(255,255,255,0.4)' }
+                }>
+                {m.label}
+              </button>
+            ))}
           </div>
         </div>
 
         {error && (
-          <div className="max-w-md mx-auto bg-red-900/30 border border-red-700 rounded-xl p-4 text-center">
-            <p className="text-red-200 text-sm">{error}</p>
+          <div className="max-w-md mx-auto rounded-xl p-4 text-center text-sm"
+            style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#f87171' }}>
+            {error}
           </div>
         )}
 
-        {/* Plan Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
-          {plans.map((plan) => {
-            const colors = colorMap[plan.color];
-            const isCurrentPlan = currentPlan === plan.id;
+        {/* Plan cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          {PLANS.map((plan) => {
+            const isCurrent = currentPlan === plan.id;
+            const isProcessing = processing === plan.id;
 
             return (
-              <div
-                key={plan.id}
-                className={`relative bg-gray-900/80 border rounded-xl overflow-hidden transition-all duration-300 ${colors.border} ${colors.glow} ${plan.popular ? 'xl:scale-105' : ''}`}
+              <div key={plan.id}
+                className="relative rounded-2xl overflow-hidden transition-all duration-200"
+                style={{
+                  background: plan.popular ? `linear-gradient(135deg,rgba(99,102,241,0.12),rgba(139,92,246,0.08))` : '#16161a',
+                  border: plan.popular ? '1px solid rgba(99,102,241,0.35)' : '1px solid rgba(255,255,255,0.06)',
+                  boxShadow: plan.popular ? '0 0 40px rgba(99,102,241,0.12)' : '0 1px 3px rgba(0,0,0,0.3)',
+                  transform: plan.popular ? 'scale(1.02)' : 'scale(1)',
+                }}
               >
                 {plan.popular && (
-                  <div className="bg-indigo-600 text-center py-1.5">
-                    <span className="text-xs font-bold tracking-wider uppercase">Más Popular</span>
+                  <div className="text-center py-2 text-[10px] font-black uppercase tracking-widest"
+                    style={{ background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', color: 'white' }}>
+                    ✦ Más popular
                   </div>
                 )}
 
-                <div className="p-6 space-y-5">
-                  {/* Plan name & badge */}
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-white">{plan.name}</h3>
-                    {isCurrentPlan && (
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-900/40 text-green-300 border border-green-700/40">
-                        Tu plan
+                <div className="p-6">
+                  {/* Plan header */}
+                  <div className="mb-5">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.12em]"
+                        style={{ color: plan.accent }}>
+                        {plan.name}
                       </span>
-                    )}
+                      {isCurrent && (
+                        <span className="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider"
+                          style={{ background: 'rgba(16,185,129,0.12)', color: '#34d399', border: '1px solid rgba(16,185,129,0.25)' }}>
+                          Tu plan
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-end gap-1.5 mb-1">
+                      {plan.price === 0 ? (
+                        <span className="text-3xl font-black tracking-tight text-white">Gratis</span>
+                      ) : (
+                        <>
+                          <span className="text-3xl font-black tracking-tight text-white">${plan.price}</span>
+                          <span className="text-sm mb-1" style={{ color: 'rgba(255,255,255,0.3)' }}>USD / {plan.period}</span>
+                        </>
+                      )}
+                    </div>
+                    <p className="text-xs" style={{ color: 'rgba(255,255,255,0.35)' }}>{plan.desc}</p>
                   </div>
 
-                  {/* Price */}
-                  <div>
-                    {plan.price === 0 ? (
-                      <div>
-                        <span className="text-3xl font-bold text-white">Gratis</span>
-                        <span className="text-gray-500 text-sm ml-2">/ {plan.period}</span>
-                      </div>
-                    ) : (
-                      <div>
-                        <span className="text-3xl font-bold text-white">${plan.price}</span>
-                        <span className="text-gray-500 text-sm ml-1">USD / {plan.period}</span>
-                      </div>
-                    )}
-                    <p className="text-gray-500 text-xs mt-1">{plan.description}</p>
-                  </div>
-
-                  {/* CTA Button */}
-                  <button
-                    onClick={() => handleCheckout(plan.id)}
-                    disabled={isCurrentPlan || processingPlan === plan.id}
-                    className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-colors ${
-                      isCurrentPlan
-                        ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                        : processingPlan === plan.id
-                        ? 'bg-gray-700 text-gray-400 cursor-wait'
-                        : `${colors.btn} text-white`
-                    }`}
+                  {/* CTA */}
+                  <button onClick={() => checkout(plan.id)}
+                    disabled={isCurrent || isProcessing}
+                    className="w-full py-2.5 rounded-xl text-sm font-bold mb-5 transition-all"
+                    style={isCurrent
+                      ? { background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.25)', cursor: 'default' }
+                      : plan.popular
+                      ? { background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', color: 'white', boxShadow: '0 4px 16px rgba(79,70,229,0.35)', cursor: 'pointer', border: 'none' }
+                      : { background: `${plan.accent}18`, color: plan.accent, border: `1px solid ${plan.accent}30`, cursor: 'pointer' }
+                    }
                   >
-                    {processingPlan === plan.id
-                      ? 'Procesando...'
-                      : isCurrentPlan
-                      ? 'Plan actual'
-                      : plan.cta}
+                    {isProcessing ? 'Procesando...' : isCurrent ? 'Plan actual' : plan.cta}
                   </button>
 
                   {/* Features */}
-                  <ul className="space-y-2.5 pt-2 border-t border-gray-800">
-                    {plan.features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-2.5">
-                        <CheckIcon className="w-4 h-4 text-green-400 flex-shrink-0 mt-0.5" />
-                        <span className="text-gray-300 text-sm leading-tight">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 16 }}>
+                    <ul className="space-y-2.5">
+                      {plan.features.map((f, i) => (
+                        <li key={i} className="flex items-start gap-2.5">
+                          <span className="flex-shrink-0 mt-0.5" style={{ color: plan.accent }}>
+                            <CheckIcon />
+                          </span>
+                          <span className="text-sm leading-tight" style={{ color: 'rgba(255,255,255,0.55)' }}>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Comparison note */}
-        <div className="text-center text-gray-500 text-xs">
+        <p className="text-center text-xs" style={{ color: 'rgba(255,255,255,0.2)' }}>
           Todos los planes incluyen SSL, backups automáticos y actualizaciones.
-          {selectedPayment === 'mercadopago' && ' Precios en USD, pagás en pesos al tipo de cambio del día.'}
-        </div>
+          {payment === 'mercadopago' && ' · Pagás en pesos al tipo de cambio del día.'}
+        </p>
 
         {/* FAQ */}
-        <div className="max-w-2xl mx-auto space-y-4 pt-4">
-          <h2 className="text-xl font-bold text-white text-center">Preguntas Frecuentes</h2>
-
-          {[
-            {
-              q: '¿Puedo cambiar de plan en cualquier momento?',
-              a: 'Sí, podés actualizar o bajar tu plan desde el panel de control. Los cambios se aplican en el próximo ciclo de facturación.',
-            },
-            {
-              q: '¿Necesito tarjeta de crédito para el trial?',
-              a: 'No, el período de prueba de 14 días es completamente gratuito y no requiere método de pago.',
-            },
-            {
-              q: '¿Qué pasa cuando termina mi trial?',
-              a: 'Tu cuenta se pausa automáticamente. Podés elegir un plan pago para continuar usando todos los agentes y funcionalidades.',
-            },
-            {
-              q: '¿Puedo cancelar mi suscripción?',
-              a: 'Sí, podés cancelar en cualquier momento sin penalidad. Seguís teniendo acceso hasta el final del período facturado.',
-            },
-          ].map((faq, i) => (
-            <div key={i} className="bg-gray-900/60 border border-gray-800 rounded-xl p-5">
+        <div className="max-w-2xl mx-auto space-y-3 pb-8">
+          <h2 className="text-lg font-bold text-white text-center tracking-tight mb-6">Preguntas frecuentes</h2>
+          {FAQS.map((faq, i) => (
+            <div key={i} className="rounded-2xl p-5"
+              style={{ background: '#16161a', border: '1px solid rgba(255,255,255,0.05)' }}>
               <h3 className="text-sm font-semibold text-white mb-1.5">{faq.q}</h3>
-              <p className="text-gray-400 text-sm">{faq.a}</p>
+              <p className="text-sm" style={{ color: 'rgba(255,255,255,0.4)', lineHeight: 1.6 }}>{faq.a}</p>
             </div>
           ))}
         </div>
@@ -329,6 +228,6 @@ export default function PricingPage() {
   );
 }
 
-export function getServerSideProps(context) {
+export function getServerSideProps() {
   return { props: {} };
 }
