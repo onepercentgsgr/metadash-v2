@@ -7,20 +7,27 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Inter var', 'Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+      },
       colors: {
-        dark: {
-          50: "#f9fafb",
-          100: "#f3f4f6",
-          200: "#e5e7eb",
-          300: "#d1d5db",
-          400: "#9ca3af",
-          500: "#6b7280",
-          600: "#4b5563",
-          700: "#374151",
-          800: "#1f2937",
-          900: "#111827",
-          950: "#030712",
+        surface: {
+          0: '#09090b',
+          1: '#0f0f12',
+          2: '#16161a',
+          3: '#1c1c22',
+          4: '#242430',
         },
+        border: {
+          DEFAULT: 'rgba(255,255,255,0.06)',
+          strong: 'rgba(255,255,255,0.10)',
+        },
+      },
+      boxShadow: {
+        'card': '0 1px 3px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04)',
+        'card-hover': '0 4px 16px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.07)',
+        'glow-indigo': '0 0 24px rgba(99,102,241,0.35)',
+        'glow-violet': '0 0 24px rgba(139,92,246,0.35)',
       },
     },
   },
