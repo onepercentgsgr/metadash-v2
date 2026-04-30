@@ -23,6 +23,7 @@ from database import engine, get_db, Base
 from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog
 from agents.shared_memory import AgentMemory  # registers table with Base.metadata
 import config
+from plan_limits import check_feature_access, check_generation_limit, get_plan_limits, PLAN_DISPLAY_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,13 @@ try:
     V35_AVAILABLE = True
 except ImportError:
     V35_AVAILABLE = False
+
+# Import chat launch routes
+try:
+    from chat_routes import router as chat_router
+    CHAT_AVAILABLE = True
+except ImportError:
+    CHAT_AVAILABLE = False
 
 # Initialize database
 Base.metadata.create_all(bind=engine)
@@ -103,6 +111,10 @@ if PAYMENTS_AVAILABLE:
 # Include v3.5 routes
 if V35_AVAILABLE:
     app.include_router(v35_router)
+
+# Include chat launch routes
+if CHAT_AVAILABLE:
+    app.include_router(chat_router)
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -433,6 +445,13 @@ def get_tenant_config(user_id: int, db: Session) -> TenantConfig:
     if not config_obj:
         raise HTTPException(status_code=404, detail="Tenant config not found")
     return config_obj
+
+
+def get_anthropic_api_key(config_obj: TenantConfig) -> str:
+    """Return the effective Anthropic API key: user config overrides env var."""
+    env_key = os.environ.get("ANTHROPIC_API_KEY", "")
+    user_key = config_obj.anthropic_api_key or ""
+    return user_key if user_key else env_key
 
 
 def get_active_subscription(user_id: int, db: Session) -> Subscription:
@@ -777,6 +796,8 @@ async def get_subscription(
         "trial_end": subscription.trial_end,
         "created_at": subscription.created_at,
         "updated_at": subscription.updated_at,
+        "limits": get_plan_limits(subscription.plan),
+        "display_name": PLAN_DISPLAY_NAMES.get(subscription.plan, subscription.plan),
     }
 
 
@@ -1233,9 +1254,12 @@ async def optimize_campaigns(
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
     config_obj = get_tenant_config(user.id, db)
 
-    if not config_obj.anthropic_api_key:
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
 
     try:
@@ -1255,7 +1279,7 @@ async def optimize_campaigns(
             except Exception as meta_err:
                 logger.warning(f"Auto-fetch failed (non-blocking): {meta_err}")
 
-        result = run_optimizer(campaigns_data, config_obj.negocio_info or "", config_obj.anthropic_api_key)
+        result = run_optimizer(campaigns_data, config_obj.negocio_info or "", api_key)
 
         log_entry = AgentLog(
             user_id=user.id,
@@ -1279,15 +1303,18 @@ async def run_finance_agent(
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
     config_obj = get_tenant_config(user.id, db)
 
-    if not config_obj.anthropic_api_key:
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
 
     try:
         from agents import analyze_finances as run_finance
         financial_data = (request.context or {}).get("financial_data", {})
-        result = run_finance(financial_data, config_obj.negocio_info or "", config_obj.anthropic_api_key)
+        result = run_finance(financial_data, config_obj.negocio_info or "", api_key)
 
         log_entry = AgentLog(
             user_id=user.id, agent_type="finance",
@@ -1310,15 +1337,18 @@ async def generate_scripts(
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
     config_obj = get_tenant_config(user.id, db)
-    
-    if not config_obj.anthropic_api_key:
+
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
-    
+
     try:
         from agents import generate_scripts as run_scripts
         brief = request.prompt or "Generate ad scripts for current campaigns"
-        result = run_scripts(brief, config_obj.negocio_info or "", config_obj.anthropic_api_key)
+        result = run_scripts(brief, config_obj.negocio_info or "", api_key)
 
         log_entry = AgentLog(
             user_id=user.id, agent_type="script_gen",
@@ -1341,15 +1371,18 @@ async def analyze_creatives(
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
     config_obj = get_tenant_config(user.id, db)
-    
-    if not config_obj.anthropic_api_key:
+
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
-    
+
     try:
         from agents import analyze_creatives as run_creatives
         creatives_data = (request.context or {}).get("creatives_data", [])
-        result = run_creatives(creatives_data, config_obj.negocio_info or "", config_obj.anthropic_api_key)
+        result = run_creatives(creatives_data, config_obj.negocio_info or "", api_key)
 
         log_entry = AgentLog(
             user_id=user.id, agent_type="creative_director",
@@ -1372,15 +1405,18 @@ async def get_growth_strategy(
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
     config_obj = get_tenant_config(user.id, db)
-    
-    if not config_obj.anthropic_api_key:
+
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
-    
+
     try:
         from agents import get_growth_strategy as run_growth
         context_data = request.context or {}
-        result = run_growth(context_data, config_obj.negocio_info or "", config_obj.anthropic_api_key)
+        result = run_growth(context_data, config_obj.negocio_info or "", api_key)
 
         log_entry = AgentLog(
             user_id=user.id, agent_type="advisor",
@@ -1403,15 +1439,18 @@ async def get_cro_advice(
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
     config_obj = get_tenant_config(user.id, db)
-    
-    if not config_obj.anthropic_api_key:
+
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
-    
+
     try:
         from agents import get_cro_advice as run_cro
         context_data = request.context or {}
-        result = run_cro(context_data, config_obj.negocio_info or "", config_obj.anthropic_api_key)
+        result = run_cro(context_data, config_obj.negocio_info or "", api_key)
 
         log_entry = AgentLog(
             user_id=user.id, agent_type="cro",
@@ -1434,18 +1473,21 @@ async def audit_landing_page(
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
     config_obj = get_tenant_config(user.id, db)
-    
-    if not config_obj.anthropic_api_key:
+
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
-    
+
     landing_url = (request.context or {}).get("landing_page_url", "") or config_obj.landing_page_url
     if not landing_url:
         raise HTTPException(status_code=400, detail="Landing page URL not configured")
 
     try:
         from agents import audit_landing_page as run_landing
-        result = run_landing(landing_url, config_obj.negocio_info or "", config_obj.anthropic_api_key)
+        result = run_landing(landing_url, config_obj.negocio_info or "", api_key)
 
         log_entry = AgentLog(
             user_id=user.id, agent_type="landing_page_auditor",
@@ -1468,9 +1510,12 @@ async def full_audit(
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
     config_obj = get_tenant_config(user.id, db)
 
-    if not config_obj.anthropic_api_key:
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
 
     try:
@@ -1497,7 +1542,7 @@ async def full_audit(
             financial_data=ctx.get("financial_data", {}),
             landing_url=config_obj.landing_page_url or "",
             negocio_info=config_obj.negocio_info or "",
-            api_key=config_obj.anthropic_api_key,
+            api_key=api_key,
         )
 
         # Append GA4 context to result if available
@@ -1528,9 +1573,12 @@ async def run_analytics_agent(
 ):
     """Run GA4 analytics analysis agent."""
     user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
     config_obj = get_tenant_config(user.id, db)
 
-    if not config_obj.anthropic_api_key:
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
     if not (hasattr(config_obj, 'ga4_property_id') and hasattr(config_obj, 'ga4_credentials_json') and
             config_obj.ga4_property_id and config_obj.ga4_credentials_json):
@@ -1543,7 +1591,7 @@ async def run_analytics_agent(
             property_id=config_obj.ga4_property_id,
             ga4_credentials=config_obj.ga4_credentials_json,
             negocio_info=config_obj.negocio_info or "",
-            api_key=config_obj.anthropic_api_key,
+            api_key=api_key,
             days=days,
             landing_url=config_obj.landing_page_url or "",
         )
@@ -1599,6 +1647,8 @@ async def run_playbook_copywriter(
 ):
     """Run Playbook Copywriter - Genera copy para landing page, anuncios y email sequence."""
     user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
 
     try:
         from agents import run_copywriter_analysis
@@ -1635,6 +1685,8 @@ async def run_playbook_design(
 ):
     """Run Playbook Design - Genera mockups, auditoría de conversión y estrategia de colores."""
     user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
 
     try:
         from agents import run_design_analysis
@@ -1671,6 +1723,8 @@ async def run_playbook_social_media(
 ):
     """Run Playbook Social Media - TikTok orgánico + variaciones de creativos para Meta Ads."""
     user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
 
     try:
         from agents import run_social_media_analysis
@@ -1803,9 +1857,12 @@ async def run_agent(
     db: Session = Depends(get_db),
 ):
     user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
     config_obj = get_tenant_config(user.id, db)
 
-    if not config_obj.anthropic_api_key:
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
 
     agent_type = request.agent_type.lower()
@@ -2060,8 +2117,15 @@ async def run_infoproducto_endpoint(
     db: Session = Depends(get_db),
 ):
     user = get_current_user_from_header(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    # Autonomous/24h agent steps require autonomous_agents feature; regular steps require chat_launch
+    if request.step_id in ("autonomous_24h", "autonomous_launch"):
+        check_feature_access(subscription.plan, "autonomous_agents")
+    else:
+        check_feature_access(subscription.plan, "chat_launch")
     config_obj = get_tenant_config(user.id, db)
-    if not config_obj.anthropic_api_key:
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
     try:
         from agents.infoproducto_agent import run_infoproducto_step
@@ -2070,7 +2134,7 @@ async def run_infoproducto_endpoint(
             user_id=user.id,
             step_id=request.step_id,
             state=request.state,
-            api_key=config_obj.anthropic_api_key,
+            api_key=api_key,
         )
         return {"step_id": request.step_id, "output": output}
     except ValueError as e:
@@ -2087,8 +2151,11 @@ async def run_tiktok_ads_endpoint(
     db: Session = Depends(get_db),
 ):
     user = get_current_user_from_header(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
     config_obj = get_tenant_config(user.id, db)
-    if not config_obj.anthropic_api_key:
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
     try:
         from agents.tiktok_ads_agent import run_tiktok_ads
@@ -2097,7 +2164,7 @@ async def run_tiktok_ads_endpoint(
             user_id=user.id,
             mode=request.mode,
             payload=request.payload,
-            api_key=config_obj.anthropic_api_key,
+            api_key=api_key,
         )
         return {"mode": request.mode, "output": output}
     except ValueError as e:
@@ -2114,15 +2181,18 @@ async def generate_tiktok_video_endpoint(
     db: Session = Depends(get_db),
 ):
     user = get_current_user_from_header(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
     config_obj = get_tenant_config(user.id, db)
-    if not config_obj.anthropic_api_key:
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
     try:
         from agents.tiktok_creator import TikTokCreatorAgent
         from agents.shared_memory import SharedMemoryStore
         memory = SharedMemoryStore(db, user.id)
         ctx = {**memory.get_full_context(), **request.context}
-        agent = TikTokCreatorAgent(api_key=config_obj.anthropic_api_key)
+        agent = TikTokCreatorAgent(api_key=api_key)
         result = agent.generate_daily_video(ctx)
         return result
     except Exception as e:
@@ -2137,15 +2207,18 @@ async def generate_tiktok_calendar_endpoint(
     db: Session = Depends(get_db),
 ):
     user = get_current_user_from_header(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
     config_obj = get_tenant_config(user.id, db)
-    if not config_obj.anthropic_api_key:
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
     try:
         from agents.tiktok_creator import TikTokCreatorAgent
         from agents.shared_memory import SharedMemoryStore
         memory = SharedMemoryStore(db, user.id)
         ctx = {**memory.get_full_context(), **request.context}
-        agent = TikTokCreatorAgent(api_key=config_obj.anthropic_api_key)
+        agent = TikTokCreatorAgent(api_key=api_key)
         result = agent.generate_weekly_calendar(ctx)
         return result
     except Exception as e:

@@ -23,15 +23,44 @@ const STEPS = [
 ];
 
 const PLANS = [
-  { name: 'Starter', price: 29,  accent: '#3b82f6', desc: 'Para emprendedores que empiezan', features: ['5 agentes de IA', 'Optimización automática', '1 cuenta Meta Ads', 'Historial 30 días', 'GA4 integrado'], cta: 'Elegir Starter' },
-  { name: 'Pro',     price: 79,  accent: '#6366f1', desc: 'Para agencias en crecimiento',    popular: true, features: ['Agentes IA ilimitados', 'Agentes autónomos 24/7', 'CRO + Growth + Scripts', '5 cuentas Meta Ads', 'Historial 1 año', 'Soporte prioritario'], cta: 'Elegir Pro' },
-  { name: 'Enterprise', price: 199, accent: '#8b5cf6', desc: 'Para alto volumen y equipos', features: ['Todo lo de Pro', 'Cuentas Meta ilimitadas', 'API con SLA', 'Dashboard white-label', 'Gestor dedicado', 'Soporte 24/7'], cta: 'Contactar ventas' },
+  {
+    name: 'Launch',
+    price: 19,
+    accent: '#3b82f6',
+    desc: 'Para emprendedores que empiezan',
+    features: [
+      '1 infoproducto activo',
+      '5 agentes de IA especializados',
+      '100 generaciones IA por mes',
+      '1 cuenta Meta Ads conectada',
+      'Wizard de lanzamiento guiado',
+      'Soporte por email',
+    ],
+    cta: 'Empezar con Launch',
+  },
+  {
+    name: 'Scale',
+    price: 49,
+    accent: '#6366f1',
+    desc: 'Para escalar y automatizar',
+    popular: true,
+    features: [
+      'Infoproductos ilimitados',
+      'Agentes IA ilimitados + autónomos 24/7',
+      'Generaciones IA ilimitadas',
+      '5 cuentas Meta Ads',
+      'Chat IA para lanzar en horas',
+      'Optimización autónoma de campañas',
+      'Soporte prioritario',
+    ],
+    cta: 'Empezar con Scale',
+  },
 ];
 
 const FAQS = [
   { q: '¿Necesito experiencia en marketing?',        a: 'No. MetaDash está diseñado para que los agentes hagan el trabajo técnico. Vos decidís la estrategia.' },
   { q: '¿Puedo empezar sin producto terminado?',     a: 'Sí. El wizard de Infoproducto te guía en 14 pasos: de la idea al lanzamiento, con todo generado por IA.' },
-  { q: '¿Qué pasa cuando termina el trial de 14 días?', a: 'Tu cuenta se pausa. Elegís un plan pago para continuar. Sin cobros automáticos ni sorpresas.' },
+  { q: '¿Qué pasa cuando termina el trial de 14 días?', a: 'Tu cuenta se pausa. Elegís un plan pago para continuar: Launch ($19/mes) o Scale ($49/mes). Sin cobros automáticos ni sorpresas.' },
   { q: '¿Funciona para infoproductos en cualquier nicho?', a: 'Sí. Los agentes adaptan el tono, modismos y estrategia según tu mercado (Argentina, México, España, LATAM, etc.).' },
 ];
 

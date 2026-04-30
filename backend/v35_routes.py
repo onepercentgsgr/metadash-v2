@@ -19,7 +19,7 @@ FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 ARS_PLANS = {
     "starter": 19900,
-    "pro": 29900,
+    "pro": 49900,
     "enterprise": 79900,
 }
 
