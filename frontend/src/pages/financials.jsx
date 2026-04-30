@@ -2,12 +2,13 @@
 
 import { useState, useEffect } from 'react';
 import { Layout } from '../components/Layout';
+import { Icon } from '../components/Icons';
 import { api } from '../lib/api';
 
 const TABS = [
-  { id: 'records', label: 'Registros',      icon: '📊' },
-  { id: 'upload',  label: 'Importar Excel', icon: '📤' },
-  { id: 'add',     label: 'Agregar Manual', icon: '➕' },
+  { id: 'records', label: 'Registros',      icon: 'financials' },
+  { id: 'upload',  label: 'Importar Excel', icon: 'upload'     },
+  { id: 'add',     label: 'Agregar Manual', icon: 'plus'       },
 ];
 
 const EMPTY_RECORD = { periodo: '', ingresos: '', costos: '', ad_spend: '', devoluciones: '', ordenes: '' };
@@ -74,7 +75,7 @@ export default function FinancialsPage() {
     finally { setUploading(false); }
   }
 
-  const inputClass = "w-full rounded-xl px-4 py-2.5 text-sm placeholder-gray-600 focus:outline-none transition-colors text-white";
+  const inputClass = "w-full rounded-xl px-4 py-2.5 text-sm focus:outline-none transition-colors text-white";
   const inputStyle = { background: '#0d0d11', border: '1px solid #2a2a35', color: 'white' };
 
   return (
@@ -94,14 +95,14 @@ export default function FinancialsPage() {
         {error && (
           <div className="rounded-xl p-4 flex items-center gap-3"
             style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <span style={{ color: '#f87171' }}>⚠</span>
+            <span style={{ color: '#f87171' }}><Icon name="warning" size={14} strokeWidth={2} /></span>
             <p className="text-sm" style={{ color: '#fca5a5' }}>{error}</p>
           </div>
         )}
         {success && (
           <div className="rounded-xl p-4 flex items-center gap-3"
             style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
-            <span style={{ color: '#34d399' }}>✓</span>
+            <span style={{ color: '#34d399' }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
             <p className="text-sm" style={{ color: '#6ee7b7' }}>{success}</p>
           </div>
         )}
@@ -112,13 +113,14 @@ export default function FinancialsPage() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className="px-4 py-2 text-sm font-semibold rounded-lg transition-all"
+              className="px-4 py-2 text-sm font-semibold rounded-lg transition-all flex items-center gap-2"
               style={tab === t.id
                 ? { background: '#0d0d11', color: '#e5e7eb', boxShadow: '0 1px 4px rgba(0,0,0,0.4)' }
                 : { color: '#6b7280' }
               }
             >
-              {t.icon} {t.label}
+              <Icon name={t.icon} size={13} strokeWidth={2} />
+              {t.label}
             </button>
           ))}
         </div>
@@ -133,7 +135,7 @@ export default function FinancialsPage() {
               </div>
             ) : records.length === 0 ? (
               <div className="rounded-2xl p-12 text-center" style={{ background: '#16161a', border: '1px solid #1e1e24' }}>
-                <div className="text-4xl mb-3">📊</div>
+                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#10b981' }}><Icon name="financials" size={22} strokeWidth={1.75} /></div>
                 <p className="text-sm mb-4" style={{ color: '#9ca3af' }}>No hay registros financieros aún</p>
                 <button
                   onClick={() => setTab('add')}
@@ -193,9 +195,9 @@ export default function FinancialsPage() {
           <div className="rounded-2xl p-8" style={{ background: '#16161a', border: '1px solid #1e1e24' }}>
             <div className="max-w-md mx-auto space-y-6">
               <div className="text-center">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4"
-                  style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)' }}>
-                  📤
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                  style={{ background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.2)', color: '#6366f1' }}>
+                  <Icon name="upload" size={28} strokeWidth={1.5} />
                 </div>
                 <h3 className="text-base font-bold text-white mb-1">Importar desde Excel</h3>
                 <p className="text-sm" style={{ color: '#9ca3af' }}>Carga un archivo Excel con tus registros financieros</p>
@@ -209,7 +211,7 @@ export default function FinancialsPage() {
                   onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#2a2a35'; }}
                 >
                   <div className="flex flex-col items-center gap-2">
-                    <span className="text-2xl">📁</span>
+                    <span style={{ color: '#9ca3af' }}><Icon name="file" size={22} strokeWidth={1.5} /></span>
                     <span className="text-sm font-medium" style={{ color: '#9ca3af' }}>
                       {uploading ? 'Subiendo...' : 'Hacé clic o arrastrá tu archivo'}
                     </span>

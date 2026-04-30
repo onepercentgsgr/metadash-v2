@@ -1,32 +1,62 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/router';
+import { Icon } from '../components/Icons';
 
-const CheckIcon = ({ className }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-  </svg>
-);
+const FEATURES = [
+  { icon: 'videos',     accent: '#ec4899', name: 'Videos TikTok diarios',    desc: 'Un guion nuevo cada día, generado con IA. 7 ángulos probados para máxima conversión orgánica.' },
+  { icon: 'rocket',     accent: '#6366f1', name: 'Landing Pages con CRO',    desc: 'Generá y auditá tu landing con IA. Headlines, CTAs y trust signals optimizados para vender.' },
+  { icon: 'campaigns',  accent: '#3b82f6', name: 'Meta Ads — 24/7',          desc: 'Agentes que analizan ROAS, CPM y fatiga creativa. Detectan qué pausar, escalar o ajustar.' },
+  { icon: 'financials', accent: '#10b981', name: 'Control financiero',        desc: 'MER, breakeven ROAS, márgenes y proyecciones. Sabés exactamente si tu negocio es rentable.' },
+  { icon: 'brain',      accent: '#8b5cf6', name: 'IA de nivel pro',          desc: '8 agentes especializados con contexto compartido. Cada uno sabe lo que hacen los demás.' },
+  { icon: 'creditcard', accent: '#f59e0b', name: 'Pagos integrados',         desc: 'MercadoPago y Stripe listos para cobrar. Tus clientes pagan, vos recibís.' },
+];
 
-const ArrowIcon = ({ className }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-  </svg>
-);
+const STEPS = [
+  { num: '01', title: 'Registrate en 2 minutos',    desc: 'Creá tu cuenta. Sin tarjeta, sin compromiso. 14 días para probar todo.' },
+  { num: '02', title: 'Conectá tus herramientas',   desc: 'Meta Ads, GA4 y MercadoPago en un solo lugar. Los agentes empiezan a trabajar solos.' },
+  { num: '03', title: 'Generá tu primer contenido', desc: 'TikTok, copys para ads, guiones de video — todo en segundos con contexto de tu producto.' },
+  { num: '04', title: 'Vendé y escalá',             desc: 'Los agentes optimizan tus campañas mientras vos dormís. Vos te enfocás en el producto.' },
+];
+
+const PLANS = [
+  { name: 'Starter', price: 29,  accent: '#3b82f6', desc: 'Para emprendedores que empiezan', features: ['5 agentes de IA', 'Optimización automática', '1 cuenta Meta Ads', 'Historial 30 días', 'GA4 integrado'], cta: 'Elegir Starter' },
+  { name: 'Pro',     price: 79,  accent: '#6366f1', desc: 'Para agencias en crecimiento',    popular: true, features: ['Agentes IA ilimitados', 'Agentes autónomos 24/7', 'CRO + Growth + Scripts', '5 cuentas Meta Ads', 'Historial 1 año', 'Soporte prioritario'], cta: 'Elegir Pro' },
+  { name: 'Enterprise', price: 199, accent: '#8b5cf6', desc: 'Para alto volumen y equipos', features: ['Todo lo de Pro', 'Cuentas Meta ilimitadas', 'API con SLA', 'Dashboard white-label', 'Gestor dedicado', 'Soporte 24/7'], cta: 'Contactar ventas' },
+];
+
+const FAQS = [
+  { q: '¿Necesito experiencia en marketing?',        a: 'No. MetaDash está diseñado para que los agentes hagan el trabajo técnico. Vos decidís la estrategia.' },
+  { q: '¿Puedo empezar sin producto terminado?',     a: 'Sí. El wizard de Infoproducto te guía en 14 pasos: de la idea al lanzamiento, con todo generado por IA.' },
+  { q: '¿Qué pasa cuando termina el trial de 14 días?', a: 'Tu cuenta se pausa. Elegís un plan pago para continuar. Sin cobros automáticos ni sorpresas.' },
+  { q: '¿Funciona para infoproductos en cualquier nicho?', a: 'Sí. Los agentes adaptan el tono, modismos y estrategia según tu mercado (Argentina, México, España, LATAM, etc.).' },
+];
+
+function CheckSVG({ color = '#10b981' }) {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 6L9 17l-5-5"/>
+    </svg>
+  );
+}
 
 export default function HomePage() {
   const { user } = useAuth();
   const router = useRouter();
+  const [openFaq, setOpenFaq] = useState(null);
 
   if (user) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-white mb-4">Bienvenido de vuelta, {user.name}</h1>
-          <Link href="/dashboard" className="inline-block px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg transition">
+      <div style={{ minHeight: '100vh', background: '#09090b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontSize: 12, fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>De vuelta</p>
+          <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', background: 'linear-gradient(135deg,#fff 40%,rgba(255,255,255,0.5) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 24 }}>
+            Hola de nuevo, {user.name?.split(' ')[0]}
+          </h1>
+          <Link href="/dashboard" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 28px', background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', borderRadius: 12, color: 'white', fontWeight: 700, fontSize: 14, textDecoration: 'none', boxShadow: '0 4px 20px rgba(79,70,229,0.4), inset 0 1px 0 rgba(255,255,255,0.15)' }}>
             Ir al Dashboard →
           </Link>
         </div>
@@ -35,165 +65,257 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
-      <nav className="fixed top-0 w-full bg-black/80 backdrop-blur border-b border-gray-800 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <div className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-blue-400 bg-clip-text text-transparent">MetaDash</div>
-          <div className="flex gap-4 items-center">
-            <Link href="/login" className="text-gray-300 hover:text-white transition">Login</Link>
-            <Link href="/register" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg font-medium transition">Prueba Gratis 7 días</Link>
+    <div style={{ minHeight: '100vh', background: '#09090b', color: 'white', fontFamily: 'inherit' }}>
+
+      {/* Ambient background */}
+      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: 0 }}>
+        <div style={{ position: 'absolute', top: '-15%', left: '50%', transform: 'translateX(-50%)', width: 1000, height: 500, background: 'radial-gradient(ellipse,rgba(99,102,241,0.12) 0%,transparent 65%)' }} />
+        <div style={{ position: 'absolute', bottom: '10%', right: '-10%', width: 600, height: 600, background: 'radial-gradient(circle,rgba(139,92,246,0.07) 0%,transparent 60%)' }} />
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px)', backgroundSize: '64px 64px' }} />
+      </div>
+
+      {/* Nav */}
+      <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, background: 'rgba(9,9,11,0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '0 24px', height: 60, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 900, fontSize: 11, boxShadow: '0 0 16px rgba(99,102,241,0.35)' }}>MD</div>
+            <span style={{ fontWeight: 800, fontSize: 16, letterSpacing: '-0.02em', color: 'white' }}>MetaDash</span>
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <Link href="/login" style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.5)', textDecoration: 'none', padding: '7px 14px', borderRadius: 8, transition: 'color 0.15s' }}
+              onMouseEnter={e => e.target.style.color='rgba(255,255,255,0.85)'}
+              onMouseLeave={e => e.target.style.color='rgba(255,255,255,0.5)'}>
+              Login
+            </Link>
+            <Link href="/register" style={{ fontSize: 13, fontWeight: 700, color: 'white', textDecoration: 'none', padding: '7px 18px', borderRadius: 8, background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', boxShadow: '0 2px 10px rgba(79,70,229,0.35), inset 0 1px 0 rgba(255,255,255,0.15)' }}>
+              Comenzar gratis
+            </Link>
           </div>
         </div>
       </nav>
 
-      <section className="relative pt-32 pb-20 overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute top-1/2 right-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl"></div>
-        </div>
-        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-block mb-6 px-4 py-2 bg-indigo-500/20 border border-indigo-500/50 rounded-full text-sm font-semibold text-indigo-300">
-            ⚡ Lanza tu infoproducto en 4 horas
+      {/* Hero */}
+      <section style={{ position: 'relative', zIndex: 1, paddingTop: 140, paddingBottom: 100, textAlign: 'center', padding: '140px 24px 100px' }}>
+        <div style={{ maxWidth: 780, margin: '0 auto' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 999, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', marginBottom: 28 }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366f1', boxShadow: '0 0 8px rgba(99,102,241,0.8)' }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.1em' }}>14 días gratis · Sin tarjeta</span>
           </div>
-          <h1 className="text-5xl sm:text-7xl font-black mb-6 leading-tight">
-            Crea y vende tu{' '}
-            <span className="bg-gradient-to-r from-indigo-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">primer infoproducto</span>
-            {' '}sin experiencia
+
+          <h1 style={{ fontSize: 'clamp(36px,6vw,68px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.05, marginBottom: 20 }}>
+            <span style={{ background: 'linear-gradient(135deg,#fff 40%,rgba(255,255,255,0.55) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+              Lanzá tu infoproducto
+            </span>
+            <br />
+            <span style={{ background: 'linear-gradient(135deg,#818cf8,#a78bfa,#c084fc)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+              con IA de nivel dios
+            </span>
           </h1>
-          <p className="text-xl text-gray-400 mb-8 max-w-3xl mx-auto leading-relaxed">
-            MetaDash genera automáticamente videos TikTok diarios, optimiza tus landing pages con IA,
-            administra tus campañas de ads, y te conecta con MercadoPago.
-            Todo lo que necesitas para vender en línea, ahora integrado en una plataforma.
+
+          <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.42)', lineHeight: 1.65, maxWidth: 560, margin: '0 auto 36px' }}>
+            Agentes que crean tu contenido, optimizan tus campañas 24/7 y analizan tus finanzas — mientras vos te enfocás en escalar.
           </p>
-          <div className="bg-gray-900/60 border border-gray-800 rounded-lg p-6 mb-8 max-w-2xl mx-auto">
-            <p className="text-sm text-gray-300 mb-3">Lo que obtienes:</p>
-            <div className="grid grid-cols-2 gap-3 text-left">
-              {['Videos TikTok automatizados', 'Landing pages optimizadas', 'Gestión de campañas Meta Ads', 'Pagos con MercadoPago', 'Panel de análisis completo', 'Soporte 24/7'].map((item) => (
-                <div key={item} className="flex items-center gap-2">
-                  <CheckIcon className="w-5 h-5 text-green-400 flex-shrink-0" />
-                  <span className="text-sm">{item}</span>
-                </div>
-              ))}
-            </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 24px', maxWidth: 480, margin: '0 auto 40px', textAlign: 'left' }}>
+            {['Videos TikTok automáticos diarios', 'Optimización de Meta Ads 24/7', 'Wizard de infoproducto guiado por IA', 'CRO en landing page + análisis', 'Control financiero con MER y ROAS', 'Pagos con MercadoPago y Stripe'].map((f) => (
+              <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <CheckSVG />
+                <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>{f}</span>
+              </div>
+            ))}
           </div>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Link href="/register" className="px-8 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 rounded-xl font-bold text-lg transition transform hover:scale-105 flex items-center justify-center gap-2">
-              Comienza Gratis por 7 Días <ArrowIcon className="w-5 h-5" />
+
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 20 }}>
+            <Link href="/register" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '14px 32px', background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', borderRadius: 14, color: 'white', fontWeight: 800, fontSize: 15, textDecoration: 'none', boxShadow: '0 6px 24px rgba(79,70,229,0.45), inset 0 1px 0 rgba(255,255,255,0.15)', letterSpacing: '-0.01em' }}>
+              Empezar gratis <Icon name="arrowright" size={16} strokeWidth={2.5} />
             </Link>
-            <button onClick={() => document.getElementById('pricing').scrollIntoView({ behavior: 'smooth' })} className="px-8 py-4 border border-gray-700 hover:border-indigo-500 rounded-xl font-semibold transition">
-              Ver Precios
+            <button onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+              style={{ padding: '14px 28px', background: 'transparent', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 14, color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor='rgba(99,102,241,0.4)'; e.currentTarget.style.color='white'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor='rgba(255,255,255,0.12)'; e.currentTarget.style.color='rgba(255,255,255,0.6)'; }}>
+              Ver planes
             </button>
           </div>
-          <div className="text-sm text-gray-500">
-            <p>✓ Sin tarjeta de crédito • ✓ Acceso inmediato • ✓ Cancela cuando quieras</p>
-          </div>
+
+          <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)' }}>
+            Sin tarjeta de crédito · Acceso inmediato · Cancelá cuando quieras
+          </p>
         </div>
       </section>
 
-      <section className="py-20 border-t border-gray-800">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-center mb-16">Lanza en 4 pasos</h2>
-          <div className="space-y-12">
-            {[
-              { step: '1', title: 'Regístrate en 2 minutos', desc: 'Crea tu cuenta con email y contraseña. No necesitas tarjeta de crédito para la prueba gratis.' },
-              { step: '2', title: 'Conecta tus herramientas', desc: 'Integra Meta Ads, Google Analytics y MercadoPago. MetaDash genera todo automáticamente.' },
-              { step: '3', title: 'Genera tu primer video', desc: 'MetaDash crea un video TikTok cada día con IA. Elige entre 7 ángulos de contenido comprobados.' },
-              { step: '4', title: 'Vende y cobra', desc: 'Tus clientes compran tu infoproducto, MercadoPago cobra, MetaDash te da el dinero. Simple.' },
-            ].map((item) => (
-              <div key={item.step} className="flex gap-8">
-                <div className="flex-shrink-0"><div className="flex items-center justify-center h-12 w-12 rounded-lg bg-indigo-600"><span className="text-xl font-bold">{item.step}</span></div></div>
-                <div><h3 className="text-xl font-bold text-white mb-2">{item.title}</h3><p className="text-gray-400">{item.desc}</p></div>
+      {/* Steps */}
+      <section style={{ position: 'relative', zIndex: 1, padding: '80px 24px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ maxWidth: 900, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 56 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>Cómo funciona</p>
+            <h2 style={{ fontSize: 'clamp(26px,4vw,38px)', fontWeight: 800, letterSpacing: '-0.03em', background: 'linear-gradient(135deg,#fff 40%,rgba(255,255,255,0.5) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+              De cero a ventas en 4 pasos
+            </h2>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 24 }}>
+            {STEPS.map((s, i) => (
+              <div key={s.num} style={{ position: 'relative', padding: '28px 24px', background: '#16161a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#4f46e5', marginBottom: 14, letterSpacing: '0.06em', fontVariantNumeric: 'tabular-nums' }}>{s.num}</div>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: 'white', marginBottom: 8, letterSpacing: '-0.01em' }}>{s.title}</h3>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', lineHeight: 1.6 }}>{s.desc}</p>
+                {i < STEPS.length - 1 && (
+                  <div style={{ position: 'absolute', right: -13, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.12)', fontSize: 18, display: 'none' }}>→</div>
+                )}
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="py-20 border-t border-gray-800">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-center mb-16">Todo lo que necesitas para vender</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { icon: '📹', name: 'Videos Automáticos', desc: 'Un video TikTok nuevo cada día, generado con IA. 7 ángulos probados para máxima conversión.' },
-              { icon: '🚀', name: 'Landing Pages', desc: 'Crea y optimiza landing pages sin código. IA analiza y mejora automáticamente.' },
-              { icon: '📊', name: 'Análisis Completo', desc: 'Dashboard con métricas de ventas, conversiones, ROI y más. Todo en un solo lugar.' },
-              { icon: '💳', name: 'MercadoPago Integrado', desc: 'Cobra en ARS directamente. Sin comisiones ocultas. Recibe tu dinero cada mes.' },
-              { icon: '🤖', name: 'IA Automática', desc: 'Agentes de IA que trabajan 24/7. Generan contenido, optimizan campañas, analizan datos.' },
-              { icon: '🔗', name: 'Integraciones', desc: 'Conecta Meta Ads, Google Analytics, TikTok, Shopify y más en segundos.' },
-            ].map((feature) => (
-              <div key={feature.name} className="bg-gray-900/60 border border-gray-800 hover:border-indigo-500/50 rounded-xl p-6 transition transform hover:scale-105">
-                <div className="text-4xl mb-3">{feature.icon}</div>
-                <h3 className="font-bold text-white mb-2 text-lg">{feature.name}</h3>
-                <p className="text-sm text-gray-400">{feature.desc}</p>
+      {/* Features */}
+      <section style={{ position: 'relative', zIndex: 1, padding: '80px 24px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 56 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>Todo incluido</p>
+            <h2 style={{ fontSize: 'clamp(26px,4vw,38px)', fontWeight: 800, letterSpacing: '-0.03em', background: 'linear-gradient(135deg,#fff 40%,rgba(255,255,255,0.5) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+              Una plataforma para todo tu negocio
+            </h2>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 16 }}>
+            {FEATURES.map((f) => (
+              <div key={f.name}
+                style={{ padding: '24px', background: '#16161a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 20, cursor: 'default', transition: 'all 0.2s' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.border = `1px solid ${f.accent}35`;
+                  e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px ${f.accent}15`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.border = '1px solid rgba(255,255,255,0.06)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: `${f.accent}15`, border: `1px solid ${f.accent}25`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: f.accent, marginBottom: 16 }}>
+                  <Icon name={f.icon} size={20} strokeWidth={1.75} />
+                </div>
+                <h3 style={{ fontSize: 15, fontWeight: 700, color: 'white', marginBottom: 6, letterSpacing: '-0.01em' }}>{f.name}</h3>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', lineHeight: 1.65 }}>{f.desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="pricing" className="py-20 border-t border-gray-800">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-center mb-4">Planes simples y transparentes</h2>
-          <p className="text-center text-gray-400 mb-16">Todas las funciones en todos los planes. Cancela cuando quieras.</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              { name: 'Starter', price: '19.900', description: 'Perfecto para comenzar', features: ['1 video TikTok por día', '1 landing page', 'Análisis básico', 'Soporte por email'] },
-              { name: 'Pro', price: '29.900', description: 'Recomendado para creadores', featured: true, features: ['Videos TikTok ilimitados', 'Landing pages ilimitadas', 'Análisis avanzado', 'Agentes IA 24/7', 'Soporte prioritario'] },
-              { name: 'Enterprise', price: '79.900', description: 'Para agencias', features: ['Todo en Pro', 'Múltiples usuarios', 'API personalizada', 'Gestor de cuenta dedicado', 'Integraciones personalizadas'] },
-            ].map((plan) => (
-              <div key={plan.name} className={`rounded-2xl p-8 transition transform hover:scale-105 ${ plan.featured ? 'bg-gradient-to-b from-indigo-600/20 to-blue-600/20 border-2 border-indigo-500 relative' : 'bg-gray-900/60 border border-gray-800' }`}>
-                {plan.featured && (<div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-indigo-600 px-4 py-1 rounded-full text-sm font-semibold">Más popular</div>)}
-                <h3 className="text-2xl font-bold mb-2">{plan.name}</h3>
-                <p className="text-gray-400 text-sm mb-6">{plan.description}</p>
-                <div className="mb-6"><span className="text-4xl font-bold">${plan.price}</span><span className="text-gray-400 ml-2">/mes</span></div>
-                <Link href="/register" className={`w-full py-3 rounded-lg font-semibold transition block text-center mb-8 ${ plan.featured ? 'bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white' : 'border border-gray-700 hover:border-indigo-500 text-white' }`}>Empezar Ahora</Link>
-                <ul className="space-y-3">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-3">
-                      <CheckIcon className="w-5 h-5 text-green-400 flex-shrink-0" />
-                      <span className="text-sm text-gray-300">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+      {/* Pricing */}
+      <section id="pricing" style={{ position: 'relative', zIndex: 1, padding: '80px 24px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 56 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>Planes y Precios</p>
+            <h2 style={{ fontSize: 'clamp(26px,4vw,38px)', fontWeight: 800, letterSpacing: '-0.03em', background: 'linear-gradient(135deg,#fff 40%,rgba(255,255,255,0.5) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 10 }}>
+              Escalá tu negocio con IA
+            </h2>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.35)' }}>14 días de trial gratis en todos los planes</p>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16, alignItems: 'start' }}>
+            {PLANS.map((plan) => (
+              <div key={plan.name} style={{
+                background: plan.popular ? 'linear-gradient(135deg,rgba(99,102,241,0.12),rgba(139,92,246,0.08))' : '#16161a',
+                border: plan.popular ? '1px solid rgba(99,102,241,0.35)' : '1px solid rgba(255,255,255,0.06)',
+                borderRadius: 20, overflow: 'hidden',
+                boxShadow: plan.popular ? '0 0 40px rgba(99,102,241,0.12)' : 'none',
+                transform: plan.popular ? 'scale(1.02)' : 'none',
+              }}>
+                {plan.popular && (
+                  <div style={{ textAlign: 'center', padding: '8px', background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', fontSize: 10, fontWeight: 900, color: 'white', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+                    ✦ Más popular
+                  </div>
+                )}
+                <div style={{ padding: '24px' }}>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: plan.accent, textTransform: 'uppercase', letterSpacing: '0.1em' }}>{plan.name}</span>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, margin: '8px 0 4px' }}>
+                    <span style={{ fontSize: 36, fontWeight: 900, color: 'white', letterSpacing: '-0.04em' }}>${plan.price}</span>
+                    <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.3)', marginBottom: 5 }}>USD / mes</span>
+                  </div>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginBottom: 20 }}>{plan.desc}</p>
+                  <Link href="/register" style={{
+                    display: 'block', textAlign: 'center', padding: '10px', borderRadius: 12,
+                    fontWeight: 700, fontSize: 13, textDecoration: 'none', marginBottom: 20,
+                    background: plan.popular ? 'linear-gradient(135deg,#4f46e5,#7c3aed)' : `${plan.accent}18`,
+                    color: plan.popular ? 'white' : plan.accent,
+                    border: plan.popular ? 'none' : `1px solid ${plan.accent}30`,
+                    boxShadow: plan.popular ? '0 4px 16px rgba(79,70,229,0.35)' : 'none',
+                  }}>
+                    {plan.cta}
+                  </Link>
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 16 }}>
+                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {plan.features.map((f) => (
+                        <li key={f} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <CheckSVG color={plan.accent} />
+                          <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>{f}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="py-20 border-t border-gray-800">
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-4xl font-bold text-center mb-16">Preguntas frecuentes</h2>
-          <div className="space-y-6">
-            {[
-              { q: '¿Necesito experiencia en marketing?', a: 'No. MetaDash es diseñado para principiantes. Solo conecta tus cuentas y deja que la IA haga el trabajo.' },
-              { q: '¿Qué pasa después de los 7 días gratis?', a: 'Tu suscripción se activa automáticamente según el plan que elegiste. Puedes cancelar en cualquier momento sin penalidades.' },
-              { q: '¿Puedo usar MetaDash para varias personas?', a: 'Sí. Los planes Pro y Enterprise incluyen múltiples usuarios. Cada uno tiene su propio dashboard.' },
-              { q: '¿Cómo retiro mis ganancias?', a: 'MercadoPago deposita directamente en tu cuenta bancaria. Tienes acceso inmediato a todas tus ventas.' },
-              { q: '¿Qué pasa si algo se daña?', a: 'Tenemos soporte 24/7. Responden en menos de 2 horas. Plus, puedes revisar todos los cambios antes de aplicarlos.' },
-            ].map((item) => (
-              <div key={item.q} className="bg-gray-900/60 border border-gray-800 rounded-lg p-6">
-                <h3 className="font-bold text-white mb-2">{item.q}</h3>
-                <p className="text-gray-400">{item.a}</p>
+      {/* FAQ */}
+      <section style={{ position: 'relative', zIndex: 1, padding: '80px 24px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ maxWidth: 640, margin: '0 auto' }}>
+          <h2 style={{ fontSize: 'clamp(24px,4vw,34px)', fontWeight: 800, letterSpacing: '-0.03em', textAlign: 'center', marginBottom: 40, background: 'linear-gradient(135deg,#fff 40%,rgba(255,255,255,0.5) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
+            Preguntas frecuentes
+          </h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {FAQS.map((faq, i) => (
+              <div key={i} style={{ background: '#16161a', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 16, overflow: 'hidden' }}>
+                <button onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  style={{ width: '100%', padding: '18px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', color: 'white', fontFamily: 'inherit' }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'rgba(255,255,255,0.85)', paddingRight: 16 }}>{faq.q}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.3)', flexShrink: 0, transition: 'transform 0.2s', transform: openFaq === i ? 'rotate(180deg)' : 'none', display: 'block' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                  </span>
+                </button>
+                {openFaq === i && (
+                  <div style={{ padding: '0 20px 18px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.42)', lineHeight: 1.65, marginTop: 14 }}>{faq.a}</p>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="py-20 border-t border-gray-800">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-4xl font-bold mb-6">¿Listo para lanzar?</h2>
-          <p className="text-xl text-gray-400 mb-8">7 días gratis. Sin tarjeta de crédito. Cancela cuando quieras.</p>
-          <Link href="/register" className="inline-block px-8 py-4 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 rounded-xl font-bold text-lg transition transform hover:scale-105">
-            Comenzar Ahora →
+      {/* Final CTA */}
+      <section style={{ position: 'relative', zIndex: 1, padding: '100px 24px', borderTop: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
+        <div style={{ maxWidth: 600, margin: '0 auto' }}>
+          <div style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px', boxShadow: '0 0 32px rgba(99,102,241,0.45)' }}>
+            <Icon name="rocket" size={24} strokeWidth={1.75} />
+          </div>
+          <h2 style={{ fontSize: 'clamp(28px,5vw,44px)', fontWeight: 900, letterSpacing: '-0.04em', background: 'linear-gradient(135deg,#fff 40%,rgba(255,255,255,0.5) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 12 }}>
+            ¿Listo para lanzar?
+          </h2>
+          <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.35)', marginBottom: 32, lineHeight: 1.6 }}>
+            14 días gratis. Sin tarjeta. Cancelá cuando quieras.
+          </p>
+          <Link href="/register" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '16px 40px', background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', borderRadius: 16, color: 'white', fontWeight: 800, fontSize: 16, textDecoration: 'none', boxShadow: '0 8px 32px rgba(79,70,229,0.45), inset 0 1px 0 rgba(255,255,255,0.15)', letterSpacing: '-0.01em' }}>
+            Comenzar gratis <Icon name="arrowright" size={18} strokeWidth={2.5} />
           </Link>
         </div>
       </section>
 
-      <footer className="border-t border-gray-800 py-12 text-center text-gray-500">
-        <p>&copy; 2024 MetaDash. Todos los derechos reservados.</p>
+      {/* Footer */}
+      <footer style={{ position: 'relative', zIndex: 1, borderTop: '1px solid rgba(255,255,255,0.05)', padding: '32px 24px', textAlign: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
+          <div style={{ width: 24, height: 24, borderRadius: 6, background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 900, fontSize: 9 }}>MD</div>
+          <span style={{ fontWeight: 700, fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>MetaDash</span>
+        </div>
+        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.18)' }}>
+          © 2025 MetaDash · Todos los derechos reservados · SSL · Backups automáticos
+        </p>
       </footer>
+
     </div>
   );
 }

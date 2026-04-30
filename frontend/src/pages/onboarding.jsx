@@ -4,435 +4,350 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../lib/api';
+import { Icon } from '../components/Icons';
 
-const CheckIcon = ({ className }) => (
-  <svg className={className} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-  </svg>
-);
+const STEPS = [
+  { id: 1, name: 'Bienvenida',    icon: 'rocket'    },
+  { id: 2, name: 'Meta Ads',      icon: 'campaigns' },
+  { id: 3, name: 'Analytics',     icon: 'financials'},
+  { id: 4, name: 'Preferencias',  icon: 'settings'  },
+  { id: 5, name: 'Completado',    icon: 'check'     },
+];
 
-const steps = [
-  { id: 1, name: 'Bienvenida', icon: '👋' },
-  { id: 2, name: 'Meta Ads', icon: '📊' },
-  { id: 3, name: 'Google Analytics', icon: '📈' },
-  { id: 4, name: 'Preferencias', icon: '⚙️' },
-  { id: 5, name: 'Completado', icon: '🎉' },
+const FEATURES = [
+  '8 agentes de IA especializados trabajando 24/7',
+  'Análisis de campañas, finanzas y creatividades',
+  'Google Analytics integrado',
+  'Conexión segura con Meta Ads',
+  'Auditoría automática de landing pages',
+];
+
+const MODES = [
+  { value: 'hybrid', label: 'Híbrido (Recomendado)', desc: 'Los agentes optimizan automáticamente, pero te piden aprobación para cambios grandes' },
+  { value: 'manual', label: 'Manual',                desc: 'Los agentes solo dan recomendaciones, vos decidís si aplicarlas' },
+  { value: 'full',   label: 'Completamente Autónomo',desc: 'Los agentes hacen cambios sin tu aprobación (solo para expertos)' },
 ];
 
 export default function OnboardingPage() {
   const router = useRouter();
   const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    meta_access_token: '',
-    meta_ad_account_id: '',
-    ga4_property_id: '',
-    ga4_file: null,
-    autonomousMode: 'hybrid',
-    emailNotifications: true,
+  const [loading, setLoading]         = useState(false);
+  const [formData, setFormData]       = useState({
+    meta_access_token: '', meta_ad_account_id: '',
+    ga4_property_id: '', ga4_file: null,
+    autonomousMode: 'hybrid', emailNotifications: true,
   });
 
   useEffect(() => {
-    if (user?.onboarded_at) {
-      router.push('/dashboard');
-    }
+    if (user?.onboarded_at) router.push('/dashboard');
   }, [user, router]);
 
-  const handleInputChange = (e) => {
+  function handleInputChange(e) {
     const { name, value, type, checked } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
-  };
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+  }
 
-  const handleFileUpload = (e) => {
-    setFormData((prev) => ({
-      ...prev,
-      ga4_file: e.target.files[0],
-    }));
-  };
+  function handleFileUpload(e) {
+    setFormData(prev => ({ ...prev, ga4_file: e.target.files[0] }));
+  }
 
-  const handleNext = async () => {
+  async function handleNext() {
     if (currentStep === 5) {
-      // Complete onboarding
       setLoading(true);
       try {
-        const formDataToSend = new FormData();
-        formDataToSend.append('meta_access_token', formData.meta_access_token);
-        formDataToSend.append('meta_ad_account_id', formData.meta_ad_account_id);
-        formDataToSend.append('ga4_property_id', formData.ga4_property_id);
-        if (formData.ga4_file) {
-          formDataToSend.append('ga4_file', formData.ga4_file);
-        }
-        formDataToSend.append('autonomousMode', formData.autonomousMode);
-        formDataToSend.append('emailNotifications', formData.emailNotifications);
-
-        await api.apiFetch('/auth/complete-onboarding', {
-          method: 'POST',
-          body: formDataToSend,
-        });
-
+        const fd = new FormData();
+        fd.append('meta_access_token',   formData.meta_access_token);
+        fd.append('meta_ad_account_id',  formData.meta_ad_account_id);
+        fd.append('ga4_property_id',     formData.ga4_property_id);
+        if (formData.ga4_file) fd.append('ga4_file', formData.ga4_file);
+        fd.append('autonomousMode',      formData.autonomousMode);
+        fd.append('emailNotifications',  formData.emailNotifications);
+        await api.apiFetch('/auth/complete-onboarding', { method: 'POST', body: fd });
         router.push('/dashboard');
-      } catch (error) {
-        console.error('Error completing onboarding:', error);
+      } catch (err) {
+        console.error('Error completing onboarding:', err);
       } finally {
         setLoading(false);
       }
     } else {
-      setCurrentStep((prev) => Math.min(prev + 1, steps.length));
+      setCurrentStep(prev => Math.min(prev + 1, STEPS.length));
     }
-  };
+  }
 
-  const handleBack = () => {
-    setCurrentStep((prev) => Math.max(prev - 1, 1));
-  };
+  function handleBack() {
+    setCurrentStep(prev => Math.max(prev - 1, 1));
+  }
 
-  const isStepValid = () => {
-    if (currentStep === 2) {
-      return formData.meta_access_token && formData.meta_ad_account_id;
-    }
-    if (currentStep === 3) {
-      return formData.ga4_property_id;
-    }
+  function isStepValid() {
+    if (currentStep === 2) return formData.meta_access_token && formData.meta_ad_account_id;
+    if (currentStep === 3) return formData.ga4_property_id;
     return true;
+  }
+
+  const inputStyle = {
+    width: '100%', background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10,
+    padding: '10px 14px', fontSize: 14, color: 'white', outline: 'none',
+    fontFamily: 'inherit', transition: 'border-color 0.15s, background 0.15s',
+    boxSizing: 'border-box',
   };
+  const onFocus = (e) => { e.target.style.borderColor = 'rgba(99,102,241,0.5)'; e.target.style.background = 'rgba(99,102,241,0.04)'; };
+  const onBlur  = (e) => { e.target.style.borderColor = 'rgba(255,255,255,0.09)'; e.target.style.background = 'rgba(255,255,255,0.04)'; };
+
+  const labelStyle = { display: 'block', fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.5)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.07em' };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-900 to-black">
-      {/* Background effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl"></div>
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12 font-sans"
+      style={{ background: '#09090b' }}>
+
+      {/* Ambient */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div style={{ position: 'absolute', top: '-10%', left: '50%', transform: 'translateX(-50%)', width: 900, height: 400, background: 'radial-gradient(ellipse,rgba(99,102,241,0.1) 0%,transparent 60%)' }} />
+        <div style={{ position: 'absolute', bottom: '-5%', right: '-5%', width: 500, height: 500, background: 'radial-gradient(circle,rgba(139,92,246,0.07) 0%,transparent 60%)' }} />
+        <div style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,0.012) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,0.012) 1px,transparent 1px)', backgroundSize: '64px 64px' }} />
       </div>
 
-      {/* Content */}
-      <div className="relative max-w-2xl mx-auto px-4 py-12">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-3xl font-bold text-white mb-2">Bienvenido a MetaDash</h1>
-          <p className="text-gray-400">Vamos a configurar tu cuenta en {steps.length - 1} pasos</p>
+      <div className="relative w-full max-w-xl">
+
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-8">
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)', boxShadow: '0 0 28px rgba(99,102,241,0.45), inset 0 1px 0 rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 900, fontSize: 14, letterSpacing: '-0.02em', marginBottom: 16 }}>
+            MD
+          </div>
+          <h1 style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1, background: 'linear-gradient(135deg,#fff 40%,rgba(255,255,255,0.5) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 8 }}>
+            Configurá tu cuenta
+          </h1>
+          <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)', fontWeight: 450 }}>
+            4 pasos — menos de 2 minutos
+          </p>
         </div>
 
-        {/* Progress bar */}
-        <div className="mb-8">
-          <div className="flex justify-between mb-4">
-            {steps.map((step) => (
-              <div
-                key={step.id}
-                className={`flex flex-col items-center cursor-pointer transition-all ${
-                  step.id <= currentStep ? 'opacity-100' : 'opacity-50'
-                }`}
-                onClick={() => step.id < currentStep && setCurrentStep(step.id)}
-              >
-                <div
-                  className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold transition-all ${
-                    step.id < currentStep
-                      ? 'bg-green-600 text-white'
-                      : step.id === currentStep
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-800 text-gray-500'
-                  }`}
-                >
-                  {step.id < currentStep ? '✓' : step.icon}
-                </div>
-                <span className="text-xs text-gray-400 mt-2 text-center max-w-12">
-                  {step.name}
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="h-1 bg-gray-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-indigo-600 to-blue-600 transition-all duration-300"
-              style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
-            ></div>
-          </div>
-        </div>
-
-        {/* Step Content */}
-        <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-8 backdrop-blur">
-          {currentStep === 1 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-4">
-                  ¡Hola, {user?.name || 'Usuario'}!
-                </h2>
-                <p className="text-gray-400 leading-relaxed">
-                  MetaDash es una plataforma de IA que optimiza tus campañas publicitarias de Meta Ads
-                  automáticamente, analiza tus métricas y te da recomendaciones para escalar tu negocio.
-                </p>
-              </div>
-
-              <div className="space-y-3 pt-4">
-                {[
-                  '🤖 8 agentes de IA especializados trabajando 24/7',
-                  '📊 Análisis de campañas, finanzas y creatividades',
-                  '📈 Google Analytics integrado',
-                  '🔒 Conexión segura con Meta Ads',
-                  '⚡ Auditoría automática de landing pages',
-                ].map((feature, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <CheckIcon className="w-5 h-5 text-green-400 flex-shrink-0" />
-                    <span className="text-gray-300">{feature}</span>
+        {/* Step indicator */}
+        <div style={{ marginBottom: 28 }}>
+          <div className="flex justify-between items-center" style={{ marginBottom: 12 }}>
+            {STEPS.map((step, i) => {
+              const done    = step.id < currentStep;
+              const active  = step.id === currentStep;
+              return (
+                <div key={step.id} className="flex flex-col items-center gap-1.5" style={{ flex: 1 }}>
+                  <div
+                    className="flex items-center justify-center transition-all"
+                    style={{
+                      width: 36, height: 36, borderRadius: '50%',
+                      background: done ? '#10b981' : active ? 'linear-gradient(135deg,#4f46e5,#7c3aed)' : 'rgba(255,255,255,0.06)',
+                      border: done ? 'none' : active ? 'none' : '1px solid rgba(255,255,255,0.1)',
+                      color: done || active ? 'white' : 'rgba(255,255,255,0.25)',
+                      boxShadow: active ? '0 0 16px rgba(99,102,241,0.45)' : 'none',
+                    }}
+                  >
+                    {done ? (
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6L9 17l-5-5"/>
+                      </svg>
+                    ) : (
+                      <Icon name={step.icon} size={14} strokeWidth={2} />
+                    )}
                   </div>
+                  <span style={{ fontSize: 10, fontWeight: 600, color: active ? 'rgba(255,255,255,0.7)' : done ? '#34d399' : 'rgba(255,255,255,0.25)', letterSpacing: '0.04em' }}>
+                    {step.name}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          {/* Progress line */}
+          <div style={{ height: 2, background: 'rgba(255,255,255,0.06)', borderRadius: 2, overflow: 'hidden' }}>
+            <div style={{ height: '100%', background: 'linear-gradient(90deg,#4f46e5,#7c3aed)', borderRadius: 2, transition: 'width 0.4s ease', width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }} />
+          </div>
+        </div>
+
+        {/* Card */}
+        <div style={{ background: 'rgba(22,22,26,0.8)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, padding: '32px', backdropFilter: 'blur(20px)', boxShadow: '0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04)', marginBottom: 16 }}>
+
+          {/* Step 1: Welcome */}
+          {currentStep === 1 && (
+            <div>
+              <h2 style={{ fontSize: 20, fontWeight: 800, color: 'white', marginBottom: 6, letterSpacing: '-0.02em' }}>
+                ¡Hola, {user?.name?.split(' ')[0] || 'bienvenido'}!
+              </h2>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', lineHeight: 1.6, marginBottom: 24 }}>
+                MetaDash es tu plataforma de IA para optimizar campañas de Meta Ads automáticamente, analizar métricas y escalar tu negocio.
+              </p>
+              <ul style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {FEATURES.map((f, i) => (
+                  <li key={i} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ color: '#10b981', flexShrink: 0 }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                    </span>
+                    <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)' }}>{f}</span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           )}
 
+          {/* Step 2: Meta Ads */}
           {currentStep === 2 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-2">Conecta Meta Ads</h2>
-                <p className="text-gray-400 text-sm">
-                  MetaDash necesita acceso a tu cuenta de Meta Ads para analizar y optimizar tus campañas.
-                </p>
-              </div>
-
-              <div className="space-y-4">
+            <div>
+              <h2 style={{ fontSize: 20, fontWeight: 800, color: 'white', marginBottom: 6, letterSpacing: '-0.02em' }}>Conectá Meta Ads</h2>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', lineHeight: 1.5, marginBottom: 24 }}>
+                MetaDash necesita acceso a tu cuenta de Meta Ads para analizar y optimizar tus campañas.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div>
-                  <label className="block text-sm font-medium text-white mb-2">
-                    Access Token de Meta Ads
-                  </label>
-                  <input
-                    type="password"
-                    name="meta_access_token"
-                    value={formData.meta_access_token}
-                    onChange={handleInputChange}
-                    placeholder="Pega tu access token aquí"
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-indigo-600"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Obtén tu token en{' '}
-                    <a
-                      href="https://developers.facebook.com/tools/accesstoken"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-400 hover:text-indigo-300"
-                    >
-                      Facebook Graph API
-                    </a>
+                  <label style={labelStyle}>Access Token de Meta Ads</label>
+                  <input type="password" name="meta_access_token" value={formData.meta_access_token} onChange={handleInputChange}
+                    placeholder="Pegá tu access token aquí" style={inputStyle} onFocus={onFocus} onBlur={onBlur} />
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 5 }}>
+                    Obtené tu token en{' '}
+                    <a href="https://developers.facebook.com/tools/accesstoken" target="_blank" rel="noopener noreferrer"
+                      style={{ color: '#a5b4fc', textDecoration: 'none' }}>Facebook Graph API</a>
                   </p>
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-white mb-2">
-                    ID de Cuenta de Ads
-                  </label>
-                  <input
-                    type="text"
-                    name="meta_ad_account_id"
-                    value={formData.meta_ad_account_id}
-                    onChange={handleInputChange}
-                    placeholder="Ej: act_123456789"
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-indigo-600"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
+                  <label style={labelStyle}>ID de Cuenta de Ads</label>
+                  <input type="text" name="meta_ad_account_id" value={formData.meta_ad_account_id} onChange={handleInputChange}
+                    placeholder="Ej: act_123456789" style={inputStyle} onFocus={onFocus} onBlur={onBlur} />
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 5 }}>
                     Lo encontrás en Ads Manager → Configuración
                   </p>
                 </div>
               </div>
-
-              <div className="bg-blue-900/30 border border-blue-700/40 rounded-lg p-4">
-                <p className="text-sm text-blue-300">
-                  💡 Estos datos se encriptan y se almacenan de forma segura. Solo se usan para conectar
-                  con Meta Ads.
+              <div style={{ marginTop: 20, background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                <span style={{ color: '#818cf8', flexShrink: 0, marginTop: 1 }}><Icon name="lock" size={14} /></span>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
+                  Estos datos se encriptan y se almacenan de forma segura. Solo se usan para conectar con Meta Ads.
                 </p>
               </div>
             </div>
           )}
 
+          {/* Step 3: GA4 */}
           {currentStep === 3 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-2">Google Analytics (Opcional)</h2>
-                <p className="text-gray-400 text-sm">
-                  Conecta tu GA4 para que los agentes vean el comportamiento de tus usuarios y den
-                  mejores recomendaciones.
-                </p>
-              </div>
-
-              <div className="space-y-4">
+            <div>
+              <h2 style={{ fontSize: 20, fontWeight: 800, color: 'white', marginBottom: 6, letterSpacing: '-0.02em' }}>Google Analytics 4 <span style={{ fontSize: 13, fontWeight: 500, color: 'rgba(255,255,255,0.3)' }}>(Opcional)</span></h2>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', lineHeight: 1.5, marginBottom: 24 }}>
+                Conectá GA4 para que los agentes vean el comportamiento de tus usuarios y den mejores recomendaciones.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                 <div>
-                  <label className="block text-sm font-medium text-white mb-2">
-                    ID de Propiedad de GA4
-                  </label>
-                  <input
-                    type="text"
-                    name="ga4_property_id"
-                    value={formData.ga4_property_id}
-                    onChange={handleInputChange}
-                    placeholder="Ej: 123456789"
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-600 focus:outline-none focus:border-indigo-600"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Lo encontrás en Google Analytics → Admin → Propiedades
+                  <label style={labelStyle}>ID de Propiedad de GA4</label>
+                  <input type="text" name="ga4_property_id" value={formData.ga4_property_id} onChange={handleInputChange}
+                    placeholder="Ej: 123456789" style={inputStyle} onFocus={onFocus} onBlur={onBlur} />
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 5 }}>
+                    Google Analytics → Admin → Propiedades
                   </p>
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-white mb-2">
-                    Archivo JSON de Credenciales (Opcional)
+                  <label style={labelStyle}>Credenciales Service Account (JSON)</label>
+                  <label htmlFor="ga4-file" style={{ display: 'block', cursor: 'pointer' }}>
+                    <div style={{ ...inputStyle, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
+                      <span style={{ color: 'rgba(255,255,255,0.3)' }}><Icon name="file" size={15} /></span>
+                      <span style={{ fontSize: 13, color: formData.ga4_file ? '#34d399' : 'rgba(255,255,255,0.35)' }}>
+                        {formData.ga4_file?.name || 'Subir archivo JSON de Service Account'}
+                      </span>
+                    </div>
+                    <input id="ga4-file" type="file" accept=".json" onChange={handleFileUpload} style={{ display: 'none' }} />
                   </label>
-                  <div className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center hover:border-indigo-600 transition cursor-pointer">
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                      id="ga4-file"
-                    />
-                    <label htmlFor="ga4-file" className="cursor-pointer">
-                      <div className="text-2xl mb-2">📄</div>
-                      <p className="text-sm text-white font-medium">
-                        {formData.ga4_file?.name || 'Sube tu archivo de credenciales JSON'}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Descárgalo desde Google Cloud Console
-                      </p>
-                    </label>
-                  </div>
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', marginTop: 5 }}>
+                    Descargalo desde Google Cloud Console
+                  </p>
                 </div>
               </div>
-
-              <div className="bg-yellow-900/30 border border-yellow-700/40 rounded-lg p-4">
-                <p className="text-sm text-yellow-300">
-                  ⚠️ Paso opcional pero recomendado. Sin GA4, los agentes tendrán recomendaciones más
-                  básicas.
+              <div style={{ marginTop: 20, background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: 10, padding: '12px 16px', display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                <span style={{ color: '#fbbf24', flexShrink: 0, marginTop: 1 }}><Icon name="warning" size={14} /></span>
+                <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', lineHeight: 1.5 }}>
+                  Paso opcional pero recomendado. Sin GA4, los agentes tendrán recomendaciones más básicas.
                 </p>
               </div>
             </div>
           )}
 
+          {/* Step 4: Preferences */}
           {currentStep === 4 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-2">Preferencias</h2>
-                <p className="text-gray-400 text-sm">Elige cómo quieres que trabajen los agentes.</p>
-              </div>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-white mb-3">
-                    Modo de Agentes Autónomos
-                  </label>
-                  <div className="space-y-2">
-                    {[
-                      {
-                        value: 'hybrid',
-                        label: 'Híbrido (Recomendado)',
-                        desc: 'Los agentes optimizan automáticamente, pero te piden aprobación para cambios grandes',
-                      },
-                      {
-                        value: 'manual',
-                        label: 'Manual',
-                        desc: 'Los agentes solo dan recomendaciones, tú decides si aplicarlas',
-                      },
-                      {
-                        value: 'full',
-                        label: 'Completamente Autónomo',
-                        desc: 'Los agentes hacen cambios sin tu aprobación (solo para expertos)',
-                      },
-                    ].map((mode) => (
-                      <label key={mode.value} className="flex items-start gap-3 p-3 rounded-lg border border-gray-700 hover:border-indigo-600 cursor-pointer transition">
-                        <input
-                          type="radio"
-                          name="autonomousMode"
-                          value={mode.value}
-                          checked={formData.autonomousMode === mode.value}
-                          onChange={handleInputChange}
-                          className="mt-1"
-                        />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-white">{mode.label}</p>
-                          <p className="text-xs text-gray-500">{mode.desc}</p>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="pt-4">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      name="emailNotifications"
-                      checked={formData.emailNotifications}
-                      onChange={handleInputChange}
-                      className="w-4 h-4 rounded border-gray-600"
-                    />
+            <div>
+              <h2 style={{ fontSize: 20, fontWeight: 800, color: 'white', marginBottom: 6, letterSpacing: '-0.02em' }}>Preferencias</h2>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', lineHeight: 1.5, marginBottom: 24 }}>
+                Elegí cómo querés que trabajen los agentes.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+                <label style={{ ...labelStyle, marginBottom: 10 }}>Modo de Agentes Autónomos</label>
+                {MODES.map(mode => (
+                  <label key={mode.value} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 14px', borderRadius: 10, cursor: 'pointer', border: `1px solid ${formData.autonomousMode === mode.value ? 'rgba(99,102,241,0.4)' : 'rgba(255,255,255,0.07)'}`, background: formData.autonomousMode === mode.value ? 'rgba(99,102,241,0.06)' : 'transparent', transition: 'all 0.15s' }}>
+                    <div style={{ width: 16, height: 16, borderRadius: '50%', border: `2px solid ${formData.autonomousMode === mode.value ? '#6366f1' : 'rgba(255,255,255,0.2)'}`, background: formData.autonomousMode === mode.value ? '#6366f1' : 'transparent', flexShrink: 0, marginTop: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'all 0.15s' }}>
+                      {formData.autonomousMode === mode.value && <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'white' }} />}
+                    </div>
+                    <input type="radio" name="autonomousMode" value={mode.value} checked={formData.autonomousMode === mode.value} onChange={handleInputChange} style={{ display: 'none' }} />
                     <div>
-                      <p className="text-sm font-medium text-white">Recibir notificaciones por email</p>
-                      <p className="text-xs text-gray-500">
-                        Alertas sobre cambios importantes y resúmenes semanales
-                      </p>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 2 }}>{mode.label}</p>
+                      <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>{mode.desc}</p>
                     </div>
                   </label>
-                </div>
+                ))}
               </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', padding: '12px 14px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div
+                  onClick={() => setFormData(prev => ({ ...prev, emailNotifications: !prev.emailNotifications }))}
+                  style={{ width: 40, height: 22, borderRadius: 11, background: formData.emailNotifications ? 'linear-gradient(135deg,#4f46e5,#7c3aed)' : 'rgba(255,255,255,0.1)', transition: 'all 0.2s', position: 'relative', cursor: 'pointer', flexShrink: 0, boxShadow: formData.emailNotifications ? '0 0 8px rgba(99,102,241,0.4)' : 'none' }}>
+                  <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, left: formData.emailNotifications ? 20 : 2, transition: 'left 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
+                </div>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.85)', marginBottom: 1 }}>Notificaciones por email</p>
+                  <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>Alertas importantes y resúmenes semanales</p>
+                </div>
+              </label>
             </div>
           )}
 
+          {/* Step 5: Done */}
           {currentStep === 5 && (
-            <div className="space-y-6 text-center">
-              <div className="text-6xl mb-4">🎉</div>
-              <div>
-                <h2 className="text-2xl font-bold text-white mb-2">¡Todo configurado!</h2>
-                <p className="text-gray-400 leading-relaxed">
-                  Tu cuenta está lista. Los agentes de IA comenzarán a analizar tus campañas en tiempo
-                  real y te darán recomendaciones dentro de poco.
-                </p>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ width: 64, height: 64, borderRadius: 20, background: 'linear-gradient(135deg,rgba(16,185,129,0.15),rgba(16,185,129,0.05))', border: '1px solid rgba(16,185,129,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', boxShadow: '0 0 32px rgba(16,185,129,0.2)' }}>
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
               </div>
-
-              <div className="bg-green-900/30 border border-green-700/40 rounded-lg p-4 text-left mt-6">
-                <h3 className="text-sm font-semibold text-green-300 mb-2">Próximos pasos:</h3>
-                <ul className="text-sm text-green-300/80 space-y-1">
-                  <li>✓ Los agentes comenzarán el análisis automáticamente</li>
-                  <li>✓ Verás resultados en el dashboard en 2-3 minutos</li>
-                  <li>✓ Recibiras notificaciones cuando haya recomendaciones nuevas</li>
-                  <li>✓ Puedes ajustar configuraciones en cualquier momento</li>
-                </ul>
+              <h2 style={{ fontSize: 22, fontWeight: 800, color: 'white', marginBottom: 8, letterSpacing: '-0.02em' }}>¡Todo configurado!</h2>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', lineHeight: 1.6, marginBottom: 24 }}>
+                Tu cuenta está lista. Los agentes de IA comenzarán a analizar tus campañas y te darán recomendaciones dentro de poco.
+              </p>
+              <div style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)', borderRadius: 12, padding: '16px 20px', textAlign: 'left' }}>
+                <p style={{ fontSize: 11, fontWeight: 700, color: '#34d399', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Próximos pasos</p>
+                {[
+                  'Los agentes comenzarán el análisis automáticamente',
+                  'Verás resultados en el dashboard en 2-3 minutos',
+                  'Recibirás notificaciones cuando haya recomendaciones nuevas',
+                  'Podés ajustar configuraciones en cualquier momento',
+                ].map((item, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: i < 3 ? 8 : 0 }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>{item}</span>
+                  </div>
+                ))}
               </div>
             </div>
           )}
         </div>
 
         {/* Navigation */}
-        <div className="flex gap-4 mt-8">
-          <button
-            onClick={handleBack}
-            disabled={currentStep === 1}
-            className="flex-1 px-6 py-3 bg-gray-800 hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition"
-          >
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button onClick={handleBack} disabled={currentStep === 1}
+            style={{ flex: 1, padding: '11px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, cursor: currentStep === 1 ? 'not-allowed' : 'pointer', color: 'rgba(255,255,255,0.4)', fontWeight: 600, fontSize: 14, fontFamily: 'inherit', opacity: currentStep === 1 ? 0.4 : 1, transition: 'all 0.15s' }}>
             Atrás
           </button>
-          <button
-            onClick={handleNext}
-            disabled={!isStepValid() || loading}
-            className="flex-1 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-lg transition flex items-center justify-center gap-2"
-          >
+          <button onClick={handleNext} disabled={!isStepValid() || loading}
+            style={{ flex: 2, padding: '11px', background: (!isStepValid() || loading) ? 'rgba(99,102,241,0.4)' : 'linear-gradient(135deg,#4f46e5,#7c3aed)', border: 'none', borderRadius: 10, cursor: (!isStepValid() || loading) ? 'not-allowed' : 'pointer', color: 'white', fontWeight: 700, fontSize: 14, fontFamily: 'inherit', boxShadow: (!isStepValid() || loading) ? 'none' : '0 4px 20px rgba(79,70,229,0.4), inset 0 1px 0 rgba(255,255,255,0.15)', transition: 'all 0.15s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             {loading ? (
-              <>
-                <span className="animate-spin">⏳</span>
-                Completando...
-              </>
-            ) : currentStep === steps.length ? (
-              <>Ir al Dashboard →</>
-            ) : (
-              <>Siguiente →</>
-            )}
+              <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: 'white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />Completando...</>
+            ) : currentStep === STEPS.length ? 'Ir al Dashboard →' : 'Siguiente →'}
           </button>
         </div>
 
-        {/* Skip onboarding link */}
         {currentStep < 5 && (
-          <div className="text-center mt-6">
-            <button
-              onClick={() => router.push('/dashboard')}
-              className="text-sm text-gray-500 hover:text-gray-400 transition"
-            >
+          <div style={{ textAlign: 'center', marginTop: 16 }}>
+            <button onClick={() => router.push('/dashboard')}
+              style={{ fontSize: 12, color: 'rgba(255,255,255,0.2)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+              onMouseEnter={(e) => { e.target.style.color = 'rgba(255,255,255,0.45)'; }}
+              onMouseLeave={(e) => { e.target.style.color = 'rgba(255,255,255,0.2)'; }}>
               Saltear y ir al dashboard
             </button>
           </div>
@@ -442,6 +357,6 @@ export default function OnboardingPage() {
   );
 }
 
-export function getServerSideProps(context) {
+export function getServerSideProps() {
   return { props: {} };
 }

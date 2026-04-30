@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { Layout } from '../components/Layout';
+import { Icon } from '../components/Icons';
 import { api } from '../lib/api';
 
 const SECTIONS = [
   {
     id: 'meta',
     title: 'Meta Ads',
-    icon: '📱',
+    icon: 'campaigns',
     accent: '#3b82f6',
     description: 'Conecta tu cuenta de Meta Business para acceder a campañas y métricas',
     fields: [
@@ -21,7 +22,7 @@ const SECTIONS = [
   {
     id: 'ai',
     title: 'Agentes IA',
-    icon: '🤖',
+    icon: 'brain',
     accent: '#8b5cf6',
     description: 'Claves API para los agentes de inteligencia artificial',
     fields: [
@@ -32,7 +33,7 @@ const SECTIONS = [
   {
     id: 'negocio',
     title: 'Información del Negocio',
-    icon: '🏪',
+    icon: 'store',
     accent: '#f59e0b',
     description: 'Contexto que los agentes usan para personalizar sus análisis',
     fields: [
@@ -43,7 +44,7 @@ const SECTIONS = [
   {
     id: 'ga4',
     title: 'Google Analytics 4',
-    icon: '📊',
+    icon: 'financials',
     accent: '#f97316',
     description: 'Conecta GA4 para análisis de tráfico, conversiones y comportamiento',
     fields: [
@@ -54,7 +55,7 @@ const SECTIONS = [
   {
     id: 'shopify',
     title: 'Shopify',
-    icon: '🛍️',
+    icon: 'shopify',
     accent: '#10b981',
     description: 'Integración con tu tienda Shopify',
     fields: [
@@ -65,7 +66,7 @@ const SECTIONS = [
   {
     id: 'pagos',
     title: 'Pagos',
-    icon: '💳',
+    icon: 'creditcard',
     accent: '#6366f1',
     description: 'Integración de pagos con MercadoPago',
     fields: [
@@ -184,14 +185,14 @@ export default function SettingsPage() {
         {error && (
           <div className="rounded-xl p-4 flex items-center gap-3"
             style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
-            <span style={{ color: '#f87171' }}>⚠</span>
+            <span style={{ color: '#f87171' }}><Icon name="warning" size={14} strokeWidth={2} /></span>
             <p className="text-sm" style={{ color: '#fca5a5' }}>{error}</p>
           </div>
         )}
         {success && (
           <div className="rounded-xl p-4 flex items-center gap-3"
             style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
-            <span style={{ color: '#34d399' }}>✓</span>
+            <span style={{ color: '#34d399' }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg></span>
             <p className="text-sm" style={{ color: '#6ee7b7' }}>{success}</p>
           </div>
         )}
@@ -203,9 +204,9 @@ export default function SettingsPage() {
 
               {/* Section header */}
               <div className="px-5 pt-5 pb-4 flex items-start gap-4">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
-                  style={{ background: `${section.accent}15`, border: `1px solid ${section.accent}25` }}>
-                  {section.icon}
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: `${section.accent}15`, border: `1px solid ${section.accent}25`, color: section.accent }}>
+                  <Icon name={section.icon} size={17} strokeWidth={1.75} />
                 </div>
                 <div>
                   <h2 className="text-sm font-bold text-white leading-none mb-1">{section.title}</h2>
@@ -230,8 +231,8 @@ export default function SettingsPage() {
                         onMouseEnter={(e) => { e.currentTarget.style.borderColor = section.accent; }}
                         onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#2a2a35'; }}
                       >
-                        <span className="text-xs font-medium" style={{ color: ga4File ? '#34d399' : '#9ca3af' }}>
-                          {ga4File ? '✓ Archivo cargado' : '📁 Subir archivo JSON de Service Account'}
+                        <span className="text-xs font-medium flex items-center gap-2" style={{ color: ga4File ? '#34d399' : '#9ca3af' }}>
+                          {ga4File ? '✓ Archivo cargado' : 'Subir archivo JSON de Service Account'}
                         </span>
                         <input type="file" accept=".json" onChange={handleGa4FileChange} className="hidden" />
                       </div>
