@@ -43,6 +43,13 @@ try:
 except ImportError:
     V35_AVAILABLE = False
 
+# Import chat launch routes
+try:
+    from chat_routes import router as chat_router
+    CHAT_AVAILABLE = True
+except ImportError:
+    CHAT_AVAILABLE = False
+
 # Initialize database
 Base.metadata.create_all(bind=engine)
 
@@ -104,6 +111,10 @@ if PAYMENTS_AVAILABLE:
 # Include v3.5 routes
 if V35_AVAILABLE:
     app.include_router(v35_router)
+
+# Include chat launch routes
+if CHAT_AVAILABLE:
+    app.include_router(chat_router)
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
