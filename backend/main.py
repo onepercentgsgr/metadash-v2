@@ -50,7 +50,45 @@ try:
 except ImportError:
     CHAT_AVAILABLE = False
 
-# Initialize database
+# Initialize database + run migrations for existing tables
+def _run_migrations():
+    """Add missing columns to existing tables without dropping data."""
+    from sqlalchemy import text, inspect as sa_inspect
+    migrations = [
+        # users table
+        ("users", "has_paid",    "BOOLEAN DEFAULT FALSE"),
+        ("users", "paid_at",     "TIMESTAMP"),
+        ("users", "onboarded_at","TIMESTAMP"),
+        # tenant_configs new columns
+        ("tenant_configs", "hf_api_key",            "TEXT"),
+        ("tenant_configs", "negocio_info",           "TEXT"),
+        ("tenant_configs", "landing_page_url",       "TEXT"),
+        ("tenant_configs", "shopify_store_url",      "TEXT"),
+        ("tenant_configs", "shopify_webhook_secret", "TEXT"),
+        ("tenant_configs", "mercadopago_access_token","TEXT"),
+        ("tenant_configs", "anthropic_api_key",      "TEXT"),
+        ("tenant_configs", "meta_app_id",            "TEXT"),
+        ("tenant_configs", "meta_app_secret",        "TEXT"),
+        # subscriptions
+        ("subscriptions", "trial_start", "TIMESTAMP"),
+        ("subscriptions", "updated_at",  "TIMESTAMP"),
+    ]
+    insp = sa_inspect(engine)
+    existing_tables = insp.get_table_names()
+    with engine.connect() as conn:
+        for table, col, col_type in migrations:
+            if table not in existing_tables:
+                continue
+            existing_cols = [c["name"] for c in insp.get_columns(table)]
+            if col not in existing_cols:
+                try:
+                    conn.execute(text(f'ALTER TABLE "{table}" ADD COLUMN "{col}" {col_type}'))
+                    conn.commit()
+                    logger.info(f"Migration: added {table}.{col}")
+                except Exception as e:
+                    logger.warning(f"Migration skipped {table}.{col}: {e}")
+
+_run_migrations()
 Base.metadata.create_all(bind=engine)
 
 # Create FastAPI app
