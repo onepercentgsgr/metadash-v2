@@ -68,16 +68,25 @@ async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
     )
 
 # ── CORS Configuration ──
-# Secure allowlist of origins - reject everything else
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001").split(",")
 ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS]
+
+def _is_allowed_origin(origin: str) -> bool:
+    if origin in ALLOWED_ORIGINS:
+        return True
+    # Allow any Vercel preview/production deployment
+    if origin.endswith(".vercel.app"):
+        return True
+    # Allow any Railway deployment
+    if origin.endswith(".railway.app") or origin.endswith(".up.railway.app"):
+        return True
+    return False
 
 class SecureCORSMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         origin = request.headers.get("origin", "")
 
-        # Only respond to whitelisted origins
-        allowed_origin = origin if origin in ALLOWED_ORIGINS else None
+        allowed_origin = origin if _is_allowed_origin(origin) else None
 
         # Preflight OPTIONS → responder inmediatamente con CORS headers
         if request.method == "OPTIONS":
