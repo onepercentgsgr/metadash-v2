@@ -8,7 +8,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User, TenantConfig
-from main import get_current_user_from_header
+from auth_utils import get_current_user_from_header
 from agents.chat_launch_agent import chat_with_agent
 
 router = APIRouter(prefix="/agents/chat", tags=["chat"])
