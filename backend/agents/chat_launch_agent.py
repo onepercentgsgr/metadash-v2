@@ -7,7 +7,6 @@ import json
 import anthropic
 from typing import Generator
 from sqlalchemy.orm import Session
-from agents.shared_memory import SharedMemory
 from agents.infoproducto_agent import run_infoproducto_step
 
 CHAT_SYSTEM_PROMPT = """Sos un estratega de lanzamiento de infoproductos en LATAM, experto en marketing digital y ventas online.
