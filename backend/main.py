@@ -551,6 +551,7 @@ def startup_event():
                 email=admin_email,
                 hashed_password=hash_password(admin_password),
                 name="Admin",
+                # NOTE: password will be force-synced below
                 role="admin",
                 is_active=True,
             )
@@ -573,12 +574,12 @@ def startup_event():
             )
             db.add(subscription)
             db.commit()
-        elif admin.role != "admin":
-            # If admin email user exists but isn't admin yet, upgrade them
-            admin.role = "admin"
-            admin.is_active = True
-            db.commit()
-            logger.info(f"Upgraded {admin_email} to admin role")
+        # Always sync admin password + role from env vars (handles stale DB from old deploys)
+        admin.hashed_password = hash_password(admin_password)
+        admin.role = "admin"
+        admin.is_active = True
+        db.commit()
+        logger.info(f"Admin credentials synced for {admin_email}")
 
         # Ensure admin has enterprise plan (not trial)
         admin_sub = db.query(Subscription).filter(
