@@ -2122,6 +2122,10 @@ class InfoproductoRunRequest(BaseModel):
     state: Dict[str, Any]
 
 
+class InfoproductoFromUrlRequest(BaseModel):
+    url: str
+
+
 class TikTokAdsRunRequest(BaseModel):
     mode: str  # "strategy" | "optimize"
     payload: Dict[str, Any] = {}
@@ -2190,6 +2194,102 @@ async def run_infoproducto_endpoint(
     except Exception as e:
         logger.error(f"Infoproducto agent error: {type(e).__name__}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error en agente infoproducto: {str(e)}")
+
+
+@app.post("/agents/infoproducto/from-url")
+async def infoproducto_from_url_endpoint(
+    request: InfoproductoFromUrlRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+
+    url = request.url.strip()
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+
+    try:
+        import httpx
+        from bs4 import BeautifulSoup
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; MetaDash/3.5; +https://metadash.app)",
+            "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+        }
+        async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client:
+            resp = await client.get(url, headers=headers)
+        resp.raise_for_status()
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for tag in soup(["script", "style", "nav", "footer", "header", "noscript", "iframe"]):
+            tag.decompose()
+
+        title = soup.title.string.strip() if soup.title and soup.title.string else ""
+        text_blocks = []
+        for tag in soup.find_all(["h1", "h2", "h3", "p", "li", "span", "strong", "em"]):
+            t = tag.get_text(separator=" ", strip=True)
+            if len(t) > 20:
+                text_blocks.append(t)
+
+        page_text = "\n".join(dict.fromkeys(text_blocks))[:12000]
+
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=422, detail=f"No se pudo acceder a la URL: HTTP {e.response.status_code}")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=422, detail=f"Error de red al acceder a la URL: {str(e)}")
+    except Exception as e:
+        logger.error(f"from-url scrape error: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=422, detail=f"Error procesando la URL: {str(e)}")
+
+    prompt = f"""Eres un experto en marketing de infoproductos. Analiza el contenido de esta página de ventas/landing y extrae la información clave para armar el modelado de oferta.
+
+URL: {url}
+Título: {title}
+
+CONTENIDO DE LA PÁGINA:
+{page_text}
+
+Devuelve ÚNICAMENTE un JSON válido con esta estructura exacta (sin markdown, sin explicaciones adicionales):
+{{
+  "nombre": "nombre del producto o servicio",
+  "tipo": "uno de: ebook, curso, membresía, plantilla, servicio, coaching, comunidad",
+  "problema": "qué problema principal resuelve (2-4 oraciones)",
+  "publico": "descripción del avatar/público objetivo (2-3 oraciones)",
+  "incluye": "qué incluye el producto (lista de bullet points separados por \\n)",
+  "precio": "precio mencionado o vacío si no se encuentra",
+  "diferencial": "qué lo hace único o diferente a la competencia (2-3 oraciones)",
+  "prueba_social": "testimonios, resultados o prueba social mencionada (resume en 2-3 oraciones)",
+  "competidor": "competidor o alternativa mencionada, o vacío",
+  "bonus_count": "cantidad de bonos si se mencionan, o '0'",
+  "notas": "información adicional relevante que no encaja en los campos anteriores"
+}}"""
+
+    try:
+        import anthropic as anthropic_sdk
+        client = anthropic_sdk.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1500,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = msg.content[0].text.strip()
+        # Strip markdown code fences if present
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        oferta = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Claude devolvió JSON inválido: {str(e)}")
+    except Exception as e:
+        logger.error(f"from-url claude error: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error en el análisis con IA: {str(e)}")
+
+    return {"oferta": oferta}
 
 
 @app.post("/agents/tiktok-ads/run")

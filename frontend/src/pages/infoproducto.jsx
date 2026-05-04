@@ -152,6 +152,10 @@ export default function InfoproductoPage() {
   const [PS, setPS] = useState(emptyState);
   const [running, setRunning] = useState(false);
   const [savedAt, setSavedAt] = useState(null);
+  const [urlModal, setUrlModal] = useState(false);
+  const [urlInput, setUrlInput] = useState('');
+  const [urlLoading, setUrlLoading] = useState(false);
+  const [urlError, setUrlError] = useState('');
 
   // load from shared memory backend
   useEffect(() => {
@@ -249,6 +253,41 @@ export default function InfoproductoPage() {
     navigator.clipboard.writeText(out);
   }
 
+  async function fromUrl() {
+    setUrlError('');
+    setUrlLoading(true);
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const res = await fetch(`${API_URL}/agents/infoproducto/from-url`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ url: urlInput }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || `Error ${res.status}`);
+      }
+      const data = await res.json();
+      if (data?.oferta) {
+        setPS(prev => ({
+          ...prev,
+          oferta: { ...prev.oferta, ...data.oferta },
+          paso_actual: 0,
+        }));
+        setUrlModal(false);
+        setUrlInput('');
+      }
+    } catch (e) {
+      setUrlError(e?.message || 'Error desconocido');
+    } finally {
+      setUrlLoading(false);
+    }
+  }
+
   if (authLoading) return null;
 
   return (
@@ -313,6 +352,12 @@ export default function InfoproductoPage() {
         </nav>
 
         <div className="p-3 border-t border-[#1e1e24] space-y-2">
+          <button
+            onClick={() => { setUrlModal(true); setUrlError(''); }}
+            className="w-full px-3 py-2 bg-amber-600/15 border border-amber-600/40 hover:bg-amber-600/25 text-amber-300 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5"
+          >
+            🔗 Importar desde URL
+          </button>
           <button
             onClick={() => router.push('/campaigns')}
             className="w-full px-3 py-2 bg-indigo-600/20 border border-indigo-700/40 hover:bg-indigo-600/30 text-indigo-300 text-xs font-semibold rounded-lg transition"
@@ -487,6 +532,51 @@ export default function InfoproductoPage() {
 
         </div>
       </main>
+
+      {/* URL IMPORT MODAL */}
+      {urlModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="bg-[#16161a] border border-[#27272f] rounded-2xl p-6 w-full max-w-lg shadow-2xl">
+            <h3 className="text-base font-extrabold text-gray-100 mb-1">Importar desde URL</h3>
+            <p className="text-xs text-gray-500 mb-5">
+              Pegá la URL de tu landing page, sales page o página de producto. La IA va a analizar el contenido y pre-completar todos los campos del paso de Oferta.
+            </p>
+            <input
+              type="url"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && !urlLoading && urlInput.trim() && fromUrl()}
+              placeholder="https://tu-landing.com"
+              className="w-full bg-[#111114] border border-[#27272f] text-gray-100 px-3 py-2.5 rounded-xl text-sm focus:border-indigo-500 focus:outline-none mb-3"
+              autoFocus
+            />
+            {urlError && (
+              <p className="text-xs text-red-400 mb-3">⚠ {urlError}</p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={fromUrl}
+                disabled={urlLoading || !urlInput.trim()}
+                className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm rounded-xl transition"
+              >
+                {urlLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Analizando...
+                  </span>
+                ) : '🔗 Analizar página'}
+              </button>
+              <button
+                onClick={() => { setUrlModal(false); setUrlInput(''); setUrlError(''); }}
+                disabled={urlLoading}
+                className="px-4 py-2.5 bg-[#111114] hover:bg-[#1e1e24] text-gray-400 text-sm font-semibold rounded-xl border border-[#27272f] transition"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
