@@ -386,7 +386,8 @@ export default function LanzarPage() {
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const history = buildHistory(messages); // history before new user msg
 
-      const res = await fetch('/api/agents/chat/launch', {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const res = await fetch(`${API_URL}/agents/chat/launch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

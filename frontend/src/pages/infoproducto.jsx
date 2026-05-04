@@ -178,7 +178,7 @@ export default function InfoproductoPage() {
       try {
         await api.apiFetch('/memory/infoproducto', {
           method: 'POST',
-          body: JSON.stringify({ state: PS }),
+          body: JSON.stringify({ value: PS, memory_type: 'product' }),
           headers: { 'Content-Type': 'application/json' },
         });
         setSavedAt(Date.now());
