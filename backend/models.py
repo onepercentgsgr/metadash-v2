@@ -182,6 +182,24 @@ class GeneratedVideo(Base):
     user = relationship("User")
 
 
+class PipelineRun(Base):
+    __tablename__ = "pipeline_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    run_id = Column(String, unique=True, index=True)
+    status = Column(String, default="running")  # "running", "complete", "error"
+    product_name = Column(String, nullable=True)
+    deliverables = Column(JSON, nullable=True)
+    state_snapshot = Column(JSON, nullable=True)
+    error_message = Column(Text, nullable=True)
+    duration_seconds = Column(Integer, nullable=True)
+    started_at = Column(DateTime, default=datetime.utcnow, index=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    user = relationship("User")
+
+
 class AutonomousActionLog(Base):
     __tablename__ = "autonomous_action_logs"
 

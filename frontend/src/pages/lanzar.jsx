@@ -631,28 +631,64 @@ export default function LanzarPage() {
                   <p style={styles.chatHeaderSub}>El agente guía tu lanzamiento paso a paso</p>
                 </div>
               </div>
-              <button
-                onClick={downloadInfoproducto}
-                disabled={messages.length < 2}
-                style={{
-                  padding: '8px 14px',
-                  background: messages.length < 2 ? 'rgba(255,255,255,0.04)' : 'linear-gradient(135deg,#10b981,#059669)',
-                  color: messages.length < 2 ? 'rgba(255,255,255,0.3)' : '#fff',
-                  border: 'none',
-                  borderRadius: 8,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  cursor: messages.length < 2 ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  whiteSpace: 'nowrap',
-                }}
-                title="Descargar todo lo conversado y los entregables como archivo Markdown"
-              >
-                <Icon name="file" size={13} />
-                Descargar todo
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={downloadInfoproducto}
+                  disabled={messages.length < 2}
+                  style={{
+                    padding: '8px 14px',
+                    background: messages.length < 2 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)',
+                    color: messages.length < 2 ? 'rgba(255,255,255,0.3)' : '#fff',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: messages.length < 2 ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    whiteSpace: 'nowrap',
+                  }}
+                  title="Descargar la conversación como Markdown"
+                >
+                  <Icon name="file" size={13} />
+                  Descargar chat
+                </button>
+                <button
+                  onClick={() => {
+                    // Persist the chat-extracted state as the seed for the pipeline
+                    try {
+                      localStorage.setItem('metadash_pipeline_seed', JSON.stringify({
+                        ...productState,
+                        oferta: { ...(productState || {}) },
+                      }));
+                    } catch {}
+                    window.location.href = '/infoproducto/run';
+                  }}
+                  disabled={Object.keys(productState || {}).length < 3}
+                  style={{
+                    padding: '8px 14px',
+                    background: Object.keys(productState || {}).length < 3
+                      ? 'rgba(255,255,255,0.04)'
+                      : 'linear-gradient(135deg,#4f46e5,#7c3aed)',
+                    color: Object.keys(productState || {}).length < 3 ? 'rgba(255,255,255,0.3)' : '#fff',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: Object.keys(productState || {}).length < 3 ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    whiteSpace: 'nowrap',
+                    boxShadow: Object.keys(productState || {}).length >= 3 ? '0 4px 14px rgba(79,70,229,0.4)' : 'none',
+                  }}
+                  title="Correr el pipeline Nivel Dios: 16 agentes generan tu infoproducto completo"
+                >
+                  <Icon name="rocket" size={13} />
+                  Generar infoproducto completo
+                </button>
+              </div>
             </div>
 
             {/* Messages */}

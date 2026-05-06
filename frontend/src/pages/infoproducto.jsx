@@ -353,6 +353,18 @@ export default function InfoproductoPage() {
 
         <div className="p-3 border-t border-[#1e1e24] space-y-2">
           <button
+            onClick={() => {
+              try {
+                localStorage.setItem('metadash_pipeline_seed', JSON.stringify(PS));
+              } catch {}
+              router.push('/infoproducto/run');
+            }}
+            className="w-full px-3 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-900/30"
+            title="Pipeline Nivel Dios — 16 agentes generan tu infoproducto completo en ~2 minutos"
+          >
+            🎬 Generar infoproducto completo
+          </button>
+          <button
             onClick={() => { setUrlModal(true); setUrlError(''); }}
             className="w-full px-3 py-2 bg-amber-600/15 border border-amber-600/40 hover:bg-amber-600/25 text-amber-300 text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5"
           >

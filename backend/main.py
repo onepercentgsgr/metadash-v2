@@ -20,7 +20,7 @@ from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
 
 from database import engine, get_db, Base
-from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog
+from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog, PipelineRun
 from agents.shared_memory import AgentMemory  # registers table with Base.metadata
 import config
 from plan_limits import check_feature_access, check_generation_limit, get_plan_limits, PLAN_DISPLAY_NAMES
@@ -2126,6 +2126,10 @@ class InfoproductoFromUrlRequest(BaseModel):
     url: str
 
 
+class PipelineRunRequest(BaseModel):
+    state: Dict[str, Any] = {}
+
+
 class TikTokAdsRunRequest(BaseModel):
     mode: str  # "strategy" | "optimize"
     payload: Dict[str, Any] = {}
@@ -2290,6 +2294,264 @@ Devuelve ÚNICAMENTE un JSON válido con esta estructura exacta (sin markdown, s
         raise HTTPException(status_code=500, detail=f"Error en el análisis con IA: {str(e)}")
 
     return {"oferta": oferta}
+
+
+@app.post("/agents/infoproducto/run-pipeline")
+async def run_infoproducto_pipeline_endpoint(
+    request: PipelineRunRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Run the full Nivel Dios pipeline (16 steps) with SSE streaming.
+    Each step's progress is streamed live; final ZIP is fetched separately.
+    """
+    user = get_current_user_from_header(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
+
+    # Quota check: count runs this month
+    from plan_limits import check_pipeline_limit
+    from datetime import datetime as _dt
+    month_start = _dt(_dt.utcnow().year, _dt.utcnow().month, 1)
+    runs_this_month = db.query(PipelineRun).filter(
+        PipelineRun.user_id == user.id,
+        PipelineRun.started_at >= month_start,
+    ).count()
+    check_pipeline_limit(subscription.plan, runs_this_month)
+
+    config_obj = get_tenant_config(user.id, db)
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+
+    import uuid as _uuid
+    run_id = str(_uuid.uuid4())
+
+    # Pre-create the run record so the user can navigate to /infoproducto/run/<id>
+    run_record = PipelineRun(
+        user_id=user.id,
+        run_id=run_id,
+        status="running",
+        product_name=(request.state.get("oferta") or {}).get("nombre") or request.state.get("nombre"),
+        state_snapshot=request.state,
+    )
+    db.add(run_record)
+    db.commit()
+
+    from agents.pipeline_orchestrator import run_pipeline_streaming
+    from fastapi.responses import StreamingResponse
+
+    def event_stream():
+        # We need a fresh db session because the generator runs after the request returns
+        from database import SessionLocal
+        local_db = SessionLocal()
+        deliverables_acc: Dict[str, str] = {}
+        state_acc = dict(request.state)
+        had_error = False
+        try:
+            for sse_chunk in run_pipeline_streaming(
+                db=local_db,
+                user_id=user.id,
+                state=state_acc,
+                api_key=api_key,
+                run_id=run_id,
+            ):
+                # Parse the event to capture deliverables for DB persistence
+                try:
+                    payload_str = sse_chunk.split("data: ", 1)[1].strip()
+                    payload = json.loads(payload_str)
+                    if payload.get("type") == "step.complete":
+                        deliverables_acc[payload["step_id"]] = payload.get("output", "")
+                    if payload.get("type") == "pipeline.error":
+                        had_error = True
+                except Exception:
+                    pass
+                yield sse_chunk
+
+            # Persist final result
+            run_db = local_db.query(PipelineRun).filter(PipelineRun.run_id == run_id).first()
+            if run_db:
+                run_db.deliverables = deliverables_acc
+                run_db.state_snapshot = state_acc
+                run_db.status = "error" if had_error else "complete"
+                from datetime import datetime as _dt2
+                run_db.completed_at = _dt2.utcnow()
+                run_db.duration_seconds = int((run_db.completed_at - run_db.started_at).total_seconds())
+                local_db.commit()
+        except Exception as e:
+            logger.exception(f"[pipeline endpoint] error: {e}")
+            run_db = local_db.query(PipelineRun).filter(PipelineRun.run_id == run_id).first()
+            if run_db:
+                run_db.status = "error"
+                run_db.error_message = str(e)
+                local_db.commit()
+            yield f"data: {json.dumps({'type': 'pipeline.error', 'error': str(e)})}\n\n"
+        finally:
+            local_db.close()
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@app.get("/agents/infoproducto/runs")
+async def list_pipeline_runs_endpoint(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """List all pipeline runs for the current user."""
+    user = get_current_user_from_header(authorization, db)
+    runs = db.query(PipelineRun).filter(
+        PipelineRun.user_id == user.id,
+    ).order_by(PipelineRun.started_at.desc()).limit(50).all()
+    return [
+        {
+            "run_id": r.run_id,
+            "status": r.status,
+            "product_name": r.product_name,
+            "duration_seconds": r.duration_seconds,
+            "started_at": r.started_at.isoformat() if r.started_at else None,
+            "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+        }
+        for r in runs
+    ]
+
+
+@app.get("/agents/infoproducto/run/{run_id}")
+async def get_pipeline_run_endpoint(
+    run_id: str,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Get a single pipeline run with all deliverables."""
+    user = get_current_user_from_header(authorization, db)
+    run = db.query(PipelineRun).filter(
+        PipelineRun.run_id == run_id,
+        PipelineRun.user_id == user.id,
+    ).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return {
+        "run_id": run.run_id,
+        "status": run.status,
+        "product_name": run.product_name,
+        "deliverables": run.deliverables or {},
+        "state_snapshot": run.state_snapshot or {},
+        "duration_seconds": run.duration_seconds,
+        "error_message": run.error_message,
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+    }
+
+
+@app.get("/agents/infoproducto/bundle/{run_id}")
+async def download_pipeline_bundle_endpoint(
+    run_id: str,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Download all deliverables as a ZIP."""
+    user = get_current_user_from_header(authorization, db)
+    run = db.query(PipelineRun).filter(
+        PipelineRun.run_id == run_id,
+        PipelineRun.user_id == user.id,
+    ).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    if not run.deliverables:
+        raise HTTPException(status_code=400, detail="Run has no deliverables yet")
+
+    from agents.pipeline_orchestrator import build_bundle_zip
+    from fastapi.responses import Response
+
+    zip_bytes = build_bundle_zip(run.deliverables, run.state_snapshot or {})
+    product_slug = (run.product_name or "infoproducto").lower().replace(" ", "-")
+    # sanitize slug for filename
+    safe_slug = "".join(c for c in product_slug if c.isalnum() or c in "-_") or "infoproducto"
+
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_slug}-{run_id[:8]}.zip"',
+        },
+    )
+
+
+@app.get("/agents/infoproducto/bundle/{run_id}/download-token")
+async def get_pipeline_bundle_token_endpoint(
+    run_id: str,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Get a short-lived signed token to download the bundle without Authorization header.
+    (Browser <a> tags can't send custom headers, so we sign a token instead.)
+    """
+    user = get_current_user_from_header(authorization, db)
+    run = db.query(PipelineRun).filter(
+        PipelineRun.run_id == run_id,
+        PipelineRun.user_id == user.id,
+    ).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    # Reuse the JWT signing key
+    from datetime import datetime as _dt3, timedelta as _td
+    payload = {
+        "sub": str(user.id),
+        "run_id": run_id,
+        "exp": _dt3.utcnow() + _td(minutes=5),
+        "scope": "bundle_download",
+    }
+    token = jwt.encode(payload, config.SECRET_KEY, algorithm=config.ALGORITHM)
+    return {"token": token}
+
+
+@app.get("/agents/infoproducto/bundle/{run_id}/by-token")
+async def download_pipeline_bundle_by_token_endpoint(
+    run_id: str,
+    token: str,
+    db: Session = Depends(get_db),
+):
+    """Download a bundle ZIP using a signed download token (for direct browser links)."""
+    try:
+        decoded = jwt.decode(token, config.SECRET_KEY, algorithms=[config.ALGORITHM])
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired download token")
+
+    if decoded.get("scope") != "bundle_download" or decoded.get("run_id") != run_id:
+        raise HTTPException(status_code=403, detail="Token not valid for this resource")
+
+    user_id = int(decoded.get("sub"))
+    run = db.query(PipelineRun).filter(
+        PipelineRun.run_id == run_id,
+        PipelineRun.user_id == user_id,
+    ).first()
+    if not run or not run.deliverables:
+        raise HTTPException(status_code=404, detail="Run or deliverables not found")
+
+    from agents.pipeline_orchestrator import build_bundle_zip
+    from fastapi.responses import Response
+
+    zip_bytes = build_bundle_zip(run.deliverables, run.state_snapshot or {})
+    product_slug = (run.product_name or "infoproducto").lower().replace(" ", "-")
+    safe_slug = "".join(c for c in product_slug if c.isalnum() or c in "-_") or "infoproducto"
+
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_slug}-{run_id[:8]}.zip"',
+        },
+    )
 
 
 @app.post("/agents/tiktok-ads/run")
