@@ -366,6 +366,48 @@ export default function LanzarPage() {
       .filter((m) => m.role === 'user' || m.role === 'assistant')
       .map((m) => ({ role: m.role, content: m.content }));
 
+  // Export entire conversation + product state as Markdown file
+  const downloadInfoproducto = () => {
+    const productName = productState.nombre || 'infoproducto';
+    const slug = String(productName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'infoproducto';
+
+    const lines = [];
+    lines.push(`# ${productName}`);
+    lines.push('');
+    lines.push(`_Generado por MetaDash · ${new Date().toLocaleDateString('es-AR')}_`);
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+    lines.push('## 📋 Datos del Infoproducto');
+    lines.push('');
+    Object.entries(productState).forEach(([k, v]) => {
+      if (v) lines.push(`- **${k}**: ${v}`);
+    });
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+    lines.push('## 💬 Conversación completa con el agente');
+    lines.push('');
+    messages.forEach((msg) => {
+      if (!msg.content) return;
+      lines.push(`### ${msg.role === 'user' ? '👤 Vos' : '🤖 Agente IA'}`);
+      lines.push('');
+      lines.push(msg.content);
+      lines.push('');
+    });
+
+    const md = lines.join('\n');
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${slug}-${Date.now()}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const sendMessage = async () => {
     if (!inputText.trim() || isStreaming) return;
 
@@ -575,18 +617,42 @@ export default function LanzarPage() {
           {/* ── Left: chat panel ── */}
           <div style={styles.chatLeft}>
             {/* Header */}
-            <div style={styles.chatHeader}>
-              <button style={styles.chatHeaderBack} onClick={() => setMode('selector')}>
-                <Icon name="chevronLeft" size={13} />
-                Volver
-              </button>
-              <div>
-                <p style={styles.chatHeaderTitle}>
-                  <Icon name="brain" size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
-                  Modo IA — Nivel Dios
-                </p>
-                <p style={styles.chatHeaderSub}>El agente guía tu lanzamiento paso a paso</p>
+            <div style={{ ...styles.chatHeader, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button style={styles.chatHeaderBack} onClick={() => setMode('selector')}>
+                  <Icon name="chevronLeft" size={13} />
+                  Volver
+                </button>
+                <div>
+                  <p style={styles.chatHeaderTitle}>
+                    <Icon name="brain" size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                    Modo IA — Nivel Dios
+                  </p>
+                  <p style={styles.chatHeaderSub}>El agente guía tu lanzamiento paso a paso</p>
+                </div>
               </div>
+              <button
+                onClick={downloadInfoproducto}
+                disabled={messages.length < 2}
+                style={{
+                  padding: '8px 14px',
+                  background: messages.length < 2 ? 'rgba(255,255,255,0.04)' : 'linear-gradient(135deg,#10b981,#059669)',
+                  color: messages.length < 2 ? 'rgba(255,255,255,0.3)' : '#fff',
+                  border: 'none',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: messages.length < 2 ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  whiteSpace: 'nowrap',
+                }}
+                title="Descargar todo lo conversado y los entregables como archivo Markdown"
+              >
+                <Icon name="file" size={13} />
+                Descargar todo
+              </button>
             </div>
 
             {/* Messages */}

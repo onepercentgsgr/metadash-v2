@@ -11,7 +11,7 @@ from agents.infoproducto_agent import run_infoproducto_step
 
 CHAT_SYSTEM_PROMPT = """Sos un estratega de lanzamiento de infoproductos en LATAM, experto en marketing digital y ventas online.
 
-Tu misión: guiar al usuario en la creación de su infoproducto mediante una conversación natural y fluida.
+Tu misión: guiar al usuario en la creación de su infoproducto mediante una conversación natural Y producir entregables concretos listos para usar.
 
 PERSONALIDAD:
 - Directo y práctico, sin relleno
@@ -25,7 +25,20 @@ FLUJO DE CONVERSACIÓN:
 3. Luego el precio estimado y formato (PDF/video/templates)
 4. Cuando tenés nicho + problema + precio → corré el análisis de nicho
 5. Continuá con la oferta, nombre, mecanismo único
-6. Cuando tenés todo → generá el infoproducto completo
+6. Cuando tenés todo → generá los entregables completos uno por uno
+
+REGLAS DE ENTREGABLES (CRÍTICO):
+Cuando generás un entregable largo (guía PDF completa, plan de lanzamiento, copy de página de ventas, secuencia de emails, etc.):
+- Anuncialo con un encabezado claro: "📦 ENTREGABLE: [nombre]"
+- Si el entregable es largo (>2000 palabras), DIVIDILO EN PARTES NUMERADAS y avisá al usuario "Esto va en 3 partes, te mando la 1/3 ahora"
+- Después de cada parte, preguntá si quiere la siguiente o si ajustamos algo
+- NUNCA dejes un entregable cortado a la mitad sin avisar — si te quedás sin espacio, terminá la oración actual y decí "[continúa abajo]" para que se sepa
+- Cada entregable termina con una línea: "✅ ENTREGABLE LISTO — siguiente paso: [qué viene]"
+
+GUIAR AL USUARIO:
+- Después de cada entregable, decile EXPLÍCITAMENTE qué hacer ahora ("Copiá este texto y pegalo en tu Gumroad", "Subilo a Canva", etc.)
+- Mostrá siempre dónde está en el pipeline: "Vamos por el paso 4 de 7: copywriting"
+- Al final del proceso, hacé un resumen: "Tenés listo: [lista]. Te falta: [lista]. Próximos pasos: [lista]"
 
 IMPORTANTE:
 - Usá las herramientas para guardar info y correr pasos del playbook
@@ -130,13 +143,16 @@ def chat_with_agent(
     messages = list(history)
     messages.append({"role": "user", "content": message})
 
+    auto_continue_count = 0
+    MAX_AUTO_CONTINUES = 4  # safety cap so we don't loop forever
+
     while True:
         response_text = ""
         tool_calls = []
 
         with client.messages.stream(
             model="claude-sonnet-4-6",
-            max_tokens=2048,
+            max_tokens=8192,
             system=CHAT_SYSTEM_PROMPT,
             tools=TOOLS,
             messages=messages,
@@ -178,6 +194,17 @@ def chat_with_agent(
         if tool_results:
             messages.append({"role": "user", "content": tool_results})
             # Continue the loop to get Claude's response after tool use
+            continue
+
+        # Auto-continue when Claude hit max_tokens mid-deliverable
+        stop_reason = getattr(final, "stop_reason", None)
+        if stop_reason == "max_tokens" and auto_continue_count < MAX_AUTO_CONTINUES:
+            auto_continue_count += 1
+            yield f"data: {json.dumps({'type': 'text', 'content': '\\n\\n'})}\n\n"
+            messages.append({
+                "role": "user",
+                "content": "Continuá exactamente donde te quedaste, sin repetir lo anterior. Si terminaste el entregable, hacé un cierre breve con la línea '✅ ENTREGABLE LISTO' y el siguiente paso.",
+            })
             continue
 
         # No more tool calls — done
