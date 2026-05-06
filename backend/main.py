@@ -2296,6 +2296,130 @@ Devuelve ÚNICAMENTE un JSON válido con esta estructura exacta (sin markdown, s
     return {"oferta": oferta}
 
 
+def _bridge_chat_state_to_pipeline_state(chat_state: dict) -> dict:
+    """
+    Bridge the flat shape produced by the chat-launch agent (top-level keys
+    like ``nicho``, ``problema``, ``precio``, ``nombre``, ``mecanismo``,
+    ``audiencia``, ``formato``, ``pais``) into the nested shape that the
+    Nivel Dios pipeline + playbook prompts expect (mirror of the frontend
+    ``emptyState()`` in ``frontend/src/pages/infoproducto.jsx``).
+
+    The function is idempotent: if ``chat_state`` already contains the nested
+    objects (e.g. when the seed comes from the manual /infoproducto page),
+    those values are preserved and only the missing pieces are filled in.
+    """
+    src = dict(chat_state or {})
+
+    # Country -> (moneda, modismo) defaults
+    pais_raw = (src.get("pais") or "LATAM").strip()
+    pais_lower = pais_raw.lower()
+    country_defaults = {
+        "argentina": ("ARS", "argento"),
+        "méxico":    ("MXN", "mexicano"),
+        "mexico":    ("MXN", "mexicano"),
+        "colombia":  ("COP", "colombiano"),
+        "chile":     ("CLP", "chileno"),
+        "perú":      ("PEN", "peruano"),
+        "peru":      ("PEN", "peruano"),
+        "españa":    ("EUR", "español"),
+        "espana":    ("EUR", "español"),
+        "uruguay":   ("UYU", "rioplatense"),
+    }
+    moneda_default, modismo_default = country_defaults.get(
+        pais_lower, ("USD", "neutro latinoamericano")
+    )
+
+    # Allowed `tipo` enum values (must match frontend select)
+    allowed_tipos = {"ebook", "curso", "membresía", "membresia",
+                     "plantilla", "servicio", "coaching", "comunidad"}
+    formato_raw = (src.get("formato") or "").strip()
+    formato_norm = formato_raw.lower()
+    tipo_from_formato = formato_norm if formato_norm in allowed_tipos else None
+
+    # Canonical empty shape (mirrors frontend emptyState())
+    bridged: dict = {
+        "pais": pais_raw or "LATAM",
+        "moneda": src.get("moneda") or moneda_default,
+        "modismo": src.get("modismo") or modismo_default,
+        "paso_actual": src.get("paso_actual", 0),
+        "pasos_completos": src.get("pasos_completos", []),
+        "oferta": {
+            "nombre": "", "tipo": "ebook", "problema": "", "publico": "",
+            "incluye": "", "precio": "", "diferencial": "", "prueba_social": "",
+            "competidor": "", "bonus_count": "3", "notas": "", "output": "",
+        },
+        "investigacion": {"notas": "", "output": ""},
+        "avatares":      {"notas": "", "output": ""},
+        "brand": {
+            "paleta": "Índigo Premium", "estilo": "Profesional",
+            "tono": "Directo & Honesto",
+            "fuentes": "Montserrat + Open Sans",
+            "referencias": "Apple, Hotmart", "evitar": "",
+            "notas": "", "output": "",
+        },
+        "mockup": {"estilo": "Realista 3D", "contexto": "escritorio",
+                   "plataforma": "hotmart", "notas": "", "output": ""},
+        "ads": {"plataforma": "Meta", "cantidad": "29", "notas": "", "output": ""},
+        "bonus_mockups": {"cantidad": "6", "notas": "", "output": ""},
+        "bundle": {"notas": "", "output": ""},
+        "landing": {"plataforma": "hotmart", "objetivo": "venta directa",
+                    "notas": "", "output": ""},
+        "copys": {"plataformas": "Meta, TikTok",
+                  "formatos": "single image, carousel, reel",
+                  "notas": "", "output": ""},
+        "guiones": {"duraciones": "15s, 30s, 60s", "angulos": "",
+                    "notas": "", "output": ""},
+        "ugc": {"cantidad": "5", "notas": "", "output": ""},
+        "producto": {"formato": "ebook", "capitulos": "", "tono_contenido": "",
+                     "notas": "", "output": ""},
+        "upsells": {"modelo": "OTO + bump", "precio_up": "", "precio_down": "",
+                    "notas": "", "output": ""},
+        "email": {"secuencia": "7", "trigger": "compra",
+                  "notas": "", "output": ""},
+        "lanzamiento": {"modo": "Faceless (voz en off + b-roll)",
+                        "duracion": "30-60s",
+                        "plataforma_principal": "TikTok", "angulos": "",
+                        "notas": "", "output": ""},
+    }
+
+    # Preserve any existing nested objects from the source (manual page case)
+    for key, default_val in list(bridged.items()):
+        incoming = src.get(key)
+        if isinstance(default_val, dict) and isinstance(incoming, dict):
+            merged = dict(default_val)
+            merged.update({k: v for k, v in incoming.items() if v is not None})
+            bridged[key] = merged
+
+    # Now overlay the chat-agent's flat top-level fields onto oferta/* etc.
+    oferta = bridged["oferta"]
+    if src.get("nombre") and not oferta.get("nombre"):
+        oferta["nombre"] = src["nombre"]
+    if src.get("problema") and not oferta.get("problema"):
+        oferta["problema"] = src["problema"]
+    if src.get("precio") and not oferta.get("precio"):
+        oferta["precio"] = src["precio"]
+    if src.get("mecanismo") and not oferta.get("diferencial"):
+        oferta["diferencial"] = src["mecanismo"]
+    if src.get("audiencia") and not oferta.get("publico"):
+        oferta["publico"] = src["audiencia"]
+    if tipo_from_formato:
+        # Normalize "membresia" -> "membresía" to match enum exactly
+        oferta["tipo"] = "membresía" if tipo_from_formato == "membresia" else tipo_from_formato
+    # Nicho has no direct slot in oferta; surface it via notas (and investigacion.notas)
+    nicho = src.get("nicho")
+    if nicho:
+        existing_notes = oferta.get("notas") or ""
+        nicho_line = f"Nicho: {nicho}"
+        if nicho_line not in existing_notes:
+            oferta["notas"] = (existing_notes + ("\n" if existing_notes else "") + nicho_line).strip()
+        inv = bridged["investigacion"]
+        inv_notes = inv.get("notas") or ""
+        if nicho_line not in inv_notes:
+            inv["notas"] = (inv_notes + ("\n" if inv_notes else "") + nicho_line).strip()
+
+    return bridged
+
+
 @app.post("/agents/infoproducto/run-pipeline")
 async def run_infoproducto_pipeline_endpoint(
     request: PipelineRunRequest,
@@ -2328,13 +2452,16 @@ async def run_infoproducto_pipeline_endpoint(
     import uuid as _uuid
     run_id = str(_uuid.uuid4())
 
+    # Bridge chat-agent flat state -> nested pipeline schema (idempotent for manual-page seeds)
+    bridged_state = _bridge_chat_state_to_pipeline_state(request.state)
+
     # Pre-create the run record so the user can navigate to /infoproducto/run/<id>
     run_record = PipelineRun(
         user_id=user.id,
         run_id=run_id,
         status="running",
-        product_name=(request.state.get("oferta") or {}).get("nombre") or request.state.get("nombre"),
-        state_snapshot=request.state,
+        product_name=(bridged_state.get("oferta") or {}).get("nombre") or request.state.get("nombre"),
+        state_snapshot=bridged_state,
     )
     db.add(run_record)
     db.commit()
@@ -2347,7 +2474,7 @@ async def run_infoproducto_pipeline_endpoint(
         from database import SessionLocal
         local_db = SessionLocal()
         deliverables_acc: Dict[str, str] = {}
-        state_acc = dict(request.state)
+        state_acc = dict(bridged_state)
         had_error = False
         try:
             for sse_chunk in run_pipeline_streaming(
