@@ -190,7 +190,7 @@ def _run_wave_parallel(
             })
 
         future_to_step = {
-            executor.submit(_run_single_step_safe, sid, db, user_id, state, api_key): sid
+            executor.submit(_run_single_step_safe, sid, db, user_id, state, api_key, True): sid
             for sid in wave
         }
 
@@ -219,35 +219,64 @@ def _run_wave_parallel(
 
 def _run_single_step_safe(
     step_id: str,
-    db: Session,
+    db: Session,  # Used for inline (single-thread) calls; threads create their own
     user_id: int,
     state: dict,
     api_key: str,
+    use_own_session: bool = False,
 ) -> tuple[str, float, dict]:
-    """Execute a single step and return (output, duration_seconds, critic_review)."""
+    """
+    Execute a single step and return (output, duration_seconds, critic_review).
+
+    SQLAlchemy sessions are NOT thread-safe. When called from a worker thread
+    (use_own_session=True), this creates and closes its own session for safety.
+    Also deepcopies the state dict to avoid cross-thread reads of an evolving dict.
+    """
     from agents.critic_agent import review_output, regenerate_with_feedback
-    t0 = time.time()
-    output = run_infoproducto_step(
-        db=db, user_id=user_id, step_id=step_id,
-        state=state, api_key=api_key,
-    )
+    import copy as _copy
 
-    # Critic review
-    focus = STEP_META.get(step_id, {}).get("focus", step_id)
-    oferta = state.get("oferta") or {}
-    product_context = (oferta.get("output", "") or "")[:500] or json.dumps(oferta, ensure_ascii=False)[:500]
-    review = review_output(step_id, focus, output, api_key, product_context)
+    own_db = None
+    if use_own_session:
+        from database import SessionLocal
+        own_db = SessionLocal()
+        active_db = own_db
+    else:
+        active_db = db
 
-    # If quality is low, regenerate ONCE with feedback
-    if review.get("score", 7) < 7 and review.get("feedback_for_regen"):
-        logger.info(f"[critic] step {step_id} scored {review['score']}, regenerating with feedback")
-        try:
-            output = regenerate_with_feedback(db, user_id, step_id, state, review["feedback_for_regen"], api_key)
-            review["regenerated"] = True
-        except Exception as e:
-            logger.warning(f"[critic] regen failed for {step_id}: {e}")
+    try:
+        t0 = time.time()
+        local_state = _copy.deepcopy(state)
 
-    return output, round(time.time() - t0, 1), review
+        output = run_infoproducto_step(
+            db=active_db, user_id=user_id, step_id=step_id,
+            state=local_state, api_key=api_key,
+        )
+
+        # Critic review
+        focus = STEP_META.get(step_id, {}).get("focus", step_id)
+        oferta = local_state.get("oferta") or {}
+        product_context = (oferta.get("output", "") or "")[:500] or json.dumps(oferta, ensure_ascii=False)[:500]
+        review = review_output(step_id, focus, output, api_key, product_context)
+
+        # If quality is low, regenerate ONCE with feedback
+        if review.get("score", 7) < 7 and review.get("feedback_for_regen"):
+            logger.info(f"[critic] step {step_id} scored {review['score']}, regenerating with feedback")
+            try:
+                output = regenerate_with_feedback(
+                    active_db, user_id, step_id, local_state,
+                    review["feedback_for_regen"], api_key,
+                )
+                review["regenerated"] = True
+            except Exception as e:
+                logger.warning(f"[critic] regen failed for {step_id}: {e}")
+
+        return output, round(time.time() - t0, 1), review
+    finally:
+        if own_db is not None:
+            try:
+                own_db.close()
+            except Exception:
+                pass
 
 
 def _sse(event: dict) -> str:

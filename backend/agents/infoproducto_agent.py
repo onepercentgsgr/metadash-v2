@@ -232,6 +232,33 @@ def run_infoproducto_step(
     message = client.messages.create(**create_kwargs)
     output = message.content[0].text
 
+    # Auto-continuation: if we hit max_tokens, continue the response so long
+    # deliverables (like full producto, plan_lanzamiento, copys) are not truncated.
+    auto_continues = 0
+    MAX_AUTO_CONTINUES = 3  # tokens budget cap: 8k * 4 = 32k max per step
+    convo: list[dict] = [
+        {"role": "user", "content": user_text},
+        {"role": "assistant", "content": output},
+    ]
+    while (
+        getattr(message, "stop_reason", None) == "max_tokens"
+        and auto_continues < MAX_AUTO_CONTINUES
+    ):
+        auto_continues += 1
+        convo.append({
+            "role": "user",
+            "content": "Continuá exactamente donde te quedaste, sin repetir lo anterior. Cuando termines el entregable, cerrá con una línea final '✅ ENTREGABLE LISTO'.",
+        })
+        cont_kwargs = dict(create_kwargs)
+        cont_kwargs["messages"] = convo
+        message = client.messages.create(**cont_kwargs)
+        chunk = message.content[0].text
+        output += "\n" + chunk
+        # Track for next loop iteration (in case continuation also hits max_tokens)
+        convo.append({"role": "assistant", "content": chunk})
+    if auto_continues > 0:
+        logger.info(f"[infoproducto_agent] step={step_id} auto-continued {auto_continues}x")
+
     # Cache hit telemetry (best-effort — usage shape can vary by SDK version).
     try:
         usage = getattr(message, "usage", None)

@@ -689,12 +689,14 @@ export default function LanzarPage() {
                 </button>
                 <button
                   onClick={() => {
-                    // Persist the chat-extracted state as the seed for the pipeline
+                    // Persist chat-extracted state. Backend's bridge function
+                    // maps these flat keys (nicho, problema, precio, etc.) into
+                    // the nested pipeline shape, so we send them as-is.
                     try {
-                      localStorage.setItem('metadash_pipeline_seed', JSON.stringify({
-                        ...productState,
-                        oferta: { ...(productState || {}) },
-                      }));
+                      localStorage.setItem(
+                        'metadash_pipeline_seed',
+                        JSON.stringify(productState || {}),
+                      );
                     } catch {}
                     window.location.href = '/infoproducto/run';
                   }}
