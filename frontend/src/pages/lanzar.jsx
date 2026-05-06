@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Icon } from '../components/Icons';
+import { Markdown } from '../components/Markdown';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const BG      = '#09090b';
@@ -733,7 +734,13 @@ export default function LanzarPage() {
                   <div style={styles.messageRole}>
                     {msg.role === 'user' ? 'Vos' : 'Agente IA'}
                   </div>
-                  {msg.content || (msg.streaming && (
+                  {msg.content ? (
+                    msg.role === 'assistant' ? (
+                      <Markdown compact>{msg.content}</Markdown>
+                    ) : (
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+                    )
+                  ) : (msg.streaming && (
                     <span>
                       <span style={styles.typingDot} />
                       <span style={{ ...styles.typingDot, animationDelay: '0.2s' }} />

@@ -4,6 +4,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../../context/AuthContext';
 import { Icon } from '../../components/Icons';
+import LaunchDashboard from '../../components/LaunchDashboard';
+import { Markdown } from '../../components/Markdown';
 
 // Mirror of backend PIPELINE_WAVES — keeps UI in sync with orchestrator
 const WAVES = [
@@ -316,22 +318,18 @@ export default function RunPipelinePage() {
               </button>
             </div>
           ) : pipelineStatus === 'done' ? (
-            <div className="bg-gradient-to-br from-emerald-950/40 to-indigo-950/30 border border-emerald-700/30 rounded-2xl p-8 mb-6 text-center">
-              <div className="text-5xl mb-3">🎉</div>
-              <h2 className="text-2xl font-extrabold text-gray-100 mb-2">¡Tu infoproducto está listo!</h2>
-              <p className="text-sm text-gray-400 mb-1">
-                {ALL_STEPS.length} entregables generados en {totalDuration}s
-              </p>
-              <p className="text-xs text-gray-500 mb-6">
-                Bajá el ZIP con todos los archivos + INDEX.md con las instrucciones de uso
-              </p>
-              <button
-                onClick={downloadBundle}
-                className="px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-900/40 hover:scale-105 transition"
-              >
-                📦 Descargar bundle completo
-              </button>
-            </div>
+            <LaunchDashboard
+              run={{
+                product_name: seedState?.oferta?.nombre || seedState?.nombre || null,
+                deliverables: Object.fromEntries(
+                  Object.entries(stepStates)
+                    .filter(([, s]) => s?.output)
+                    .map(([k, s]) => [k, s.output])
+                ),
+                state_snapshot: seedState || {},
+              }}
+              onDownloadBundle={downloadBundle}
+            />
           ) : null}
 
           {activeStep ? (
@@ -349,10 +347,16 @@ export default function RunPipelinePage() {
                   <span className="text-[11px] text-gray-500">⏱ {stepStates[activeStep].duration}s</span>
                 )}
               </div>
-              <div className="bg-[#09090b] border border-[#1e1e24] rounded-xl p-4 text-xs font-mono leading-relaxed text-gray-300 whitespace-pre-wrap min-h-[400px] max-h-[70vh] overflow-y-auto">
-                {activeOutput || '⏳ Esperando…'}
-                {stepStates[activeStep]?.status === 'running' && (
-                  <span className="inline-block ml-1 w-2 h-3.5 bg-indigo-400 animate-pulse align-middle" />
+              <div className="bg-[#09090b] border border-[#1e1e24] rounded-xl p-5 min-h-[400px] max-h-[70vh] overflow-y-auto">
+                {activeOutput ? (
+                  <>
+                    <Markdown>{activeOutput}</Markdown>
+                    {stepStates[activeStep]?.status === 'running' && (
+                      <span className="inline-block ml-1 w-2 h-3.5 bg-indigo-400 animate-pulse align-middle" />
+                    )}
+                  </>
+                ) : (
+                  <div className="text-xs text-gray-500">⏳ Esperando…</div>
                 )}
               </div>
             </div>

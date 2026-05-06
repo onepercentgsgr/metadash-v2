@@ -69,3 +69,14 @@ body {
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+/* Markdown body — used by <Markdown /> component */
+.md-body > *:first-child { margin-top: 0 !important; }
+.md-body > *:last-child  { margin-bottom: 0 !important; }
+.md-compact h1,
+.md-compact h2 { font-size: 15px !important; padding-bottom: 4px !important; margin-top: 8px !important; }
+.md-compact h3 { font-size: 13px !important; margin-top: 6px !important; }
+.md-compact p,
+.md-compact li { font-size: 13px !important; }
+.md-compact ul,
+.md-compact ol { margin-left: 18px !important; }
