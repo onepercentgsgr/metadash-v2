@@ -200,7 +200,10 @@ def chat_with_agent(
         stop_reason = getattr(final, "stop_reason", None)
         if stop_reason == "max_tokens" and auto_continue_count < MAX_AUTO_CONTINUES:
             auto_continue_count += 1
-            yield f"data: {json.dumps({'type': 'text', 'content': '\\n\\n'})}\n\n"
+            # Note: build payload outside the f-string — Python 3.11 forbids
+            # backslashes inside f-string expressions.
+            _spacer = json.dumps({"type": "text", "content": "\n\n"})
+            yield f"data: {_spacer}\n\n"
             messages.append({
                 "role": "user",
                 "content": "Continuá exactamente donde te quedaste, sin repetir lo anterior. Si terminaste el entregable, hacé un cierre breve con la línea '✅ ENTREGABLE LISTO' y el siguiente paso.",
