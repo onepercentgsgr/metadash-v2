@@ -156,6 +156,22 @@ export default function InfoproductoPage() {
   const [urlInput, setUrlInput] = useState('');
   const [urlLoading, setUrlLoading] = useState(false);
   const [urlError, setUrlError] = useState('');
+  const [quota, setQuota] = useState(null);
+
+  // load monthly pipeline quota
+  useEffect(() => {
+    if (authLoading || !user) return;
+    (async () => {
+      try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        const res = await fetch(`${API_URL}/me/pipeline-quota`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.ok) setQuota(await res.json());
+      } catch {}
+    })();
+  }, [authLoading, user]);
 
   // load from shared memory backend
   useEffect(() => {
@@ -363,6 +379,19 @@ export default function InfoproductoPage() {
             title="Pipeline Nivel Dios — 16 agentes generan tu infoproducto completo en ~2 minutos"
           >
             🎬 Generar infoproducto completo
+          </button>
+          {quota && (
+            <p className="text-[10px] text-gray-500 text-center -mt-1">
+              {quota.limit == null
+                ? 'Ilimitado este mes'
+                : `${Math.max(0, (quota.remaining ?? 0))} de ${quota.limit} restantes este mes`}
+            </p>
+          )}
+          <button
+            onClick={() => router.push('/infoproducto/runs')}
+            className="w-full text-[11px] text-gray-500 hover:text-indigo-300 transition py-1"
+          >
+            📚 Ver mis infoproductos generados
           </button>
           <button
             onClick={() => { setUrlModal(true); setUrlError(''); }}

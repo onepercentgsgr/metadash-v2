@@ -344,6 +344,22 @@ export default function LanzarPage() {
   const [productState, setProductState] = useState({});
   const [completedSteps, setCompletedSteps] = useState([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [quota, setQuota] = useState(null);
+
+  // Fetch monthly pipeline quota for the badge
+  useEffect(() => {
+    (async () => {
+      try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        if (!token) return;
+        const res = await fetch(`${API_URL}/me/pipeline-quota`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) setQuota(await res.json());
+      } catch {}
+    })();
+  }, []);
 
   const messagesEndRef = useRef(null);
   const textareaRef    = useRef(null);
@@ -631,7 +647,24 @@ export default function LanzarPage() {
                   <p style={styles.chatHeaderSub}>El agente guía tu lanzamiento paso a paso</p>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {quota && (
+                  <span
+                    title={`Plan ${quota.plan_display}`}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 999,
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      color: 'rgba(255,255,255,0.55)',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {quota.limit == null ? 'Ilimitado' : `${quota.used}/${quota.limit} este mes`}
+                  </span>
+                )}
                 <button
                   onClick={downloadInfoproducto}
                   disabled={messages.length < 2}

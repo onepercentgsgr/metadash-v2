@@ -2528,6 +2528,32 @@ async def run_infoproducto_pipeline_endpoint(
     )
 
 
+@app.get("/me/pipeline-quota")
+async def get_pipeline_quota_endpoint(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Return current user's pipeline run quota for the month."""
+    user = get_current_user_from_header(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    from plan_limits import get_plan_limits, PLAN_DISPLAY_NAMES
+    from datetime import datetime as _dt
+    month_start = _dt(_dt.utcnow().year, _dt.utcnow().month, 1)
+    used = db.query(PipelineRun).filter(
+        PipelineRun.user_id == user.id,
+        PipelineRun.started_at >= month_start,
+    ).count()
+    limits = get_plan_limits(subscription.plan)
+    limit = limits.get("pipeline_runs_per_month")
+    return {
+        "plan": subscription.plan,
+        "plan_display": PLAN_DISPLAY_NAMES.get(subscription.plan, subscription.plan),
+        "used": used,
+        "limit": limit,  # null = unlimited
+        "remaining": (limit - used) if limit is not None else None,
+    }
+
+
 @app.get("/agents/infoproducto/runs")
 async def list_pipeline_runs_endpoint(
     authorization: Optional[str] = Header(None),
