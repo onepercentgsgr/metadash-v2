@@ -160,16 +160,14 @@ def _run_wave_parallel(
                        "agent": STEP_META.get(sid, {}).get("agent", "AGENTE"),
                        "focus": STEP_META.get(sid, {}).get("focus", sid)})
         try:
-            t0 = time.time()
-            output = run_infoproducto_step(
-                db=db, user_id=user_id, step_id=sid,
-                state=state, api_key=api_key,
-            )
+            output, duration, review = _run_single_step_safe(sid, db, user_id, state, api_key)
             events.append({
                 "type": "step.complete",
                 "step_id": sid,
                 "output": output,
-                "duration_seconds": round(time.time() - t0, 1),
+                "duration_seconds": duration,
+                "critic_score": review.get("score"),
+                "critic_regenerated": review.get("regenerated", False),
             })
         except Exception as e:
             logger.exception(f"[pipeline] step {sid} failed: {e}")
@@ -199,12 +197,14 @@ def _run_wave_parallel(
         for future in as_completed(future_to_step):
             sid = future_to_step[future]
             try:
-                output, duration = future.result()
+                output, duration, review = future.result()
                 events.append({
                     "type": "step.complete",
                     "step_id": sid,
                     "output": output,
                     "duration_seconds": duration,
+                    "critic_score": review.get("score"),
+                    "critic_regenerated": review.get("regenerated", False),
                 })
             except Exception as e:
                 logger.exception(f"[pipeline] step {sid} failed: {e}")
@@ -223,14 +223,31 @@ def _run_single_step_safe(
     user_id: int,
     state: dict,
     api_key: str,
-) -> tuple[str, float]:
-    """Execute a single step and return (output, duration_seconds)."""
+) -> tuple[str, float, dict]:
+    """Execute a single step and return (output, duration_seconds, critic_review)."""
+    from agents.critic_agent import review_output, regenerate_with_feedback
     t0 = time.time()
     output = run_infoproducto_step(
         db=db, user_id=user_id, step_id=step_id,
         state=state, api_key=api_key,
     )
-    return output, round(time.time() - t0, 1)
+
+    # Critic review
+    focus = STEP_META.get(step_id, {}).get("focus", step_id)
+    oferta = state.get("oferta") or {}
+    product_context = (oferta.get("output", "") or "")[:500] or json.dumps(oferta, ensure_ascii=False)[:500]
+    review = review_output(step_id, focus, output, api_key, product_context)
+
+    # If quality is low, regenerate ONCE with feedback
+    if review.get("score", 7) < 7 and review.get("feedback_for_regen"):
+        logger.info(f"[critic] step {step_id} scored {review['score']}, regenerating with feedback")
+        try:
+            output = regenerate_with_feedback(db, user_id, step_id, state, review["feedback_for_regen"], api_key)
+            review["regenerated"] = True
+        except Exception as e:
+            logger.warning(f"[critic] regen failed for {step_id}: {e}")
+
+    return output, round(time.time() - t0, 1), review
 
 
 def _sse(event: dict) -> str:
