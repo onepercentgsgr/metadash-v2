@@ -3,14 +3,160 @@ import { Markdown } from './Markdown';
 
 /**
  * Post-pipeline "Centro de Lanzamiento" — re-presents the deliverables from
- * a completed pipeline run as actionable cards (preview + copy + export).
+ * a completed pipeline run as actionable cards with HANDOFF buttons that
+ * generate tool-specific prompts (Claude Design, Midjourney, etc.) and
+ * copy them to clipboard while opening the destination tool in a new tab.
  *
- * Pure frontend: zero extra Anthropic calls. The data (deliverables) is
- * already in the run record. We only render and add smart copy/export
- * helpers per component.
+ * Pure frontend: zero extra Anthropic calls.
  */
 
-// Maps step_id → card config. Order matters: first to last in the launch flow.
+// ──────────────────────── Handoff prompt builders ────────────────────────
+// Each builder receives the deliverable content + run context and returns
+// a fully-formatted prompt ready to paste into the destination tool.
+
+const HANDOFFS = {
+  // Claude.ai chat → makes premium PDFs from text via Design mode
+  claude_pdf: {
+    label: 'Diseñar PDF en Claude',
+    icon: '🎨',
+    accent: 'from-orange-600 to-amber-600',
+    url: 'https://claude.ai/new',
+    helpText: 'Pegá el prompt en Claude (Ctrl+V) y te genera el PDF con diseño editorial.',
+    build: (content, ctx) => `Necesito que generes un PDF de diseño editorial premium para este infoproducto.
+
+**Producto:** ${ctx.productName || 'Mi Infoproducto'}
+**Estilo deseado:** moderno, profesional, tipografía elegante, layout tipo revista de negocios
+**Objetivo:** que el cliente final lo abra y sienta que pagó algo de calidad
+
+INSTRUCCIONES PARA EL DISEÑO:
+- Portada con título grande, subtítulo y autor
+- Índice con números de página
+- Headers de capítulo destacados (gran tipografía + número de capítulo)
+- Body text legible (16-18px)
+- Bloques de cita destacados (border-left + bg distinto)
+- Tablas con bordes prolijos
+- Footer con número de página + nombre del producto
+- Paleta: dark/elegante o limpia editorial (vos elegís lo mejor para el contenido)
+- Formato A4, márgenes generosos
+
+CONTENIDO:
+
+${content}`,
+  },
+
+  claude_landing: {
+    label: 'Diseñar Landing en Claude',
+    icon: '🌐',
+    accent: 'from-rose-600 to-pink-600',
+    url: 'https://claude.ai/new',
+    helpText: 'Pegá el prompt en Claude y te genera la landing HTML lista para subir.',
+    build: (content, ctx) => `Generá una LANDING PAGE en HTML+CSS puro (sin frameworks) lista para deployar a Vercel/Carrd/Hotmart.
+
+**Producto:** ${ctx.productName || 'Mi Infoproducto'}
+**Audiencia:** Argentina/LATAM, comprador de infoproductos online
+**Objetivo:** conversión a venta directa
+
+REQUISITOS TÉCNICOS:
+- HTML5 semántico, CSS en <style> en el head (un solo archivo)
+- Mobile-first, responsive
+- Dark mode con acentos vivos (gradient indigo-violeta o similar)
+- Tipografía: Inter o similar de Google Fonts
+- Carga rápida (sin librerías pesadas)
+- Pixel de Meta listo para insertar (placeholder con comentario)
+- Botón de pago con placeholder href="#" (yo lo cambio por Hotmart/MercadoPago después)
+
+ESTRUCTURA DE LA LANDING (segui el copy abajo):
+1. Hero con headline + subheadline + CTA principal
+2. Problema / agitación
+3. Solución (qué incluye)
+4. Bonuses (con mockups placeholder)
+5. Testimonios / prueba social
+6. Garantía
+7. Precio con tachado
+8. Urgencia / escasez
+9. FAQ
+10. CTA final
+11. Footer
+
+COPY COMPLETO A USAR:
+
+${content}`,
+  },
+
+  midjourney: {
+    label: 'Generar en Midjourney',
+    icon: '🖼️',
+    accent: 'from-purple-600 to-fuchsia-600',
+    url: 'https://www.midjourney.com/imagine',
+    helpText: 'Pegá los prompts en Midjourney/Ideogram, uno a la vez.',
+    build: (content, ctx) => content,
+  },
+
+  ideogram: {
+    label: 'Generar en Ideogram',
+    icon: '✨',
+    accent: 'from-purple-600 to-pink-600',
+    url: 'https://ideogram.ai/t/explore',
+    helpText: 'Pegá los prompts en Ideogram. Ideal cuando tu mockup tiene texto.',
+    build: (content, ctx) => content,
+  },
+
+  meta_ads: {
+    label: 'Subir a Meta Ads',
+    icon: '📘',
+    accent: 'from-blue-600 to-indigo-600',
+    url: 'https://business.facebook.com/adsmanager',
+    helpText: 'Abrí Ads Manager → creá campaña → pegá copy en cada anuncio.',
+    build: (content, ctx) => content,
+  },
+
+  tiktok_ads: {
+    label: 'Subir a TikTok Ads',
+    icon: '🎵',
+    accent: 'from-rose-600 to-fuchsia-600',
+    url: 'https://ads.tiktok.com/i18n/dashboard',
+    helpText: 'Abrí TikTok Ads Manager y pegá el copy.',
+    build: (content, ctx) => content,
+  },
+
+  mailchimp: {
+    label: 'Cargar a Mailchimp',
+    icon: '📧',
+    accent: 'from-yellow-600 to-amber-600',
+    url: 'https://login.mailchimp.com/',
+    helpText: 'Creá una Customer Journey y pegá cada email del bundle.',
+    build: (content, ctx) => content,
+  },
+
+  hotmart: {
+    label: 'Crear en Hotmart',
+    icon: '🛒',
+    accent: 'from-orange-600 to-red-600',
+    url: 'https://app.hotmart.com/products',
+    helpText: 'Hotmart → Crear producto → subí el PDF generado y pegá el copy.',
+    build: (content, ctx) => content,
+  },
+
+  heygen: {
+    label: 'Generar UGC en HeyGen',
+    icon: '🎙️',
+    accent: 'from-emerald-600 to-teal-600',
+    url: 'https://app.heygen.com/avatars',
+    helpText: 'HeyGen → elegí avatar → pegá el script de cada video.',
+    build: (content, ctx) => content,
+  },
+
+  notion: {
+    label: 'Pegar en Notion',
+    icon: '📓',
+    accent: 'from-gray-600 to-zinc-600',
+    url: 'https://www.notion.so/',
+    helpText: 'Creá una página en Notion y pegá el plan completo.',
+    build: (content, ctx) => content,
+  },
+};
+
+// Maps step_id → card config + which handoffs aplican.
 const CARD_CONFIG = [
   {
     step: 'oferta',
@@ -18,16 +164,15 @@ const CARD_CONFIG = [
     title: 'Modelado de Oferta',
     subtitle: 'La definición de tu producto',
     accent: 'indigo',
-    actions: ['copy_full'],
+    handoffs: [],
   },
   {
     step: 'producto',
     icon: '📘',
     title: 'Documento del Producto',
-    subtitle: 'Lo que el cliente recibe — tu PDF para vender',
+    subtitle: 'El contenido del PDF que el cliente recibe',
     accent: 'emerald',
-    actions: ['copy_full', 'download_md'],
-    hint: 'Pegalo en Google Docs y exportalo como PDF. Subilo a Hotmart/Gumroad.',
+    handoffs: ['claude_pdf', 'hotmart'],
   },
   {
     step: 'avatares',
@@ -35,43 +180,39 @@ const CARD_CONFIG = [
     title: 'Avatares + Ángulos de Campaña',
     subtitle: 'Tu público objetivo y los ángulos para hablarle',
     accent: 'purple',
-    actions: ['copy_full'],
-    hint: 'Usá esto para segmentar tus campañas de Meta/TikTok.',
+    handoffs: [],
   },
   {
     step: 'investigacion',
     icon: '🔍',
     title: 'Investigación de Mercado',
-    subtitle: 'Datos del mercado — para tu pitch y sales page',
+    subtitle: 'Datos del mercado para tu pitch y sales page',
     accent: 'cyan',
-    actions: ['copy_full'],
+    handoffs: [],
   },
   {
     step: 'brand',
     icon: '🎨',
     title: 'Identidad Visual',
-    subtitle: 'Paleta, tono, estilo — pasale esto a tu diseñador',
+    subtitle: 'Paleta, tono, estilo — para tu diseñador o Canva',
     accent: 'pink',
-    actions: ['copy_full'],
-    hint: 'Con esto usás Canva en 10 minutos.',
+    handoffs: [],
   },
   {
     step: 'mockup',
     icon: '📸',
     title: 'Mockup Principal',
-    subtitle: 'Prompt listo para Midjourney / Ideogram / Flux',
+    subtitle: 'Prompt listo para Midjourney / Ideogram',
     accent: 'amber',
-    actions: ['copy_full', 'open_midjourney'],
-    hint: 'Copiá el prompt y pegalo en Midjourney v6.1 o Ideogram.',
+    handoffs: ['midjourney', 'ideogram'],
   },
   {
     step: 'ads',
     icon: '🖼️',
-    title: 'Prompts de Ads',
+    title: 'Prompts de Imágenes para Ads',
     subtitle: 'Imágenes para tus campañas Meta/TikTok',
     accent: 'amber',
-    actions: ['copy_full'],
-    hint: 'Generá las imágenes en Midjourney/Flux y subilas al Ads Manager.',
+    handoffs: ['midjourney', 'ideogram'],
   },
   {
     step: 'bonus_mockups',
@@ -79,7 +220,7 @@ const CARD_CONFIG = [
     title: 'Bonus Mockups',
     subtitle: 'Mockups adicionales para tus bonuses',
     accent: 'amber',
-    actions: ['copy_full'],
+    handoffs: ['midjourney', 'ideogram'],
   },
   {
     step: 'bundle',
@@ -87,40 +228,39 @@ const CARD_CONFIG = [
     title: 'Bundle Completo',
     subtitle: 'Layout del bundle (producto + bonuses)',
     accent: 'indigo',
-    actions: ['copy_full'],
+    handoffs: ['claude_pdf'],
   },
   {
     step: 'landing',
     icon: '🚀',
     title: 'Landing Page',
-    subtitle: 'Estructura completa para construir en Carrd / Hotmart / Webflow',
+    subtitle: 'Copy + estructura completa lista para HTML',
     accent: 'rose',
-    actions: ['copy_full'],
-    hint: 'Sección por sección. Construilo en Carrd.co (gratis) o Hotmart Pages.',
+    handoffs: ['claude_landing'],
   },
   {
     step: 'copys',
     icon: '✍️',
     title: 'Copys para Ads (Meta + TikTok)',
-    subtitle: 'Copys listos para copiar al Ads Manager',
+    subtitle: 'Texto listo para pegar al Ads Manager',
     accent: 'sky',
-    actions: ['copy_full'],
+    handoffs: ['meta_ads', 'tiktok_ads'],
   },
   {
     step: 'guiones',
     icon: '🎬',
     title: 'Guiones de Video Ads',
-    subtitle: 'Scripts 15s / 30s / 60s — listos para grabar',
+    subtitle: 'Scripts 15s / 30s / 60s para grabar',
     accent: 'sky',
-    actions: ['copy_full'],
+    handoffs: [],
   },
   {
     step: 'ugc',
     icon: '📱',
     title: 'UGC Realistas',
-    subtitle: 'Briefs para creators o para HeyGen / avatares AI',
+    subtitle: 'Briefs para creators o avatares AI',
     accent: 'sky',
-    actions: ['copy_full'],
+    handoffs: ['heygen'],
   },
   {
     step: 'upsells',
@@ -128,25 +268,23 @@ const CARD_CONFIG = [
     title: 'Upsells + AOV',
     subtitle: 'Estrategia de ticket promedio',
     accent: 'emerald',
-    actions: ['copy_full'],
+    handoffs: ['hotmart'],
   },
   {
     step: 'email',
     icon: '📧',
     title: 'Secuencia de Email Marketing',
-    subtitle: '7 emails — pegalos en Mailchimp / MailerLite / ActiveCampaign',
+    subtitle: '7 emails listos para tu plataforma',
     accent: 'cyan',
-    actions: ['copy_full'],
-    hint: 'Cada email tiene asunto + body. Configurá triggers en tu plataforma.',
+    handoffs: ['mailchimp'],
   },
   {
     step: 'lanzamiento',
     icon: '🗓️',
-    title: 'Plan de Lanzamiento — 7 videos',
-    subtitle: 'Calendario completo + hooks + scripts + b-roll',
+    title: 'Plan de Lanzamiento',
+    subtitle: 'Calendario 7 días + hooks + scripts',
     accent: 'violet',
-    actions: ['copy_full'],
-    hint: 'Tu hoja de ruta día a día. Imprimila o pegala en Notion.',
+    handoffs: ['notion'],
   },
 ];
 
@@ -163,19 +301,19 @@ const ACCENT_STYLES = {
 };
 
 function copy(text) {
-  if (!text) return;
-  navigator.clipboard.writeText(text);
+  if (!text) return Promise.resolve(false);
+  return navigator.clipboard.writeText(text).then(() => true).catch(() => false);
 }
 
-function ComponentCard({ config, content }) {
+function ComponentCard({ config, content, ctx, onToast }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const accent = ACCENT_STYLES[config.accent] || ACCENT_STYLES.indigo;
 
   const wordCount = useMemo(() => (content ? String(content).trim().split(/\s+/).length : 0), [content]);
 
-  const handleCopy = () => {
-    copy(content);
+  const handleCopy = async () => {
+    await copy(content);
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
   };
@@ -192,9 +330,21 @@ function ComponentCard({ config, content }) {
     URL.revokeObjectURL(url);
   };
 
+  const handleHandoff = async (handoffKey) => {
+    const handoff = HANDOFFS[handoffKey];
+    if (!handoff) return;
+    const prompt = handoff.build(content, ctx);
+    const ok = await copy(prompt);
+    if (ok && onToast) {
+      onToast(`✓ Prompt copiado. Abriendo ${handoff.label.replace(/^[^ ]+ /, '')} — pegá con Ctrl+V`);
+    }
+    window.open(handoff.url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handoffs = (config.handoffs || []).map((k) => ({ key: k, ...HANDOFFS[k] })).filter((h) => h.label);
+
   return (
     <div className={`rounded-2xl border ${accent.border} ${accent.bg} overflow-hidden transition-all`}>
-      {/* Header */}
       <div className="p-5 flex items-start gap-4">
         <div className={`w-11 h-11 rounded-xl ${accent.iconBg} flex items-center justify-center text-xl shrink-0`}>
           {config.icon}
@@ -202,9 +352,6 @@ function ComponentCard({ config, content }) {
         <div className="flex-1 min-w-0">
           <h3 className={`text-base font-bold ${accent.text} mb-0.5`}>{config.title}</h3>
           <p className="text-xs text-gray-500">{config.subtitle}</p>
-          {config.hint && (
-            <p className="text-[11px] text-gray-600 mt-1.5 italic">💡 {config.hint}</p>
-          )}
         </div>
         <div className="text-right shrink-0">
           <div className="text-[10px] text-gray-600 uppercase tracking-wide font-semibold">Listo</div>
@@ -212,39 +359,51 @@ function ComponentCard({ config, content }) {
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="px-5 pb-3 flex flex-wrap gap-2">
+      {/* Handoff buttons — the killer feature */}
+      {handoffs.length > 0 && (
+        <div className="px-5 pb-3">
+          <div className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-2">
+            ⚡ Pasarlo directo a:
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {handoffs.map((h) => (
+              <button
+                key={h.key}
+                onClick={() => handleHandoff(h.key)}
+                title={h.helpText}
+                className={`px-3.5 py-2 rounded-lg bg-gradient-to-r ${h.accent} hover:brightness-110 text-white text-[11px] font-bold flex items-center gap-2 shadow-md transition`}
+              >
+                <span>{h.icon}</span>
+                <span>{h.label}</span>
+                <span className="opacity-60 text-[10px]">→</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Secondary actions */}
+      <div className="px-5 pb-3 flex flex-wrap gap-2 border-t border-[#1e1e24]/50 pt-3 mt-1">
         <button
           onClick={handleCopy}
-          className={`px-3 py-1.5 rounded-lg ${accent.iconBg} ${accent.text} hover:brightness-125 text-[11px] font-bold flex items-center gap-1.5 transition`}
+          className="px-2.5 py-1.5 rounded-lg bg-[#1e1e24] hover:bg-[#27272f] text-gray-300 text-[11px] font-semibold flex items-center gap-1.5 transition"
         >
-          {copied ? '✓ Copiado' : '📋 Copiar todo'}
+          {copied ? '✓ Copiado' : '📋 Copiar texto'}
         </button>
         <button
           onClick={downloadAsMd}
-          className="px-3 py-1.5 rounded-lg bg-[#1e1e24] hover:bg-[#27272f] text-gray-300 text-[11px] font-bold flex items-center gap-1.5 transition"
+          className="px-2.5 py-1.5 rounded-lg bg-[#1e1e24] hover:bg-[#27272f] text-gray-300 text-[11px] font-semibold flex items-center gap-1.5 transition"
         >
-          ⬇ Descargar .md
+          ⬇ .md
         </button>
-        {config.actions?.includes('open_midjourney') && (
-          <a
-            href="https://www.midjourney.com/imagine"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-3 py-1.5 rounded-lg bg-[#1e1e24] hover:bg-[#27272f] text-gray-300 text-[11px] font-bold flex items-center gap-1.5 transition"
-          >
-            🎨 Abrir Midjourney →
-          </a>
-        )}
         <button
           onClick={() => setExpanded(!expanded)}
-          className="ml-auto px-3 py-1.5 rounded-lg text-gray-500 hover:text-gray-300 text-[11px] font-bold transition"
+          className="ml-auto px-2.5 py-1.5 rounded-lg text-gray-500 hover:text-gray-300 text-[11px] font-semibold transition"
         >
           {expanded ? 'Ocultar ▲' : 'Ver preview ▼'}
         </button>
       </div>
 
-      {/* Preview (collapsible) */}
       {expanded && (
         <div className="border-t border-[#1e1e24] bg-[#09090b] p-5 max-h-[500px] overflow-y-auto">
           <Markdown>{content}</Markdown>
@@ -255,11 +414,19 @@ function ComponentCard({ config, content }) {
 }
 
 export default function LaunchDashboard({ run, onDownloadBundle }) {
-  const deliverables = run?.deliverables || {};
-  const stepsAvailable = CARD_CONFIG.filter((c) => deliverables[c.step]);
-  const productName = run?.product_name || run?.state_snapshot?.oferta?.nombre || 'Tu Infoproducto';
+  const [toast, setToast] = useState(null);
 
-  // Smart export: full bundle as one giant markdown document
+  const showToast = (message) => {
+    setToast(message);
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const deliverables = run?.deliverables || {};
+  const productName = run?.product_name || run?.state_snapshot?.oferta?.nombre || 'Tu Infoproducto';
+  const stepsAvailable = CARD_CONFIG.filter((c) => deliverables[c.step]);
+
+  const ctx = { productName };
+
   const exportFullBundle = () => {
     const lines = [`# ${productName}`, '', `_Lanzamiento generado por MetaDash_`, '', '---', ''];
     stepsAvailable.forEach((c) => {
@@ -281,32 +448,33 @@ export default function LaunchDashboard({ run, onDownloadBundle }) {
     URL.revokeObjectURL(url);
   };
 
-  // Build a printable launch checklist
   const checklistMd = useMemo(() => {
     return [
       `# Checklist de Lanzamiento — ${productName}`,
       '',
       '## Antes del lanzamiento',
-      '- [ ] Generar mockup principal en Midjourney usando el prompt del card "Mockup Principal"',
-      '- [ ] Generar 5 imágenes de ads en Midjourney/Flux',
-      '- [ ] Construir landing en Carrd.co o Hotmart Pages siguiendo el card "Landing Page"',
-      '- [ ] Crear producto en Hotmart/Gumroad con el documento del producto',
-      '- [ ] Configurar la secuencia de 7 emails en Mailchimp/MailerLite',
+      '- [ ] PDF del producto generado en Claude.ai/Design',
+      '- [ ] Mockup principal generado en Midjourney/Ideogram',
+      '- [ ] 5 imágenes de ads generadas',
+      '- [ ] Landing page armada (Carrd/Hotmart Pages o HTML de Claude)',
+      '- [ ] Producto creado en Hotmart con el PDF',
+      '- [ ] Secuencia de 7 emails configurada en Mailchimp',
+      '- [ ] Pixel de Meta instalado en la landing',
       '',
       '## Día 1 — Lanzamiento',
-      '- [ ] Publicar el primer video del plan de lanzamiento',
+      '- [ ] Publicar el primer video del plan',
       '- [ ] Activar primera campaña de ads en Meta',
       '- [ ] Mandar email 1 (anuncio) a la lista',
       '',
       '## Día 2 al 7',
-      '- [ ] Seguir el calendario del card "Plan de Lanzamiento" día a día',
-      '- [ ] Publicar 1 video por día siguiendo los guiones generados',
-      '- [ ] Mandar emails de la secuencia según el plan',
+      '- [ ] Seguir el calendario del plan de lanzamiento',
+      '- [ ] 1 video por día siguiendo los guiones generados',
+      '- [ ] Mandar emails de la secuencia según trigger',
       '',
       '## Métricas a trackear',
       '- [ ] CTR de ads (objetivo > 1.5%)',
       '- [ ] CPA / CPL',
-      '- [ ] Ratio de conversión de la landing (objetivo > 2%)',
+      '- [ ] Conversión de la landing (objetivo > 2%)',
       '- [ ] Open rate de emails (objetivo > 25%)',
     ].join('\n');
   }, [productName]);
@@ -324,7 +492,14 @@ export default function LaunchDashboard({ run, onDownloadBundle }) {
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 relative">
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white px-5 py-3 rounded-xl shadow-2xl text-sm font-bold animate-pulse">
+          {toast}
+        </div>
+      )}
+
       {/* Hero */}
       <div className="bg-gradient-to-br from-indigo-950/40 via-purple-950/30 to-emerald-950/30 border border-indigo-700/30 rounded-2xl p-6">
         <div className="flex items-start gap-4">
@@ -336,9 +511,10 @@ export default function LaunchDashboard({ run, onDownloadBundle }) {
             <p className="text-sm text-gray-400">
               <strong className="text-gray-200">{productName}</strong> · {stepsAvailable.length} entregables listos
             </p>
-            <p className="text-xs text-gray-500 mt-2">
-              Cada tarjeta abajo es un componente de tu lanzamiento. Click en "Ver preview" para revisar el contenido,
-              "Copiar todo" para llevarlo a la herramienta correspondiente, o descargarlo como `.md` individual.
+            <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+              Cada componente abajo tiene un botón <strong className="text-indigo-300">"Pasarlo directo a [herramienta]"</strong> que copia
+              un prompt bien armado al portapapeles y abre la app correspondiente. Pegás con Ctrl+V y la herramienta
+              ya sabe qué hacer. <strong className="text-gray-300">Cero pensar.</strong>
             </p>
           </div>
         </div>
@@ -370,16 +546,17 @@ export default function LaunchDashboard({ run, onDownloadBundle }) {
       {/* Cards */}
       <div className="space-y-3">
         {stepsAvailable.map((c) => (
-          <ComponentCard key={c.step} config={c} content={deliverables[c.step]} />
+          <ComponentCard key={c.step} config={c} content={deliverables[c.step]} ctx={ctx} onToast={showToast} />
         ))}
       </div>
 
       {/* Footer help */}
-      <div className="bg-[#0c0c0f] border border-[#1e1e24] rounded-2xl p-5 text-center">
+      <div className="bg-[#0c0c0f] border border-[#1e1e24] rounded-2xl p-5">
         <p className="text-xs text-gray-500 leading-relaxed">
-          💡 <strong className="text-gray-300">Recomendación de uso:</strong> empezá por el documento del producto (Hotmart),
-          después la landing (Carrd.co), después los mockups (Midjourney), y por último los ads.
-          Seguí el "Checklist de lanzamiento" arriba para no perderte ningún paso.
+          💡 <strong className="text-gray-300">Flujo recomendado:</strong> Producto → Claude (PDF) ·
+          Mockups → Midjourney · Landing → Claude (HTML) · Copys → Meta Ads · Emails → Mailchimp ·
+          Plan de lanzamiento → Notion. Cada botón te abre la herramienta y deja el prompt listo en
+          el portapapeles. <strong className="text-gray-300">Pegás y avanzás.</strong>
         </p>
       </div>
     </div>
