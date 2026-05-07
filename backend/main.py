@@ -2135,6 +2135,7 @@ class MarketValidateRequest(BaseModel):
     ads: List[str] = []
     niche: str = ""
     notes: str = ""
+    ads_library_data: Optional[Dict[str, Any]] = None
 
 
 class TikTokAdsRunRequest(BaseModel):
@@ -2756,6 +2757,7 @@ async def validate_market_endpoint(
             niche=request.niche,
             notes=request.notes,
             api_key=api_key,
+            ads_library_data=request.ads_library_data,
         )
         synth = result.get("synthesis") or {}
         verdict = (synth.get("veredicto") or {}).get("verdict") or None

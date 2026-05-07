@@ -16,10 +16,38 @@ function getVerdictStyle(v) {
   for (const key of Object.keys(VERDICT_STYLES)) {
     if (v.includes(key.replace(/[^a-zA-Z]/g, ''))) return VERDICT_STYLES[key];
   }
-  // best-effort fallback
   if (v.includes('🟢') || /rentab/i.test(v)) return VERDICT_STYLES['🟢 RENTABLE'];
   if (v.includes('🔴') || /evitar/i.test(v)) return VERDICT_STYLES['🔴 EVITAR'];
   return VERDICT_STYLES['🟡 RIESGOSO'];
+}
+
+const ADS_LIB_COUNTRIES = [
+  { code: 'AR', label: '🇦🇷 Argentina' },
+  { code: 'MX', label: '🇲🇽 México' },
+  { code: 'CO', label: '🇨🇴 Colombia' },
+  { code: 'CL', label: '🇨🇱 Chile' },
+  { code: 'PE', label: '🇵🇪 Perú' },
+  { code: 'UY', label: '🇺🇾 Uruguay' },
+  { code: 'ES', label: '🇪🇸 España' },
+  { code: 'US', label: '🇺🇸 USA' },
+  { code: 'ALL', label: '🌎 Todos los países' },
+];
+
+// Extracts a clean brand name from a URL: "https://feka.click/sales" → "feka"
+function brandFromUrl(url) {
+  try {
+    const u = new URL(url.startsWith('http') ? url : `https://${url}`);
+    const host = u.hostname.replace(/^www\./, '');
+    return host.split('.')[0];
+  } catch {
+    return url.replace(/^https?:\/\//, '').split('/')[0].split('.')[0];
+  }
+}
+
+function adsLibraryUrl(brand, country = 'AR') {
+  const c = country === 'ALL' ? 'ALL' : country;
+  const q = encodeURIComponent(brand);
+  return `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=${c}&q=${q}&search_type=keyword_unordered&media_type=all`;
 }
 
 export default function ValidarPage() {
@@ -30,9 +58,32 @@ export default function ValidarPage() {
   const [ads, setAds] = useState('');
   const [niche, setNiche] = useState('');
   const [notes, setNotes] = useState('');
+  const [country, setCountry] = useState('AR');
+  // Per-competitor ads library data: { url, brand, ads_count, oldest_active, notes }
+  const [competitorGrid, setCompetitorGrid] = useState([]);
   const [running, setRunning] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [result, setResult] = useState(null);
+
+  // Parse the URLs textarea into structured rows when user clicks "Generar grilla"
+  const generateGrid = () => {
+    const list = urls.split('\n').map(u => u.trim()).filter(Boolean);
+    setCompetitorGrid(list.map(url => {
+      // Preserve any existing data the user already filled for this URL
+      const existing = competitorGrid.find(c => c.url === url);
+      return existing || {
+        url,
+        brand: brandFromUrl(url),
+        ads_count: '',
+        oldest_active: '',
+        notes: '',
+      };
+    }));
+  };
+
+  const updateCompetitor = (idx, field, value) => {
+    setCompetitorGrid(prev => prev.map((c, i) => i === idx ? { ...c, [field]: value } : c));
+  };
 
   const runValidation = useCallback(async () => {
     setRunning(true);
@@ -51,6 +102,24 @@ export default function ValidarPage() {
         setErrorMsg('Pegá al menos una URL de competidor o un texto de ad.');
         return;
       }
+      // Build the optional ads_library_data from the per-competitor grid.
+      // Only include rows the user actually filled.
+      const filledRows = competitorGrid.filter(c =>
+        c.ads_count?.toString().trim() || c.oldest_active?.trim() || c.notes?.trim()
+      );
+      const adsLibraryData = filledRows.length > 0
+        ? {
+            country,
+            competitors: filledRows.map(c => ({
+              url: c.url,
+              brand: c.brand,
+              ads_count: c.ads_count?.toString().trim() || null,
+              oldest_active: c.oldest_active?.trim() || null,
+              notes: c.notes?.trim() || null,
+            })),
+          }
+        : null;
+
       const res = await fetch(`${API_URL}/agents/validate-market`, {
         method: 'POST',
         headers: {
@@ -62,6 +131,7 @@ export default function ValidarPage() {
           ads: adList,
           niche,
           notes,
+          ads_library_data: adsLibraryData,
         }),
       });
       if (!res.ok) {
@@ -74,7 +144,7 @@ export default function ValidarPage() {
     } finally {
       setRunning(false);
     }
-  }, [urls, ads, niche, notes]);
+  }, [urls, ads, niche, notes, country, competitorGrid]);
 
   const sendToPipeline = () => {
     const seed = result?.synthesis?.seed_para_pipeline;
@@ -184,6 +254,110 @@ https://competidor2.com/sales-page
 https://competidor3.com/landing`}
                   className="w-full bg-[#111114] border border-[#27272f] text-gray-100 px-3 py-2.5 rounded-lg text-sm focus:border-indigo-500 focus:outline-none font-mono"
                 />
+              </div>
+
+              {/* Ads Library — assisted manual scrape */}
+              <div className="bg-gradient-to-br from-blue-950/20 to-indigo-950/20 border border-blue-700/30 rounded-xl p-4">
+                <div className="flex items-start gap-3 mb-3">
+                  <div className="text-2xl">📚</div>
+                  <div className="flex-1">
+                    <div className="text-sm font-bold text-gray-100">
+                      Datos de Facebook Ads Library <span className="text-[10px] uppercase tracking-wider text-blue-400 ml-1">opcional · gratis</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      Para que el estratega tenga <strong className="text-gray-200">datos reales verificados</strong>:
+                      generá la grilla, abrí los links, contá los ads y pegá lo que veas.
+                      Si un competidor tiene 30+ ads activos hace meses → producto escalado y rentable.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-end gap-3 mb-3">
+                  <div>
+                    <label className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold block mb-1">País</label>
+                    <select
+                      value={country}
+                      onChange={e => setCountry(e.target.value)}
+                      className="bg-[#111114] border border-[#27272f] text-gray-100 px-3 py-2 rounded-lg text-xs focus:border-blue-500 focus:outline-none"
+                    >
+                      {ADS_LIB_COUNTRIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
+                    </select>
+                  </div>
+                  <button
+                    onClick={generateGrid}
+                    disabled={!urls.trim()}
+                    className="px-4 py-2 rounded-lg bg-blue-600/20 border border-blue-600/40 hover:bg-blue-600/30 disabled:opacity-40 disabled:cursor-not-allowed text-blue-300 text-xs font-bold transition"
+                  >
+                    {competitorGrid.length > 0 ? '🔄 Actualizar grilla' : '⚙️ Generar grilla de competidores'}
+                  </button>
+                </div>
+
+                {competitorGrid.length > 0 && (
+                  <div className="space-y-2.5">
+                    {competitorGrid.map((c, idx) => (
+                      <div key={`${c.url}-${idx}`} className="bg-[#0c0c0f] border border-[#1e1e24] rounded-lg p-3">
+                        <div className="flex items-start gap-2 mb-2.5">
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[11px] text-gray-500 truncate">{c.url}</div>
+                            <div className="text-xs font-semibold text-gray-200">
+                              Marca detectada:{' '}
+                              <input
+                                type="text"
+                                value={c.brand}
+                                onChange={e => updateCompetitor(idx, 'brand', e.target.value)}
+                                className="bg-[#111114] border border-[#27272f] px-2 py-0.5 rounded text-[12px] text-blue-300 font-mono w-32 focus:border-blue-500 focus:outline-none"
+                              />
+                            </div>
+                          </div>
+                          <a
+                            href={adsLibraryUrl(c.brand, country)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-2.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-bold flex items-center gap-1.5 shadow shrink-0"
+                          >
+                            🔗 Ver ads de "{c.brand}" →
+                          </a>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mb-2">
+                          <div>
+                            <label className="text-[10px] uppercase tracking-wider text-gray-600 block mb-1">Cantidad de ads activos</label>
+                            <input
+                              type="text"
+                              value={c.ads_count}
+                              onChange={e => updateCompetitor(idx, 'ads_count', e.target.value)}
+                              placeholder="ej: 47"
+                              className="w-full bg-[#111114] border border-[#27272f] text-gray-100 px-2 py-1.5 rounded text-xs focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] uppercase tracking-wider text-gray-600 block mb-1">Más viejo activo desde</label>
+                            <input
+                              type="text"
+                              value={c.oldest_active}
+                              onChange={e => updateCompetitor(idx, 'oldest_active', e.target.value)}
+                              placeholder="ej: octubre 2024 / hace 6 meses"
+                              className="w-full bg-[#111114] border border-[#27272f] text-gray-100 px-2 py-1.5 rounded text-xs focus:border-blue-500 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] uppercase tracking-wider text-gray-600 block mb-1">
+                            🔍 Hallazgos / notas para el estratega
+                          </label>
+                          <textarea
+                            value={c.notes}
+                            onChange={e => updateCompetitor(idx, 'notes', e.target.value)}
+                            rows={2}
+                            placeholder='ej: "El ad #3 tiene 50k likes corriendo desde junio, ángulo anti-Rappi. Otro ad usa testimonio de creator. Link al ad ganador: facebook.com/ads/library/?id=..."'
+                            className="w-full bg-[#111114] border border-[#27272f] text-gray-100 px-2 py-1.5 rounded text-xs focus:border-blue-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>
