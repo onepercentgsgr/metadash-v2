@@ -369,6 +369,13 @@ export default function InfoproductoPage() {
 
         <div className="p-3 border-t border-[#1e1e24] space-y-2">
           <button
+            onClick={() => router.push('/validar')}
+            className="w-full px-3 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 shadow-lg shadow-purple-900/30"
+            title="Validá si el nicho rinde antes de generar nada — analiza competidores y ads reales"
+          >
+            🧪 Validar mercado primero
+          </button>
+          <button
             onClick={() => {
               try {
                 localStorage.setItem('metadash_pipeline_seed', JSON.stringify(PS));

@@ -20,7 +20,7 @@ from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
 
 from database import engine, get_db, Base
-from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog, PipelineRun
+from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog, PipelineRun, MarketValidation
 from agents.shared_memory import AgentMemory  # registers table with Base.metadata
 import config
 from plan_limits import check_feature_access, check_generation_limit, get_plan_limits, PLAN_DISPLAY_NAMES
@@ -2130,6 +2130,13 @@ class PipelineRunRequest(BaseModel):
     state: Dict[str, Any] = {}
 
 
+class MarketValidateRequest(BaseModel):
+    urls: List[str] = []
+    ads: List[str] = []
+    niche: str = ""
+    notes: str = ""
+
+
 class TikTokAdsRunRequest(BaseModel):
     mode: str  # "strategy" | "optimize"
     payload: Dict[str, Any] = {}
@@ -2705,6 +2712,130 @@ async def download_pipeline_bundle_by_token_endpoint(
             "Content-Disposition": f'attachment; filename="{safe_slug}-{run_id[:8]}.zip"',
         },
     )
+
+
+@app.post("/agents/validate-market")
+async def validate_market_endpoint(
+    request: MarketValidateRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Run the Market Validator: scrapes competitor sales pages, analyzes ads,
+    synthesizes a market verdict + wedge + pipeline seed.
+    """
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+
+    if not request.urls and not request.ads:
+        raise HTTPException(status_code=400, detail="Pegá al menos 1 URL o 1 ad para validar")
+
+    import uuid as _uuid
+    validation_id = str(_uuid.uuid4())
+
+    # Pre-create the record
+    record = MarketValidation(
+        user_id=user.id,
+        validation_id=validation_id,
+        niche=request.niche or None,
+        notes=request.notes or None,
+        urls=request.urls,
+        ads=request.ads,
+    )
+    db.add(record)
+    db.commit()
+
+    try:
+        from agents.market_validator import validate_market
+        result = validate_market(
+            urls=request.urls,
+            ads=request.ads,
+            niche=request.niche,
+            notes=request.notes,
+            api_key=api_key,
+        )
+        synth = result.get("synthesis") or {}
+        verdict = (synth.get("veredicto") or {}).get("verdict") or None
+        score_raw = (synth.get("veredicto") or {}).get("score")
+        try:
+            score = int(score_raw) if score_raw is not None else None
+        except (TypeError, ValueError):
+            score = None
+
+        record.pages_analysis = result.get("pages")
+        record.ads_analysis = result.get("ads")
+        record.synthesis = synth
+        record.score = score
+        record.verdict = verdict
+        db.commit()
+
+        return {
+            "validation_id": validation_id,
+            "pages": result.get("pages"),
+            "ads": result.get("ads"),
+            "synthesis": synth,
+        }
+    except Exception as e:
+        logger.exception(f"[validate-market] error: {e}")
+        record.error_message = str(e)
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"Error validando mercado: {str(e)}")
+
+
+@app.get("/agents/validate-market/history")
+async def list_validations_endpoint(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """List all market validations for the current user (latest first)."""
+    user = get_current_user_from_header(authorization, db)
+    rows = db.query(MarketValidation).filter(
+        MarketValidation.user_id == user.id,
+    ).order_by(MarketValidation.created_at.desc()).limit(50).all()
+    return [
+        {
+            "validation_id": r.validation_id,
+            "niche": r.niche,
+            "score": r.score,
+            "verdict": r.verdict,
+            "url_count": len(r.urls) if r.urls else 0,
+            "ad_count": len(r.ads) if r.ads else 0,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
+@app.get("/agents/validate-market/{validation_id}")
+async def get_validation_endpoint(
+    validation_id: str,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Fetch a saved market validation."""
+    user = get_current_user_from_header(authorization, db)
+    rec = db.query(MarketValidation).filter(
+        MarketValidation.validation_id == validation_id,
+        MarketValidation.user_id == user.id,
+    ).first()
+    if not rec:
+        raise HTTPException(status_code=404, detail="Validation not found")
+    return {
+        "validation_id": rec.validation_id,
+        "niche": rec.niche,
+        "notes": rec.notes,
+        "urls": rec.urls,
+        "ads": rec.ads,
+        "pages": rec.pages_analysis,
+        "ads_analysis": rec.ads_analysis,
+        "synthesis": rec.synthesis,
+        "score": rec.score,
+        "verdict": rec.verdict,
+        "created_at": rec.created_at.isoformat() if rec.created_at else None,
+    }
 
 
 @app.post("/agents/tiktok-ads/run")

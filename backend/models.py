@@ -200,6 +200,27 @@ class PipelineRun(Base):
     user = relationship("User")
 
 
+class MarketValidation(Base):
+    __tablename__ = "market_validations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    validation_id = Column(String, unique=True, index=True)
+    niche = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+    urls = Column(JSON, nullable=True)
+    ads = Column(JSON, nullable=True)
+    pages_analysis = Column(JSON, nullable=True)
+    ads_analysis = Column(JSON, nullable=True)
+    synthesis = Column(JSON, nullable=True)
+    score = Column(Integer, nullable=True, index=True)
+    verdict = Column(String, nullable=True)  # 🟢 RENTABLE / 🟡 RIESGOSO / 🔴 EVITAR
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    user = relationship("User")
+
+
 class AutonomousActionLog(Base):
     __tablename__ = "autonomous_action_logs"
 
