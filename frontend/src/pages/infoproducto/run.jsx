@@ -173,12 +173,13 @@ export default function RunPipelinePage() {
     }
   };
 
-  // Auto-start once seedState is loaded (on first mount)
+  // Auto-start once seedState is loaded.
+  // Don't gate on `user` — AuthContext can race; we use the token directly.
   useEffect(() => {
-    if (seedState !== null && pipelineStatus === 'idle' && !authLoading && user) {
+    if (seedState !== null && pipelineStatus === 'idle' && !authLoading) {
       startPipeline();
     }
-  }, [seedState, pipelineStatus, authLoading, user, startPipeline]);
+  }, [seedState, pipelineStatus, authLoading, startPipeline]);
 
   const downloadBundle = async () => {
     if (!runId) return;

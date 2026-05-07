@@ -44,9 +44,14 @@ export default function RunsHistoryPage() {
   const fetchAll = useCallback(async () => {
     try {
       setLoading(true);
+      setErrorMsg('');
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      if (!token) {
+        setErrorMsg('No estás logueado. Volvé a entrar a la cuenta.');
+        return;
+      }
+      const headers = { Authorization: `Bearer ${token}` };
 
       const [runsRes, quotaRes] = await Promise.all([
         fetch(`${API_URL}/agents/infoproducto/runs`, { headers }),
@@ -55,8 +60,11 @@ export default function RunsHistoryPage() {
 
       if (runsRes.ok) {
         setRuns(await runsRes.json());
+      } else if (runsRes.status === 401) {
+        setErrorMsg('Sesión expirada. Volvé a iniciar sesión.');
       } else {
-        setErrorMsg('No se pudieron cargar los runs');
+        const detail = await runsRes.json().catch(() => ({}));
+        setErrorMsg(detail.detail || `Error ${runsRes.status} cargando los runs`);
       }
       if (quotaRes.ok) {
         setQuota(await quotaRes.json());
@@ -69,8 +77,11 @@ export default function RunsHistoryPage() {
   }, []);
 
   useEffect(() => {
-    if (!authLoading && user) fetchAll();
-  }, [authLoading, user, fetchAll]);
+    if (authLoading) return;
+    // Don't gate on `user` being non-null — the AuthContext can race.
+    // We fetch using the token directly; the API will 401 if it's invalid.
+    fetchAll();
+  }, [authLoading, fetchAll]);
 
   const downloadBundle = async (runId) => {
     try {
