@@ -41,13 +41,19 @@ export default function RunsHistoryPage() {
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
 
-  const fetchAll = useCallback(async () => {
+  const fetchAll = useCallback(async (attempt = 0) => {
     try {
       setLoading(true);
       setErrorMsg('');
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       if (!token) {
+        // Token may still be flushing to localStorage on first paint after login.
+        // Retry up to 3 times with a small delay before giving up.
+        if (attempt < 3) {
+          setTimeout(() => fetchAll(attempt + 1), 250);
+          return;
+        }
         setErrorMsg('No estás logueado. Volvé a entrar a la cuenta.');
         return;
       }
