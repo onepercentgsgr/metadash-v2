@@ -20,7 +20,7 @@ from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
 
 from database import engine, get_db, Base
-from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog, PipelineRun, MarketValidation
+from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog, PipelineRun, MarketValidation, CompetitorAnalysis
 from agents.shared_memory import AgentMemory  # registers table with Base.metadata
 import config
 from plan_limits import check_feature_access, check_generation_limit, get_plan_limits, PLAN_DISPLAY_NAMES
@@ -2138,6 +2138,16 @@ class MarketValidateRequest(BaseModel):
     ads_library_data: Optional[Dict[str, Any]] = None
 
 
+class CompetitorDeepAnalyzeRequest(BaseModel):
+    competitor_brand: str = ""
+    niche: str = ""
+    landing_url: str = ""
+    ad_transcription: str = ""
+    ad_visual_description: str = ""
+    ads_library_manual: Optional[Dict[str, Any]] = None
+    user_hypothesis: str = ""
+
+
 class TikTokAdsRunRequest(BaseModel):
     mode: str  # "strategy" | "optimize"
     payload: Dict[str, Any] = {}
@@ -2836,6 +2846,129 @@ async def get_validation_endpoint(
         "synthesis": rec.synthesis,
         "score": rec.score,
         "verdict": rec.verdict,
+        "created_at": rec.created_at.isoformat() if rec.created_at else None,
+    }
+
+
+@app.post("/agents/deep-analyze")
+async def deep_analyze_competitor_endpoint(
+    request: CompetitorDeepAnalyzeRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Run the Deep Competitor Analyzer (3-agent system) on ONE specific
+    competitor with full ecosystem inputs (ad + landing + ads library + hypothesis).
+    """
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+
+    if not request.ad_transcription and not request.landing_url:
+        raise HTTPException(
+            status_code=400,
+            detail="Pegá al menos la transcripción del ad o la URL de la landing.",
+        )
+
+    import uuid as _uuid
+    analysis_id = str(_uuid.uuid4())
+
+    record = CompetitorAnalysis(
+        user_id=user.id,
+        analysis_id=analysis_id,
+        competitor_brand=request.competitor_brand or None,
+        niche=request.niche or None,
+        landing_url=request.landing_url or None,
+        inputs={
+            "ad_transcription": request.ad_transcription,
+            "ad_visual_description": request.ad_visual_description,
+            "ads_library_manual": request.ads_library_manual,
+            "user_hypothesis": request.user_hypothesis,
+        },
+    )
+    db.add(record)
+    db.commit()
+
+    try:
+        from agents.competitor_analyzer import deep_analyze_competitor
+        result = deep_analyze_competitor(
+            ad_transcription=request.ad_transcription,
+            ad_visual_description=request.ad_visual_description,
+            landing_url=request.landing_url,
+            ads_library_manual=request.ads_library_manual,
+            niche=request.niche,
+            user_hypothesis=request.user_hypothesis,
+            competitor_brand=request.competitor_brand,
+            api_key=api_key,
+        )
+
+        verdict_obj = result.get("fase_4_veredicto") or {}
+        verdict = verdict_obj.get("verdict")
+        score_raw = verdict_obj.get("score")
+        try:
+            score = int(score_raw) if score_raw is not None else None
+        except (TypeError, ValueError):
+            score = None
+
+        record.analysis = result
+        record.verdict = verdict
+        record.score = score
+        db.commit()
+
+        return {"analysis_id": analysis_id, "analysis": result}
+    except Exception as e:
+        logger.exception(f"[deep-analyze] error: {e}")
+        record.error_message = str(e)
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"Error en el análisis profundo: {str(e)}")
+
+
+@app.get("/agents/deep-analyze/history")
+async def list_competitor_analyses_endpoint(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    rows = db.query(CompetitorAnalysis).filter(
+        CompetitorAnalysis.user_id == user.id,
+    ).order_by(CompetitorAnalysis.created_at.desc()).limit(50).all()
+    return [
+        {
+            "analysis_id": r.analysis_id,
+            "competitor_brand": r.competitor_brand,
+            "niche": r.niche,
+            "score": r.score,
+            "verdict": r.verdict,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
+@app.get("/agents/deep-analyze/{analysis_id}")
+async def get_competitor_analysis_endpoint(
+    analysis_id: str,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    rec = db.query(CompetitorAnalysis).filter(
+        CompetitorAnalysis.analysis_id == analysis_id,
+        CompetitorAnalysis.user_id == user.id,
+    ).first()
+    if not rec:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return {
+        "analysis_id": rec.analysis_id,
+        "competitor_brand": rec.competitor_brand,
+        "niche": rec.niche,
+        "landing_url": rec.landing_url,
+        "inputs": rec.inputs,
+        "analysis": rec.analysis,
+        "verdict": rec.verdict,
+        "score": rec.score,
         "created_at": rec.created_at.isoformat() if rec.created_at else None,
     }
 

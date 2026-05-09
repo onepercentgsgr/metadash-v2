@@ -371,9 +371,16 @@ export default function InfoproductoPage() {
           <button
             onClick={() => router.push('/validar')}
             className="w-full px-3 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 shadow-lg shadow-purple-900/30"
-            title="Validá si el nicho rinde antes de generar nada — analiza competidores y ads reales"
+            title="Escaneo amplio del mercado — analiza varios competidores y ads"
           >
-            🧪 Validar mercado primero
+            🧪 Validar mercado (escaneo amplio)
+          </button>
+          <button
+            onClick={() => router.push('/analizar')}
+            className="w-full px-3 py-2.5 bg-gradient-to-r from-rose-600 to-purple-600 hover:from-rose-500 hover:to-purple-500 text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 shadow-lg shadow-rose-900/30"
+            title="Disección quirúrgica de UN competidor — 3 agentes Nivel Dios"
+          >
+            🔬 Analizar UN competidor a fondo
           </button>
           <button
             onClick={() => {
