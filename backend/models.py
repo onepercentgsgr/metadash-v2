@@ -221,6 +221,25 @@ class MarketValidation(Base):
     user = relationship("User")
 
 
+class CompetitorAnalysis(Base):
+    __tablename__ = "competitor_analyses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    analysis_id = Column(String, unique=True, index=True)
+    competitor_brand = Column(String, nullable=True)
+    niche = Column(String, nullable=True)
+    landing_url = Column(String, nullable=True)
+    inputs = Column(JSON, nullable=True)  # ad_transcription, visual desc, ads_library_manual, hypothesis
+    analysis = Column(JSON, nullable=True)  # full structured output
+    verdict = Column(String, nullable=True)
+    score = Column(Integer, nullable=True, index=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    user = relationship("User")
+
+
 class AutonomousActionLog(Base):
     __tablename__ = "autonomous_action_logs"
 
