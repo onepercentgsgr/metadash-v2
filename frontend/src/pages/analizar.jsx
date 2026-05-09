@@ -3,7 +3,6 @@
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../context/AuthContext';
-import { Markdown } from '../components/Markdown';
 
 const VERDICT_STYLES = {
   rentable:  { bg: 'from-emerald-950/40 to-emerald-900/20', border: 'border-emerald-700/50', text: 'text-emerald-300' },
