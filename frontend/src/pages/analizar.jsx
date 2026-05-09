@@ -195,7 +195,7 @@ export default function AnalizarPage() {
                   🎬 Descripción visual del video <span className="text-gray-700">(qué se ve, qué hace el creator, qué pantallas muestra)</span>
                 </label>
                 <textarea value={adVisual} onChange={e => setAdVisual(e.target.value)} rows={4}
-                  placeholder='ej: "Creator joven en su escritorio, fondo oscuro, dashboard con $50k mostrado en pantalla, cortes rápidos cada 2s, subtítulos amarillos, terminada con un CTA: 'Link en bio'..."'
+                  placeholder={`ej: "Creator joven en su escritorio, fondo oscuro, dashboard con $50k mostrado en pantalla, cortes rápidos cada 2s, subtítulos amarillos, terminada con un CTA: 'Link en bio'..."`}
                   className="w-full bg-[#111114] border border-[#27272f] text-gray-100 px-3 py-2.5 rounded-lg text-sm focus:border-rose-500 focus:outline-none" />
               </div>
 
