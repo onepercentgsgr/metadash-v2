@@ -3156,6 +3156,83 @@ async def analyze_video_endpoint(
         raise HTTPException(status_code=500, detail=f"Error en el análisis de video: {str(e)}")
 
 
+class LibraryDataRequest(BaseModel):
+    raw_data: str
+
+
+@app.post("/agents/analyze-video/{analysis_id}/interpret-library")
+async def interpret_library_data_endpoint(
+    analysis_id: str,
+    request: LibraryDataRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """
+    El usuario fue a la Biblioteca de Anuncios, encontró datos (total de ads,
+    fecha más vieja, actividad reciente) y los pega acá. Claude los interpreta
+    en el contexto exacto del análisis ya hecho.
+    """
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+
+    rec = db.query(VideoAnalysis).filter(
+        VideoAnalysis.analysis_id == analysis_id,
+        VideoAnalysis.user_id == user.id,
+    ).first()
+    if not rec:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    analysis = rec.analysis or {}
+    estrategico = analysis.get("analisis_estrategico", {})
+    wedge = (analysis.get("veredicto_duplicacion") or {}).get("wedge", "")
+    marca = estrategico.get("marca_detectada", rec.brand or "el competidor")
+    nicho = estrategico.get("nicho_exacto", rec.niche or "el nicho")
+    funnel = estrategico.get("funnel_detectado", "")
+
+    system = (
+        "Sos un media buyer senior especializado en inteligencia competitiva de Facebook Ads. "
+        "Interpretás datos de la Biblioteca de Anuncios de Meta con precisión quirúrgica. "
+        "Sos directo, concreto, sin teoría. Hablás en español argentino informal."
+    )
+
+    brand_str = marca
+    niche_str = nicho
+    funnel_str = funnel
+    wedge_str = wedge
+
+    user_msg = (
+        f"Acabo de analizar un ad de {brand_str} en el nicho de {niche_str}.\n"
+        f"Su funnel detectado: {funnel_str}.\n"
+        f"El WEDGE que encontré para atacarlos: {wedge_str}.\n\n"
+        f"Fui a la Biblioteca de Anuncios de Meta y esto es lo que encontré:\n\n"
+        f"{request.raw_data}\n\n"
+        "Interpretá estos datos de forma concreta. Decime:\n"
+        "1. ¿Qué señal dan estos números? ¿Están testeando, escalando, o pivoteando?\n"
+        "2. ¿Cuán rentable es su operación de paid ads basándome en lo que ves?\n"
+        "3. ¿Vale la pena atacar este competidor ahora o esperás?\n"
+        "4. ¿Qué hacer con esta información en las próximas 48 horas?\n\n"
+        "Respondé en menos de 200 palabras. Sin titulares. Directo al punto."
+    )
+
+    try:
+        import anthropic as _anthropic
+        client = _anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=600,
+            system=system,
+            messages=[{"role": "user", "content": user_msg}],
+        )
+        interpretation = response.content[0].text if response.content else ""
+        return {"interpretation": interpretation}
+    except Exception as e:
+        logger.exception(f"[interpret-library] error: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interpretando datos: {str(e)}")
+
+
 @app.get("/agents/analyze-video/history")
 async def list_video_analyses_endpoint(
     authorization: Optional[str] = Header(None),

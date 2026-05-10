@@ -105,10 +105,14 @@ export default function SpyPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [progress, setProgress] = useState('');
   const [result, setResult] = useState(null);
+  const [analysisId, setAnalysisId] = useState(null);
   const [error, setError] = useState('');
   const [history, setHistory] = useState([]);
   const [tab, setTab] = useState('upload');
   const [dragOver, setDragOver] = useState(false);
+  const [libraryData, setLibraryData] = useState('');
+  const [libraryInterp, setLibraryInterp] = useState('');
+  const [interpretingLibrary, setInterpretingLibrary] = useState(false);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
@@ -178,6 +182,9 @@ export default function SpyPage() {
 
       const data = await res.json();
       setResult(data.analysis);
+      setAnalysisId(data.analysis_id);
+      setLibraryData('');
+      setLibraryInterp('');
       setTab('result');
     } catch (e) {
       clearInterval(interval);
@@ -207,9 +214,31 @@ export default function SpyPage() {
       });
       const data = await res.json();
       setResult(data.analysis);
+      setAnalysisId(data.analysis_id);
+      setLibraryData('');
+      setLibraryInterp('');
       setTab('result');
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const interpretLibrary = async () => {
+    if (!libraryData.trim() || !analysisId) return;
+    setInterpretingLibrary(true);
+    setLibraryInterp('');
+    try {
+      const res = await fetch(`${API}/agents/analyze-video/${analysisId}/interpret-library`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw_data: libraryData }),
+      });
+      const data = await res.json();
+      setLibraryInterp(data.interpretation || 'Sin respuesta');
+    } catch (e) {
+      setLibraryInterp('Error al interpretar. Intentá de nuevo.');
+    } finally {
+      setInterpretingLibrary(false);
     }
   };
 
@@ -608,6 +637,42 @@ export default function SpyPage() {
                       </p>
                     </div>
                   )}
+
+                  {/* Pegar datos de biblioteca */}
+                  <div className="rounded-xl p-4 space-y-3" style={{ background: '#0d0d11', border: '1px solid rgba(99,102,241,0.25)' }}>
+                    <div>
+                      <p className="text-xs font-bold text-white mb-0.5">Pegá lo que encontraste en la Biblioteca</p>
+                      <p className="text-[11px]" style={{ color: '#6b7280' }}>
+                        Ej: "tienen 23 ads activos, el más viejo es de octubre 2024, esta semana subieron 3 nuevos"
+                      </p>
+                    </div>
+                    <textarea
+                      value={libraryData}
+                      onChange={(e) => setLibraryData(e.target.value)}
+                      rows={3}
+                      placeholder="Contame qué viste: cuántos ads tienen, cuándo arrancaron, qué tan activos están últimamente..."
+                      className="w-full px-3 py-2.5 rounded-xl text-sm bg-transparent outline-none resize-none"
+                      style={{ background: '#16161a', border: '1px solid #2a2a35', color: '#e5e7eb' }}
+                    />
+                    <button
+                      onClick={interpretLibrary}
+                      disabled={!libraryData.trim() || interpretingLibrary}
+                      className="w-full py-2.5 text-sm font-bold rounded-xl transition-all disabled:opacity-40"
+                      style={{ background: 'linear-gradient(135deg,#4f46e5,#6366f1)', color: 'white' }}>
+                      {interpretingLibrary ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Interpretando...
+                        </span>
+                      ) : '🔍 Interpretar estos datos'}
+                    </button>
+                    {libraryInterp && (
+                      <div className="rounded-xl p-4 space-y-2" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.2)' }}>
+                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#6366f1' }}>Interpretación</p>
+                        <p className="text-sm leading-relaxed" style={{ color: '#e5e7eb' }}>{libraryInterp}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </Section>
             )}
