@@ -20,7 +20,7 @@ from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
 
 from database import engine, get_db, Base
-from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog, PipelineRun, MarketValidation, CompetitorAnalysis
+from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog, PipelineRun, MarketValidation, CompetitorAnalysis, VideoAnalysis
 from agents.shared_memory import AgentMemory  # registers table with Base.metadata
 import config
 from plan_limits import check_feature_access, check_generation_limit, get_plan_limits, PLAN_DISPLAY_NAMES
@@ -3061,6 +3061,149 @@ async def generate_tiktok_calendar_endpoint(
     except Exception as e:
         logger.error(f"TikTok calendar agent error: {type(e).__name__}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error en agente calendario TikTok: {str(e)}")
+
+
+VIDEO_MAX_MB = 150
+VIDEO_ALLOWED_TYPES = {
+    "video/mp4", "video/quicktime", "video/x-msvideo",
+    "video/webm", "video/3gpp", "video/mpeg",
+}
+
+
+@app.post("/agents/analyze-video")
+async def analyze_video_endpoint(
+    file: UploadFile = File(...),
+    niche: str = "",
+    brand: str = "",
+    hypothesis: str = "",
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Sube un video de ad del competidor y corre el análisis Nivel Dios con Claude Vision.
+    Extrae frames con ffmpeg, lee subtítulos, analiza visual/copy/psicología/estrategia.
+    """
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+
+    content_type = file.content_type or ""
+    if content_type not in VIDEO_ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Formato no soportado: {content_type}. Subí un archivo MP4, MOV, AVI o WebM.",
+        )
+
+    video_bytes = await file.read()
+    size_mb = len(video_bytes) / (1024 * 1024)
+    if size_mb > VIDEO_MAX_MB:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El video pesa {size_mb:.1f} MB. Máximo permitido: {VIDEO_MAX_MB} MB.",
+        )
+
+    import uuid as _uuid
+    analysis_id = str(_uuid.uuid4())
+
+    record = VideoAnalysis(
+        user_id=user.id,
+        analysis_id=analysis_id,
+        filename=file.filename,
+        niche=niche or None,
+        brand=brand or None,
+    )
+    db.add(record)
+    db.commit()
+
+    try:
+        from agents.video_analyzer import analyze_video
+        result = analyze_video(
+            video_bytes=video_bytes,
+            filename=file.filename or "video.mp4",
+            niche=niche,
+            brand=brand,
+            hypothesis=hypothesis,
+            api_key=api_key,
+        )
+
+        meta = result.get("_meta", {})
+        score_raw = (result.get("veredicto_duplicacion") or {}).get("score_general")
+        try:
+            score = int(float(score_raw)) if score_raw is not None else None
+        except (TypeError, ValueError):
+            score = None
+
+        verdict_decision = (result.get("veredicto_duplicacion") or {}).get("decision")
+
+        record.analysis = result
+        record.verdict = verdict_decision
+        record.score = score
+        record.frames_analyzed = meta.get("frames_analyzed")
+        db.commit()
+
+        return {"analysis_id": analysis_id, "analysis": result}
+
+    except RuntimeError as e:
+        record.error_message = str(e)
+        db.commit()
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.exception(f"[analyze-video] error: {e}")
+        record.error_message = str(e)
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"Error en el análisis de video: {str(e)}")
+
+
+@app.get("/agents/analyze-video/history")
+async def list_video_analyses_endpoint(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    rows = db.query(VideoAnalysis).filter(
+        VideoAnalysis.user_id == user.id,
+    ).order_by(VideoAnalysis.created_at.desc()).limit(50).all()
+    return [
+        {
+            "analysis_id": r.analysis_id,
+            "filename": r.filename,
+            "niche": r.niche,
+            "brand": r.brand,
+            "score": r.score,
+            "verdict": r.verdict,
+            "frames_analyzed": r.frames_analyzed,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
+@app.get("/agents/analyze-video/{analysis_id}")
+async def get_video_analysis_endpoint(
+    analysis_id: str,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    rec = db.query(VideoAnalysis).filter(
+        VideoAnalysis.analysis_id == analysis_id,
+        VideoAnalysis.user_id == user.id,
+    ).first()
+    if not rec:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return {
+        "analysis_id": rec.analysis_id,
+        "filename": rec.filename,
+        "niche": rec.niche,
+        "brand": rec.brand,
+        "frames_analyzed": rec.frames_analyzed,
+        "analysis": rec.analysis,
+        "verdict": rec.verdict,
+        "score": rec.score,
+        "created_at": rec.created_at.isoformat() if rec.created_at else None,
+    }
 
 
 if __name__ == "__main__":
