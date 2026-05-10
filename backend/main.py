@@ -159,6 +159,14 @@ if PAYMENTS_AVAILABLE:
 if V35_AVAILABLE:
     app.include_router(v35_router)
 
+# Include Master Sky integration (external dashboard aggregator)
+try:
+    from master_sky_routes import router as master_sky_router
+    app.include_router(master_sky_router)
+    logger.info("Master Sky routes loaded")
+except Exception as e:
+    logger.warning(f"Master Sky routes failed to load: {e}")
+
 # Include chat launch routes
 if CHAT_AVAILABLE:
     app.include_router(chat_router)
