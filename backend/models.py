@@ -240,6 +240,25 @@ class CompetitorAnalysis(Base):
     user = relationship("User")
 
 
+class VideoAnalysis(Base):
+    __tablename__ = "video_analyses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    analysis_id = Column(String, unique=True, index=True)
+    filename = Column(String, nullable=True)
+    niche = Column(String, nullable=True)
+    brand = Column(String, nullable=True)
+    frames_analyzed = Column(Integer, nullable=True)
+    analysis = Column(JSON, nullable=True)
+    verdict = Column(String, nullable=True)
+    score = Column(Integer, nullable=True, index=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    user = relationship("User")
+
+
 class AutonomousActionLog(Base):
     __tablename__ = "autonomous_action_logs"
 

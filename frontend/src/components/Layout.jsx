@@ -10,6 +10,7 @@ const NAV = [
   { label: 'Campañas',       path: '/campaigns',    icon: 'campaigns'   },
   { label: 'TikTok Orgánico',path: '/tiktok',       icon: 'tiktok'      },
   { label: 'Videos del Día', path: '/videos',       icon: 'videos'      },
+  { label: 'Spy de Ads',     path: '/spy',          icon: 'audit'       },
   { label: 'Infoproducto',   path: '/infoproducto', icon: 'rocket'      },
   { label: 'Agentes IA',     path: '/agents',       icon: 'agents'      },
   { label: 'Auditoría',      path: '/audit',        icon: 'audit'       },
