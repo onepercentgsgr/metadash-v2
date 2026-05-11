@@ -113,6 +113,12 @@ export default function SpyPage() {
   const [libraryData, setLibraryData] = useState('');
   const [libraryInterp, setLibraryInterp] = useState('');
   const [interpretingLibrary, setInterpretingLibrary] = useState(false);
+  const [bibReport, setBibReport] = useState(null);
+  const [bibError, setBibError] = useState('');
+  const [bibSort, setBibSort] = useState({ key: 'start_date_iso', dir: 'asc' });
+  const [bibFilter, setBibFilter] = useState('all');
+  const [bibVarMin, setBibVarMin] = useState(0);
+  const bibFileRef = useRef(null);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
@@ -242,6 +248,80 @@ export default function SpyPage() {
     }
   };
 
+  const handleLibraryJsonFile = (f) => {
+    setBibError('');
+    if (!f) return;
+    if (!f.name.toLowerCase().endsWith('.json')) {
+      setBibError('Subí el archivo JSON exportado por la extensión MetaDash Spy.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const parsed = JSON.parse(ev.target.result);
+        if (!parsed.ads || !Array.isArray(parsed.ads)) {
+          setBibError('El JSON no parece de MetaDash Spy — falta el array "ads".');
+          return;
+        }
+        try {
+          localStorage.setItem('mdspy_last_library', JSON.stringify(parsed));
+        } catch (_) {}
+        setBibReport(parsed);
+      } catch (e) {
+        setBibError('No pude parsear el JSON. Verificá que sea el archivo exportado por la extensión.');
+      }
+    };
+    reader.readAsText(f);
+  };
+
+  const goToInvestigadorWithLibrary = () => {
+    if (!bibReport) return;
+    try {
+      sessionStorage.setItem('mdspy_library_for_validar', JSON.stringify(bibReport));
+      if (analysisId) sessionStorage.setItem('mdspy_video_analysis_id', analysisId);
+    } catch (_) {}
+    router.push('/validar?source=spy');
+  };
+
+  // Carga de biblioteca persistida — si entrás a la tab y antes habías subido un JSON
+  if (typeof window !== 'undefined' && !bibReport && tab === 'biblioteca') {
+    try {
+      const cached = localStorage.getItem('mdspy_last_library');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.ads) setBibReport(parsed);
+      }
+    } catch (_) {}
+  }
+
+  const sortedBibAds = (() => {
+    if (!bibReport?.ads) return [];
+    let arr = [...bibReport.ads];
+    if (bibFilter !== 'all') arr = arr.filter((a) => a.media_type === bibFilter);
+    if (bibVarMin > 0) arr = arr.filter((a) => (a.variation_count || 1) >= bibVarMin);
+    const k = bibSort.key;
+    const dir = bibSort.dir === 'asc' ? 1 : -1;
+    arr.sort((a, b) => {
+      let av = a[k];
+      let bv = b[k];
+      if (k === 'variation_count' || k === 'days_active') {
+        av = av || 0;
+        bv = bv || 0;
+        return (av - bv) * dir;
+      }
+      if (typeof av !== 'string') av = av == null ? '' : String(av);
+      if (typeof bv !== 'string') bv = bv == null ? '' : String(bv);
+      return av.localeCompare(bv) * dir;
+    });
+    return arr;
+  })();
+
+  const toggleSort = (key) => {
+    setBibSort((prev) => prev.key === key
+      ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+      : { key, dir: 'asc' });
+  };
+
   const goToPipeline = () => {
     const seed = result?.pipeline_seed || {};
     const params = new URLSearchParams({
@@ -296,6 +376,7 @@ export default function SpyPage() {
           {[
             { id: 'upload', label: 'Analizar Video' },
             { id: 'result', label: 'Resultado', disabled: !result },
+            { id: 'biblioteca', label: 'Biblioteca' },
             { id: 'history', label: 'Historial' },
           ].map((t) => (
             <button key={t.id}
@@ -786,6 +867,253 @@ export default function SpyPage() {
                 Generar infoproducto con este WEDGE
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Biblioteca Tab */}
+        {tab === 'biblioteca' && (
+          <div className="space-y-4">
+
+            {/* Header + cómo conseguir el JSON */}
+            <div className="rounded-2xl p-4 space-y-2" style={{ background: 'rgba(99,102,241,0.05)', border: '1px solid rgba(99,102,241,0.15)' }}>
+              <p className="text-sm font-bold text-white">Importar Biblioteca de Anuncios</p>
+              <p className="text-xs" style={{ color: '#9ca3af' }}>
+                Usá la extensión <strong style={{ color: '#c7d2fe' }}>MetaDash Spy</strong> en Chrome → buscá tu competidor en facebook.com/ads/library → "Escanear" → "Exportar JSON". Subí ese archivo acá.
+              </p>
+            </div>
+
+            {/* Upload de JSON */}
+            <div
+              onClick={() => bibFileRef.current?.click()}
+              className="rounded-2xl p-6 text-center transition-all cursor-pointer"
+              style={{
+                background: bibReport ? 'rgba(99,102,241,0.06)' : '#16161a',
+                border: `2px dashed ${bibReport ? '#6366f1' : '#2a2a35'}`,
+              }}>
+              {bibReport ? (
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-white">
+                    {bibReport.meta?.page_name || bibReport.meta?.search_query || 'Biblioteca cargada'}
+                  </p>
+                  <p className="text-xs" style={{ color: '#9ca3af' }}>
+                    {bibReport.meta?.total_detected || bibReport.ads?.length || 0} ads · scaneado el{' '}
+                    {bibReport.meta?.scraped_at ? new Date(bibReport.meta.scraped_at).toLocaleDateString('es') : '—'}
+                  </p>
+                  <p className="text-[11px] mt-2" style={{ color: '#6b7280' }}>Click para cambiar el archivo</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-white">Subir JSON de la extensión</p>
+                  <p className="text-xs" style={{ color: '#6b7280' }}>Click para seleccionar el archivo</p>
+                </div>
+              )}
+              <input ref={bibFileRef} type="file" accept="application/json,.json" className="hidden"
+                onChange={(e) => handleLibraryJsonFile(e.target.files?.[0])} />
+            </div>
+
+            {bibError && (
+              <div className="rounded-xl px-4 py-3 text-sm" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)', color: '#fca5a5' }}>
+                {bibError}
+              </div>
+            )}
+
+            {bibReport && (
+              <>
+                {/* Summary cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: 'Total', value: bibReport.meta?.total_detected || bibReport.ads?.length || 0, color: '#8b5cf6' },
+                    { label: 'Videos', value: bibReport.summary?.videos || 0, color: '#ec4899' },
+                    { label: 'Imágenes', value: bibReport.summary?.images || 0, color: '#10b981' },
+                    { label: 'Max variaciones', value: bibReport.summary?.max_variations || 0, color: '#f59e0b' },
+                  ].map((m) => (
+                    <div key={m.label} className="rounded-xl p-3 text-center"
+                      style={{ background: '#16161a', border: '1px solid #1e1e24' }}>
+                      <p className="text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: '#6b7280' }}>{m.label}</p>
+                      <p className="text-2xl font-black" style={{ color: m.color }}>{m.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {bibReport.summary?.oldest_ad_date && (
+                  <div className="rounded-xl px-4 py-3 flex items-center justify-between flex-wrap gap-2"
+                    style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)' }}>
+                    <span className="text-sm" style={{ color: '#fcd34d' }}>
+                      <strong>Ad más viejo activo:</strong> {bibReport.summary.oldest_ad_date}
+                      {bibReport.summary.oldest_ad_days ? ` (${bibReport.summary.oldest_ad_days} días corriendo)` : ''}
+                    </span>
+                  </div>
+                )}
+
+                {/* Señales de scaling */}
+                {bibReport.analysis?.scaling_signals?.length > 0 && (
+                  <Section title="Señales de scaling" color="#10b981" icon="financials">
+                    <ul className="space-y-1.5">
+                      {bibReport.analysis.scaling_signals.map((s, i) => (
+                        <li key={i} className="flex gap-2 text-sm" style={{ color: '#d1d5db' }}>
+                          <span style={{ color: '#10b981' }}>●</span>{s}
+                        </li>
+                      ))}
+                    </ul>
+                  </Section>
+                )}
+
+                {/* Winner probable */}
+                {bibReport.analysis?.probable_winner && (
+                  <Section title="Winner probable" color="#f59e0b" icon="crown">
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold" style={{ color: '#fcd34d' }}>
+                        "{bibReport.analysis.probable_winner.hook}"
+                      </p>
+                      <p className="text-xs" style={{ color: '#9ca3af' }}>
+                        ID {bibReport.analysis.probable_winner.library_id} · {bibReport.analysis.probable_winner.variation_count} variaciones
+                        {bibReport.analysis.probable_winner.days_active != null ? ` · ${bibReport.analysis.probable_winner.days_active}d activo` : ''}
+                      </p>
+                      <p className="text-xs" style={{ color: '#d1d5db' }}>{bibReport.analysis.probable_winner.reason}</p>
+                    </div>
+                  </Section>
+                )}
+
+                {/* Hook patterns */}
+                {bibReport.analysis?.hook_patterns?.length > 0 && (
+                  <Section title="Hooks repetidos" color="#ec4899" icon="campaigns">
+                    <ul className="space-y-2">
+                      {bibReport.analysis.hook_patterns.slice(0, 8).map((h, i) => (
+                        <li key={i} className="rounded-lg p-2.5"
+                          style={{ background: '#0d0d11', border: '1px solid #1e1e24' }}>
+                          <p className="text-xs font-medium" style={{ color: '#e5e7eb' }}>"{h.hook}"</p>
+                          <p className="text-[10px] mt-1" style={{ color: '#6b7280' }}>
+                            frecuencia: {h.frequency} · max variaciones: {h.max_variations}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  </Section>
+                )}
+
+                {/* Prioridad de descarga */}
+                {bibReport.analysis?.download_priority?.length > 0 && (
+                  <Section title="Prioridad de descarga (videos a analizar primero)" color="#6366f1" icon="rocket">
+                    <ul className="space-y-2">
+                      {bibReport.analysis.download_priority.map((p, i) => (
+                        <li key={i} className="flex gap-3 items-start">
+                          <span className="text-lg font-black flex-shrink-0" style={{ color: '#8b5cf6', minWidth: 24 }}>{i + 1}.</span>
+                          <div>
+                            <p className="text-sm font-semibold text-white">ID {p.library_id}</p>
+                            <p className="text-xs" style={{ color: '#9ca3af' }}>{p.reason}</p>
+                            {p.hook_preview && <p className="text-xs mt-1" style={{ color: '#d1d5db' }}>"{p.hook_preview}"</p>}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </Section>
+                )}
+
+                {/* Filtros + tabla */}
+                <div className="rounded-2xl overflow-hidden" style={{ background: '#16161a', border: '1px solid #1e1e24' }}>
+                  <div className="px-4 py-3 flex items-center gap-3 flex-wrap" style={{ borderBottom: '1px solid #1e1e24' }}>
+                    <span className="text-xs font-bold uppercase tracking-widest" style={{ color: '#9ca3af' }}>
+                      Tabla de Ads ({sortedBibAds.length})
+                    </span>
+                    <select
+                      value={bibFilter}
+                      onChange={(e) => setBibFilter(e.target.value)}
+                      className="text-xs rounded-lg px-2 py-1.5 outline-none"
+                      style={{ background: '#0d0d11', border: '1px solid #2a2a35', color: '#d1d5db' }}>
+                      <option value="all">Todos</option>
+                      <option value="video">Videos</option>
+                      <option value="image">Imágenes</option>
+                      <option value="carousel">Carruseles</option>
+                    </select>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-widest" style={{ color: '#6b7280' }}>Min var.</span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={bibVarMin}
+                        onChange={(e) => setBibVarMin(parseInt(e.target.value, 10) || 0)}
+                        className="w-14 text-xs rounded-lg px-2 py-1.5 outline-none"
+                        style={{ background: '#0d0d11', border: '1px solid #2a2a35', color: '#d1d5db' }}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ maxHeight: 480, overflowY: 'auto' }}>
+                    <table className="w-full text-xs" style={{ borderCollapse: 'collapse' }}>
+                      <thead style={{ background: '#0d0d11', position: 'sticky', top: 0 }}>
+                        <tr style={{ color: '#9ca3af', textAlign: 'left' }}>
+                          {[
+                            { k: 'library_id', l: 'ID' },
+                            { k: 'media_type', l: 'Tipo' },
+                            { k: 'start_date_iso', l: 'Desde' },
+                            { k: 'days_active', l: 'Días' },
+                            { k: 'variation_count', l: 'Var.' },
+                            { k: 'cta_text', l: 'CTA' },
+                            { k: 'ad_text', l: 'Hook' },
+                          ].map((c) => (
+                            <th key={c.k}
+                              onClick={() => toggleSort(c.k)}
+                              className="px-3 py-2 cursor-pointer font-semibold uppercase tracking-wide"
+                              style={{ fontSize: 10 }}>
+                              {c.l} {bibSort.key === c.k ? (bibSort.dir === 'asc' ? '↑' : '↓') : ''}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sortedBibAds.map((ad) => {
+                          const hook = (ad.ad_text || '').split('\n')[0].slice(0, 70);
+                          return (
+                            <tr key={ad.library_id} style={{ color: '#d1d5db', borderTop: '1px solid #1e1e24' }}>
+                              <td className="px-3 py-2 font-mono" style={{ color: '#9ca3af' }}>{ad.library_id}</td>
+                              <td className="px-3 py-2">
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase"
+                                  style={{
+                                    background: ad.media_type === 'video' ? 'rgba(236,72,153,0.12)' : ad.media_type === 'image' ? 'rgba(16,185,129,0.12)' : 'rgba(99,102,241,0.12)',
+                                    color: ad.media_type === 'video' ? '#f9a8d4' : ad.media_type === 'image' ? '#86efac' : '#a5b4fc',
+                                  }}>
+                                  {ad.media_type || '?'}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2">{ad.start_date_iso || '—'}</td>
+                              <td className="px-3 py-2 font-semibold">{ad.days_active != null ? `${ad.days_active}d` : '—'}</td>
+                              <td className="px-3 py-2 font-bold"
+                                style={{ color: (ad.variation_count || 0) >= 10 ? '#fcd34d' : (ad.variation_count || 0) >= 5 ? '#a5b4fc' : '#d1d5db' }}>
+                                {ad.variation_count || 1}
+                              </td>
+                              <td className="px-3 py-2" style={{ color: '#9ca3af' }}>{ad.cta_text || '—'}</td>
+                              <td className="px-3 py-2" style={{ maxWidth: 260 }}>
+                                <div title={ad.ad_text} style={{
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                }}>{hook}</div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* CTA Investigar mercado */}
+                <div className="rounded-2xl p-5 flex items-center justify-between flex-wrap gap-4"
+                  style={{ background: 'linear-gradient(135deg,rgba(99,102,241,0.08),rgba(139,92,246,0.06))', border: '1px solid rgba(99,102,241,0.25)' }}>
+                  <div>
+                    <p className="text-sm font-bold text-white">Cruzar con landings + video → Reporte completo</p>
+                    <p className="text-xs mt-0.5" style={{ color: '#9ca3af' }}>
+                      El Investigador va a recibir esta biblioteca + landings que pegues + el último análisis de video, y genera el veredicto integrado con WEDGE y script template.
+                    </p>
+                  </div>
+                  <button onClick={goToInvestigadorWithLibrary}
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold rounded-xl transition-all flex-shrink-0"
+                    style={{ background: 'linear-gradient(135deg,#4f46e5,#6366f1)', color: 'white', boxShadow: '0 4px 15px rgba(99,102,241,0.25)' }}>
+                    <Icon name="audit" size={15} strokeWidth={2} />
+                    Investigar mercado completo
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
 

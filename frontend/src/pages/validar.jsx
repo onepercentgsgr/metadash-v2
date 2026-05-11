@@ -107,7 +107,7 @@ export default function ValidarPage() {
       const filledRows = competitorGrid.filter(c =>
         c.ads_count?.toString().trim() || c.oldest_active?.trim() || c.notes?.trim()
       );
-      const adsLibraryData = filledRows.length > 0
+      let adsLibraryData = filledRows.length > 0
         ? {
             country,
             competitors: filledRows.map(c => ({
@@ -119,6 +119,21 @@ export default function ValidarPage() {
             })),
           }
         : null;
+
+      // Si veniste del Spy de Ads (Biblioteca tab), priorizá ese JSON sobre la grilla manual
+      let videoAnalysisId = null;
+      try {
+        const spyLib = sessionStorage.getItem('mdspy_library_for_validar');
+        if (spyLib) {
+          adsLibraryData = JSON.parse(spyLib);
+          sessionStorage.removeItem('mdspy_library_for_validar');
+        }
+        const spyVid = sessionStorage.getItem('mdspy_video_analysis_id');
+        if (spyVid) {
+          videoAnalysisId = spyVid;
+          sessionStorage.removeItem('mdspy_video_analysis_id');
+        }
+      } catch (_) {}
 
       const res = await fetch(`${API_URL}/agents/validate-market`, {
         method: 'POST',
@@ -132,6 +147,7 @@ export default function ValidarPage() {
           niche,
           notes,
           ads_library_data: adsLibraryData,
+          video_analysis_id: videoAnalysisId,
         }),
       });
       if (!res.ok) {
