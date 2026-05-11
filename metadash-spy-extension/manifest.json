@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "MetaDash Spy",
+  "version": "1.0.0",
+  "description": "Lee y exporta datos de la Biblioteca de Anuncios de Meta para alimentar MetaDash. Solo lee el DOM visible — sin scraping, sin requests.",
+  "permissions": ["activeTab", "storage", "scripting"],
+  "host_permissions": ["https://www.facebook.com/ads/library/*"],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "MetaDash Spy"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.facebook.com/ads/library/*"],
+      "js": [
+        "content/i18n.js",
+        "content/parser.js",
+        "content/analyzer.js",
+        "content/content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js"
+  }
+}
