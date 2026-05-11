@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>MetaDash Spy</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="logo">
+      <span class="logo-dot"></span>
+      <span class="logo-text">MetaDash <span class="logo-accent">Spy</span></span>
+    </div>
+    <span class="version">v1.0</span>
+  </header>
+
+  <main id="main">
+
+    <!-- Estado: no estás en la Ads Library -->
+    <section id="state-off" class="state hidden">
+      <div class="state-icon">🔒</div>
+      <h2>Abrí la Biblioteca de Anuncios</h2>
+      <p class="state-sub">Esta extensión solo funciona en <code>facebook.com/ads/library</code>.</p>
+      <a class="btn primary" href="https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=AR" target="_blank">Abrir Biblioteca</a>
+    </section>
+
+    <!-- Estado: en la Ads Library, listo para escanear -->
+    <section id="state-ready" class="state hidden">
+      <div class="ready-block">
+        <div class="ready-search">
+          <span class="muted">Búsqueda actual</span>
+          <strong id="current-query">—</strong>
+        </div>
+        <div class="ready-info muted">
+          Scrolleá la página para cargar más ads, después escanealos. La extensión solo lee lo que ya cargaste — sin auto-scroll.
+        </div>
+      </div>
+
+      <button id="btn-scan" class="btn primary">
+        <span class="btn-icon">🔍</span>
+        Escanear anuncios visibles
+      </button>
+
+      <div id="scan-progress" class="scan-progress hidden">
+        <div class="spinner"></div>
+        <span>Escaneando DOM...</span>
+      </div>
+    </section>
+
+    <!-- Estado: resultado del scan -->
+    <section id="state-result" class="state hidden">
+
+      <div class="card">
+        <div class="card-row">
+          <div>
+            <div class="muted micro">Detectados</div>
+            <div class="big" id="r-total">0</div>
+          </div>
+          <div>
+            <div class="muted micro">Búsqueda</div>
+            <div class="medium" id="r-query">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card mini">
+          <span class="muted micro">Videos</span>
+          <strong id="r-videos">0</strong>
+        </div>
+        <div class="card mini">
+          <span class="muted micro">Imágenes</span>
+          <strong id="r-images">0</strong>
+        </div>
+        <div class="card mini">
+          <span class="muted micro">Más viejo</span>
+          <strong id="r-oldest">—</strong>
+        </div>
+        <div class="card mini">
+          <span class="muted micro">Max variaciones</span>
+          <strong id="r-maxvar">0</strong>
+        </div>
+      </div>
+
+      <div id="signals-block" class="signals hidden">
+        <span class="muted micro section-label">Señales detectadas</span>
+        <ul id="signals-list"></ul>
+      </div>
+
+      <div id="winner-block" class="winner hidden">
+        <span class="micro winner-label">🏆 Winner probable</span>
+        <p id="winner-hook" class="winner-hook">—</p>
+        <p id="winner-meta" class="muted micro">—</p>
+      </div>
+
+      <div class="export-block">
+        <span class="muted micro section-label">Exportar</span>
+        <div class="export-grid">
+          <button class="btn small" data-export="txt">
+            <span class="btn-icon">📄</span> TXT
+            <span class="btn-sub">para Claude</span>
+          </button>
+          <button class="btn small" data-export="json">
+            <span class="btn-icon">📋</span> JSON
+            <span class="btn-sub">para MetaDash</span>
+          </button>
+          <button class="btn small" data-export="csv">
+            <span class="btn-icon">📊</span> CSV
+            <span class="btn-sub">tabla</span>
+          </button>
+        </div>
+      </div>
+
+      <button id="btn-rescan" class="btn ghost full">↻ Escanear de nuevo</button>
+    </section>
+
+    <!-- Estado: error -->
+    <section id="state-error" class="state hidden">
+      <div class="state-icon">⚠️</div>
+      <h2>Hubo un error</h2>
+      <p class="state-sub" id="error-msg">—</p>
+      <button id="btn-retry" class="btn primary">Reintentar</button>
+    </section>
+
+  </main>
+
+  <details id="history-section" class="history">
+    <summary>Historial</summary>
+    <ul id="history-list" class="history-list"></ul>
+    <button id="btn-clear-history" class="btn small ghost">Limpiar historial</button>
+  </details>
+
+  <footer class="footer muted micro">
+    Solo lee el DOM visible — sin scraping, sin requests a Meta.
+  </footer>
+
+  <script src="exporter.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

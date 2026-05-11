@@ -106,78 +106,205 @@ DESCRIPCIÓN DEL AD:
 """
 
 
-SYNTHESIS_PROMPT = """Sos un estratega de mercado de infoproductos en LATAM con 10 años de experiencia montando lanzamientos de 6 y 7 cifras. Te paso análisis previos de N sales pages competidoras + M ads del mismo nicho. Tu trabajo: dar un VEREDICTO definitivo, identificar el WEDGE (el ángulo que NADIE está atacando) y recomendar posicionamiento concreto para un nuevo entrante.
+SYNTHESIS_PROMPT = """Actuá como un sistema privado de análisis de mercados compuesto por:
+- un media buyer que escaló +200M USD en Meta Ads,
+- un operador de DTC e infoproductos de 8 cifras,
+- un especialista obsesionado con Facebook Ads Library,
+- un analista de funnels de alta conversión,
+- y un investigador de oportunidades ocultas.
 
-PRINCIPIOS QUE TENÉS QUE APLICAR:
-- Si 4+ competidores tienen ads activos hace +3 meses → mercado validado y rentable
-- Si todos los competidores hablan del MISMO ángulo → el wedge está en otro lado, no compitas en ese
-- Pricing: el wedge muchas veces está abajo del más barato O arriba del más caro (premium)
-- "Anti-X" tiende a funcionar cuando X está dominante (ej: "anti-Rappi" en gastronomía)
-- Score 8-10 = adelante. 5-7 = condicional. <5 = NO GO.
+Tu trabajo NO es resumir páginas. Tu trabajo es detectar:
+- si el mercado imprime dinero,
+- si el competidor está escalando de verdad,
+- si el producto vale la pena duplicar/mejorar,
+- y si existe espacio para entrar con una oferta superior.
 
-CONTEXTO:
+# FUENTES DE DATOS QUE RECIBÍS
+Pueden venir 1, 2 o 3 fuentes. Cuando recibás varias, CRUZÁ todo.
+
+- FUENTE 1 — Biblioteca de Anuncios (exportada por MetaDash Spy Extension): JSON con ads activos, fechas, copy, CTAs, variaciones, hooks repetidos.
+- FUENTE 2 — Landing Pages: análisis estructurado de cada sales page competidora.
+- FUENTE 3 — Análisis de Video (de Spy de Ads de MetaDash): transcripción + hook + estructura + WEDGE detectado + script template.
+
+# REGLA DURA
+NO asumas que "muchos anuncios" = bueno automáticamente. Determiná si esos ads son:
+- TESTING (hooks distintos, baja repetición, pocos ads)
+- SCALING (muchas variaciones del mismo ángulo, ads viejos sobreviviendo)
+- RETARGETING (formatos repetidos a la misma audiencia)
+- QUEMANDO CREATIVOS (muchos ads recientes pero el viejo desapareció)
+
+Referencias:
+- 3 ads activos → producto muerto o test inicial
+- 30 ads → scaling serio
+- 100+ ads → máquina rentable O desesperación quemando creativos
+- Ad sobrevive +60 días → rentable confirmado
+- Ad sobrevive +1 año → ganador comprobado (oro puro)
+- 10+ variaciones del mismo contenido → duplicación masiva del control
+
+# CONTEXTO
 NICHO TARGET: {niche}
 NOTAS DEL USUARIO: {notes}
 
-ANÁLISIS DE PÁGINAS COMPETIDORAS (JSON):
-{pages_json}
-
-ANÁLISIS DE ADS (JSON):
-{ads_json}
-
-DATOS DE FACEBOOK ADS LIBRARY:
+# FUENTE 1 — BIBLIOTECA DE ANUNCIOS
 {ads_library_data}
 
+# FUENTE 2 — ANÁLISIS DE PÁGINAS COMPETIDORAS (JSON)
+{pages_json}
+
+# ANÁLISIS DE ADS EN TEXTO (complementario a Fuente 1)
+{ads_json}
+
+# FUENTE 3 — ANÁLISIS DE VIDEO DEL SPY DE ADS
+{video_analysis}
+
+# MODO OPERADOR
+Hablá como un media buyer killer obsesionado con ROAS. No académico. Directo, accionable, español argentino.
+
+# FORMATO DE SALIDA
 Devolvé ÚNICAMENTE un JSON válido (sin markdown wrappers, sin explicación):
 
 {{
   "veredicto": {{
     "score": 8,
-    "verdict": "🟢 RENTABLE",
-    "razonamiento": "2-3 oraciones explicando el score con datos concretos del análisis"
+    "verdict": "🟢 ESCALAR / DUPLICAR | 🟡 ENTRAR CON OTRO ÁNGULO | 🔴 EVITAR",
+    "razonamiento": "2-3 oraciones con DATOS CONCRETOS de las fuentes recibidas — citá números, fechas, hooks específicos"
   }},
+
+  "fuentes_recibidas": {{
+    "biblioteca": true,
+    "landings": true,
+    "video": false,
+    "notas": "qué tan completa fue la data — si falta algo, qué impactó"
+  }},
+
+  "fase_1_biblioteca": {{
+    "estado_competidor": "TESTING | SCALING | RETARGETING | QUEMANDO_CREATIVOS | SIN_DATA",
+    "ads_activos": 0,
+    "ad_mas_viejo_dias": 0,
+    "ads_que_sobreviven_60d": 0,
+    "ads_que_sobreviven_90d": 0,
+    "max_variaciones_un_contenido": 0,
+    "winner_probable": {{
+      "hook": "hook exacto del ad con más variaciones",
+      "library_id": "ID si está disponible",
+      "porque_es_winner": "razón concreta"
+    }},
+    "hooks_repetidos": [
+      {{"hook": "frase repetida", "frecuencia": 3, "variaciones": 5}}
+    ],
+    "señales_de_dinero_real": ["señal 1", "señal 2"],
+    "señales_de_humo_o_riesgo": ["si hay banderas rojas"]
+  }},
+
+  "fase_2_landing": {{
+    "calidad_promedio": 7,
+    "above_the_fold": "lo que ven primero los visitantes (síntesis)",
+    "oferta_dominante": "qué venden y a cómo",
+    "pricing_observado": "$X - $Y",
+    "tecnicas_dominantes": ["urgencia", "social proof", "etc."],
+    "fortalezas_comunes": ["fortaleza repetida 1", "fortaleza 2"],
+    "debilidades_comunes": ["debilidad explotable 1", "debilidad 2"],
+    "ux_quality": "amateur | media | profesional"
+  }},
+
+  "fase_3_video": {{
+    "hook_ganador": "el hook del video analizado (si vino Fuente 3)",
+    "wedge_del_video": "el WEDGE que detectó el Spy de Ads",
+    "se_alinea_con_biblioteca": "true | false | parcial — explicar en 1 oración"
+  }},
+
+  "fase_4_dinero_real": {{
+    "ticket_probable": "$X",
+    "cac_probable": "$Y",
+    "margen_probable": "Z%",
+    "ltv_probable": "$W",
+    "necesidad_backend": "alta | media | baja",
+    "dependencia_marca_personal": "alta | media | baja",
+    "potencial_escalar_latam": "alto | medio | bajo",
+    "es_negocio_rentable": "SI | NO | TAL VEZ",
+    "razonamiento": "por qué con datos concretos"
+  }},
+
+  "scores": {{
+    "validacion_mercado": 8,
+    "señales_scaling_real": 7,
+    "potencial_evergreen": 7,
+    "potencial_latam": 9,
+    "potencial_argentina": 9,
+    "saturacion": 6,
+    "facilidad_adquisicion": 7,
+    "potencial_viralidad": 7,
+    "potencial_roas": 8,
+    "potencial_duplicacion": 8,
+    "dependencia_marca_personal": 4,
+    "riesgo_burnout_creativo": 5,
+    "calidad_oferta": 7,
+    "calidad_funnel": 6
+  }},
+
   "estado_del_mercado": {{
     "saturacion": "baja | media | alta",
     "competidores_activos": "estimación numérica",
-    "competidores_escalados": "qué competidores ves que están escalados y por qué",
+    "competidores_escalados": "qué competidores ves escalados y por qué",
     "tendencia": "creciendo | estable | declinando"
   }},
+
   "angulos_dominantes": [
     "ángulo que TODOS usan 1",
     "ángulo que TODOS usan 2"
   ],
+
   "wedge": {{
-    "angulo": "el ángulo específico que nadie está atacando — sé concreto",
-    "razonamiento": "por qué este ángulo está libre",
-    "como_atacarlo": "estrategia concreta para tomar este ángulo, en 2-3 oraciones"
+    "angulo": "el ángulo específico que NADIE está atacando — sé ultra concreto",
+    "emocion_subutilizada": "emoción que nadie está activando bien",
+    "promesa_que_falta": "la promesa que el mercado no está haciendo",
+    "subnicho_abandonado": "el subnicho con baja competencia y alto potencial",
+    "mecanismo_unico_que_dominaria": "el mecanismo único que podrías ofrecer",
+    "razonamiento": "por qué este ángulo está libre — con datos",
+    "como_atacarlo": "estrategia concreta 2-3 oraciones"
   }},
+
+  "ideas_para_atacar": {{
+    "nuevos_angulos": ["ángulo 1", "ángulo 2", "ángulo 3"],
+    "hooks_virales": ["hook 1", "hook 2", "hook 3"],
+    "ofertas_irresistibles": ["oferta 1", "oferta 2", "oferta 3"],
+    "mejoras_de_funnel": ["mejora 1", "mejora 2", "mejora 3"],
+    "ideas_de_vsl": ["idea 1", "idea 2", "idea 3"],
+    "formas_de_superar_al_competidor": ["forma 1", "forma 2", "forma 3"]
+  }},
+
+  "script_template": {{
+    "hook_0_3s": "VISUAL + TEXTO + AUDIO — script exacto de los primeros 3 segundos",
+    "problema_3_8s": "VISUAL + TEXTO + VOZ",
+    "solucion_8_18s": "VISUAL + TEXTO + VOZ",
+    "prueba_18_23s": "VISUAL + TEXTO",
+    "cta_23_27s": "VISUAL + TEXTO + VOZ"
+  }},
+
   "pricing_recomendado": {{
     "rango_mercado": "$X - $Y observado",
     "tu_precio_sugerido": "$Z",
-    "razonamiento": "por qué ese precio"
+    "razonamiento": "por qué ese precio basado en el wedge"
   }},
-  "copy_winners": [
-    "elemento de copy 1 que está funcionando — para inspirarte",
-    "elemento 2"
-  ],
-  "puntos_de_dolor_top": [
-    "dolor 1 — el más fuerte y validado por los competidores",
-    "dolor 2",
-    "dolor 3"
-  ],
-  "avatar_consolidado": "descripción del cliente ideal sintetizada de todos los competidores (4-5 oraciones)",
+
+  "copy_winners": ["elemento copy 1 que funciona", "elemento 2"],
+  "puntos_de_dolor_top": ["dolor 1 validado por los competidores", "dolor 2", "dolor 3"],
+  "avatar_consolidado": "descripción del cliente ideal sintetizada de TODAS las fuentes (4-5 oraciones)",
+
   "go_no_go": {{
     "recomendacion": "GO | NO GO | GO CON CONDICIONES",
+    "explicacion_ejecutiva": "Por qué sí o no, qué señales muestran dinero real, si vale clonar el modelo, si conviene otro subnicho, dónde está la oportunidad REAL — 4-6 oraciones",
     "next_steps": ["paso accionable 1", "paso accionable 2", "paso accionable 3"]
   }},
+
   "seed_para_pipeline": {{
     "nicho": "nicho preciso para arrancar el infoproducto",
     "problema": "problema central que tu producto va a resolver, basado en el wedge",
-    "publico": "tu avatar específico (no copiar el avatar de los competidores, refinarlo)",
+    "publico": "tu avatar específico (refinado, no copiado)",
     "diferencial": "tu diferencial único basado en el wedge",
     "precio_objetivo": "tu precio recomendado",
-    "competidor_principal": "el competidor más fuerte que vas a tener que superar",
-    "notas": "notas extra estratégicas para que el agente del pipeline tenga contexto del wedge"
+    "competidor_principal": "el competidor más fuerte a superar",
+    "notas": "notas estratégicas para que el pipeline arranque con el WEDGE cargado"
   }}
 }}
 """
@@ -268,6 +395,115 @@ def analyze_ad(ad_text: str, api_key: str) -> dict:
     return _parse_json_strict(msg.content[0].text)
 
 
+def _summarize_library(library_data: Optional[dict]) -> str:
+    """Resume el JSON exportado por la extensión a un bloque legible para el prompt."""
+    if not library_data:
+        return "(sin datos de Biblioteca de Anuncios — el usuario no aportó la Fuente 1)"
+    try:
+        meta = library_data.get("meta", {})
+        summary = library_data.get("summary", {})
+        analysis = library_data.get("analysis", {})
+        ads = library_data.get("ads", []) or []
+
+        lines = []
+        lines.append(f"Fecha de scan: {meta.get('scraped_at', 'desconocida')}")
+        lines.append(f"Búsqueda: {meta.get('search_query', '') or meta.get('page_name', '')}")
+        lines.append(f"Total detectados: {meta.get('total_detected', 0)}"
+                     + (f" (de ~{meta['total_estimated']} estimados)" if meta.get('total_estimated') else ""))
+        lines.append(f"Tipos: videos={summary.get('videos', 0)}, imágenes={summary.get('images', 0)}, carruseles={summary.get('carousels', 0)}")
+        if summary.get('oldest_ad_date'):
+            lines.append(f"Ad más viejo: {summary['oldest_ad_date']} ({summary.get('oldest_ad_days', '?')} días)")
+        if summary.get('max_variations'):
+            lines.append(f"Máx. variaciones en un contenido: {summary['max_variations']}")
+        if summary.get('platforms'):
+            lines.append(f"Plataformas: {', '.join(summary['platforms'])}")
+
+        signals = analysis.get("scaling_signals", []) or []
+        if signals:
+            lines.append("\nSeñales de scaling detectadas:")
+            for s in signals[:6]:
+                lines.append(f"  - {s}")
+
+        hooks = analysis.get("hook_patterns", []) or []
+        if hooks:
+            lines.append("\nHooks repetidos (top):")
+            for h in hooks[:6]:
+                lines.append(f"  - \"{h.get('hook', '')}\" — freq {h.get('frequency', 1)}, max_var {h.get('max_variations', 1)}")
+
+        winner = analysis.get("probable_winner")
+        if winner:
+            lines.append(f"\nWinner probable: ID {winner.get('library_id', '?')}")
+            lines.append(f"  Hook: \"{winner.get('hook', '')}\"")
+            lines.append(f"  Variaciones: {winner.get('variation_count', '?')}, días activo: {winner.get('days_active', '?')}")
+            if winner.get('reason'):
+                lines.append(f"  Razón: {winner['reason']}")
+
+        # Muestreo de hasta 12 ads ordenados por antigüedad
+        sorted_ads = sorted(
+            (a for a in ads if isinstance(a, dict)),
+            key=lambda a: a.get("start_date_iso") or "9999",
+        )[:12]
+        if sorted_ads:
+            lines.append("\nMuestra de ads (más viejos primero, max 12):")
+            for i, ad in enumerate(sorted_ads):
+                lines.append(f"  [{i+1}] ID:{ad.get('library_id')} | {ad.get('media_type', '?')} | "
+                             f"desde {ad.get('start_date_iso', '?')} ({ad.get('days_active', '?')}d) | "
+                             f"variaciones: {ad.get('variation_count', 1)} | CTA: {ad.get('cta_text', '-')}")
+                hook = (ad.get("ad_text") or "").split("\n")[0][:120]
+                if hook:
+                    lines.append(f"      Hook: \"{hook}\"")
+
+        return "\n".join(lines)[:6000]
+    except Exception as e:
+        logger.warning(f"[market_validator] error summarizing library: {e}")
+        return json.dumps(library_data, ensure_ascii=False)[:3000]
+
+
+def _summarize_video_analysis(video_analysis: Optional[dict]) -> str:
+    """Resume el análisis de video del Spy de Ads (Fuente 3) para el prompt."""
+    if not video_analysis:
+        return "(sin análisis de video — el usuario no aportó la Fuente 3)"
+    try:
+        estructura = video_analysis.get("estructura_temporal", {}) or {}
+        copy = video_analysis.get("analisis_copy", {}) or {}
+        psico = video_analysis.get("analisis_psicologico", {}) or {}
+        estrat = video_analysis.get("analisis_estrategico", {}) or {}
+        veredicto = video_analysis.get("veredicto_duplicacion", {}) or {}
+        seed = video_analysis.get("pipeline_seed", {}) or {}
+
+        lines = []
+        if estrat.get("marca_detectada"):
+            lines.append(f"Marca detectada: {estrat['marca_detectada']}")
+        if estrat.get("nicho_exacto"):
+            lines.append(f"Nicho exacto: {estrat['nicho_exacto']}")
+        if estrat.get("angulo_central"):
+            lines.append(f"Ángulo central del video: {estrat['angulo_central']}")
+        if estrat.get("funnel_detectado"):
+            lines.append(f"Funnel detectado: {estrat['funnel_detectado']}")
+        if estructura.get("hook_0_3s"):
+            lines.append(f"\nHook (0-3s): {estructura['hook_0_3s']}")
+        if copy.get("hook_frase_exacta"):
+            lines.append(f"Hook frase exacta: \"{copy['hook_frase_exacta']}\"")
+        if copy.get("promesa_principal"):
+            lines.append(f"Promesa: {copy['promesa_principal']}")
+        if copy.get("mecanismo_unico"):
+            lines.append(f"Mecanismo único: {copy['mecanismo_unico']}")
+        if psico.get("avatar_implicito"):
+            lines.append(f"\nAvatar implícito: {psico['avatar_implicito']}")
+        if psico.get("dolor_especifico_tocado"):
+            lines.append(f"Dolor tocado: {psico['dolor_especifico_tocado']}")
+        if veredicto.get("wedge"):
+            lines.append(f"\nWEDGE detectado en el video: {veredicto['wedge']}")
+        if veredicto.get("score_general") is not None:
+            lines.append(f"Score del video: {veredicto['score_general']}/10")
+        if seed.get("notas_estrategicas"):
+            lines.append(f"\nNotas estratégicas: {seed['notas_estrategicas']}")
+        return "\n".join(lines)[:4000]
+    except Exception as e:
+        logger.warning(f"[market_validator] error summarizing video: {e}")
+        return json.dumps(video_analysis, ensure_ascii=False)[:3000]
+
+
 def synthesize_market(
     niche: str,
     notes: str,
@@ -275,12 +511,13 @@ def synthesize_market(
     ads: list[dict],
     ads_library_data: Optional[dict],
     api_key: str,
+    video_analysis: Optional[dict] = None,
 ) -> dict:
-    """Final market map + verdict + wedge + pipeline seed."""
+    """Final market map + verdict + wedge + pipeline seed. Acepta 3 fuentes (v2)."""
     client = anthropic.Anthropic(api_key=api_key)
     msg = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=4000,
+        max_tokens=6000,
         messages=[{
             "role": "user",
             "content": SYNTHESIS_PROMPT.format(
@@ -288,8 +525,8 @@ def synthesize_market(
                 notes=notes or "(sin notas adicionales)",
                 pages_json=json.dumps(pages, ensure_ascii=False)[:10000],
                 ads_json=json.dumps(ads, ensure_ascii=False)[:5000] or "[]",
-                ads_library_data=json.dumps(ads_library_data, ensure_ascii=False)[:3000]
-                                 if ads_library_data else "(sin datos de Ads Library — el usuario no los aportó)",
+                ads_library_data=_summarize_library(ads_library_data),
+                video_analysis=_summarize_video_analysis(video_analysis),
             ),
         }],
     )
@@ -303,10 +540,12 @@ def validate_market(
     notes: str,
     api_key: str,
     ads_library_data: Optional[dict] = None,
+    video_analysis: Optional[dict] = None,
 ) -> dict:
     """
-    Main entry point — runs all 3 agents in sequence and returns the
-    full market analysis.
+    Main entry point — corre los agentes y devuelve el análisis completo.
+    Acepta hasta 3 fuentes: landing URLs (Fuente 2), library_data (Fuente 1),
+    video_analysis (Fuente 3).
     """
     page_analyses = []
     for url in urls:
@@ -324,6 +563,7 @@ def validate_market(
         niche=niche, notes=notes,
         pages=page_analyses, ads=ad_analyses,
         ads_library_data=ads_library_data,
+        video_analysis=video_analysis,
         api_key=api_key,
     )
 

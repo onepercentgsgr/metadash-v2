@@ -2144,6 +2144,8 @@ class MarketValidateRequest(BaseModel):
     niche: str = ""
     notes: str = ""
     ads_library_data: Optional[Dict[str, Any]] = None
+    video_analysis_id: Optional[str] = None
+    video_analysis: Optional[Dict[str, Any]] = None
 
 
 class CompetitorDeepAnalyzeRequest(BaseModel):
@@ -2749,8 +2751,8 @@ async def validate_market_endpoint(
     if not api_key:
         raise HTTPException(status_code=400, detail="Anthropic API key not configured")
 
-    if not request.urls and not request.ads:
-        raise HTTPException(status_code=400, detail="Pegá al menos 1 URL o 1 ad para validar")
+    if not request.urls and not request.ads and not request.ads_library_data and not (request.video_analysis_id or request.video_analysis):
+        raise HTTPException(status_code=400, detail="Pegá al menos 1 URL, 1 ad, datos de Biblioteca o un análisis de video para validar")
 
     import uuid as _uuid
     validation_id = str(_uuid.uuid4())
@@ -2767,6 +2769,16 @@ async def validate_market_endpoint(
     db.add(record)
     db.commit()
 
+    # Si vino video_analysis_id, cargamos el análisis desde DB
+    video_analysis_payload = request.video_analysis
+    if not video_analysis_payload and request.video_analysis_id:
+        vrec = db.query(VideoAnalysis).filter(
+            VideoAnalysis.analysis_id == request.video_analysis_id,
+            VideoAnalysis.user_id == user.id,
+        ).first()
+        if vrec and vrec.analysis:
+            video_analysis_payload = vrec.analysis
+
     try:
         from agents.market_validator import validate_market
         result = validate_market(
@@ -2776,6 +2788,7 @@ async def validate_market_endpoint(
             notes=request.notes,
             api_key=api_key,
             ads_library_data=request.ads_library_data,
+            video_analysis=video_analysis_payload,
         )
         synth = result.get("synthesis") or {}
         verdict = (synth.get("veredicto") or {}).get("verdict") or None
