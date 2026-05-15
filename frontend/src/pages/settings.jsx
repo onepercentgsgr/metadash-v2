@@ -73,6 +73,16 @@ const SECTIONS = [
     ],
   },
   {
+    id: 'clarity',
+    title: 'Microsoft Clarity',
+    icon: 'audit',
+    accent: '#f59e0b',
+    description: 'Análisis visual de comportamiento en tu landing: mapas de calor, grabaciones de sesión y análisis de clicks',
+    fields: [
+      { name: 'clarity_project_id', label: 'Project ID de Clarity', type: 'text', help: 'ID del proyecto en app.clarity.ms — lo encontrás en Settings → Overview (ej: abc123xyz)' },
+    ],
+  },
+  {
     id: 'avanzado',
     title: 'Configuración Avanzada',
     icon: 'settings',
@@ -101,7 +111,7 @@ export default function SettingsPage() {
     meta_access_token: '', meta_ad_account_id: '', meta_app_id: '', meta_app_secret: '',
     anthropic_api_key: '', hf_api_key: '', negocio_info: '', landing_page_url: '',
     shopify_store_url: '', shopify_webhook_secret: '', mercadopago_access_token: '',
-    ga4_property_id: '',
+    ga4_property_id: '', clarity_project_id: '',
   });
 
   useEffect(() => { fetchConfig(); }, []);

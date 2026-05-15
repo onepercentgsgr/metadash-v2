@@ -91,6 +91,28 @@ def _run_migrations():
 _run_migrations()
 Base.metadata.create_all(bind=engine)
 
+
+def _run_safe_migrations():
+    """Agrega columnas nuevas a tablas existentes sin romper datos."""
+    from sqlalchemy import text, inspect as sa_inspect
+    inspector = sa_inspect(engine)
+    existing = {c["name"] for c in inspector.get_columns("tenant_configs")}
+    new_cols = {
+        "clarity_project_id": "VARCHAR",
+    }
+    with engine.connect() as conn:
+        for col, col_type in new_cols.items():
+            if col not in existing:
+                conn.execute(text(f"ALTER TABLE tenant_configs ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                logger.info(f"Migration: added column tenant_configs.{col}")
+
+
+try:
+    _run_safe_migrations()
+except Exception as _e:
+    logger.warning(f"Safe migration skipped: {_e}")
+
 # Create FastAPI app
 app = FastAPI(title="MetaDash API", version="2.0.0")
 
@@ -225,6 +247,7 @@ class TenantConfigUpdate(BaseModel):
     shopify_store_url: Optional[str] = None
     shopify_webhook_secret: Optional[str] = None
     mercadopago_access_token: Optional[str] = None
+    clarity_project_id: Optional[str] = None
 
 
 class TenantConfigResponse(BaseModel):
@@ -241,6 +264,7 @@ class TenantConfigResponse(BaseModel):
     shopify_store_url: Optional[str] = None
     shopify_webhook_secret: Optional[str] = None
     mercadopago_access_token: Optional[str] = None
+    clarity_project_id: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -1302,6 +1326,97 @@ async def campaign_action(
         raise HTTPException(status_code=502, detail=f"Error: {str(e)}")
 
 
+@app.get("/campaigns/{campaign_id}/adsets")
+async def get_campaign_adsets(
+    campaign_id: str,
+    date_preset: str = "last_7d",
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Trae los conjuntos de anuncios de una campaña con métricas."""
+    user = await check_subscription(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+
+    if not config_obj.meta_access_token:
+        raise HTTPException(status_code=400, detail="Meta API token not configured")
+
+    try:
+        from meta_api import get_adsets as fetch_adsets
+        adsets = await fetch_adsets(
+            access_token=config_obj.meta_access_token,
+            campaign_id=campaign_id,
+            date_preset=date_preset,
+        )
+        return adsets
+    except Exception as e:
+        logger.error(f"Adsets error for user {user.id}: {e}")
+        raise HTTPException(status_code=502, detail=f"Error fetching ad sets: {str(e)}")
+
+
+@app.get("/campaigns/{campaign_id}/daily")
+async def get_campaign_daily(
+    campaign_id: str,
+    days: int = 14,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Trae breakdown día por día de una campaña."""
+    user = await check_subscription(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+
+    if not config_obj.meta_access_token:
+        raise HTTPException(status_code=400, detail="Meta API token not configured")
+
+    try:
+        from meta_api import get_daily_breakdown
+        data = await get_daily_breakdown(
+            access_token=config_obj.meta_access_token,
+            campaign_id=campaign_id,
+            days=days,
+        )
+        return data
+    except Exception as e:
+        logger.error(f"Daily breakdown error for user {user.id}: {e}")
+        raise HTTPException(status_code=502, detail=f"Error fetching daily data: {str(e)}")
+
+
+@app.post("/adsets/action")
+async def adset_action(
+    request: dict,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Pausar o activar un conjunto de anuncios en Meta Ads."""
+    user = await check_subscription(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+
+    adset_id = request.get("adset_id")
+    action = request.get("action", "pause")
+
+    if not adset_id:
+        raise HTTPException(status_code=400, detail="adset_id is required")
+    if not config_obj.meta_access_token:
+        raise HTTPException(status_code=400, detail="Meta API token not configured")
+
+    try:
+        from meta_api import pause_adset, enable_adset
+        if action == "pause":
+            success = await pause_adset(config_obj.meta_access_token, adset_id)
+            new_status = "PAUSED"
+        else:
+            success = await enable_adset(config_obj.meta_access_token, adset_id)
+            new_status = "ACTIVE"
+
+        if success:
+            return {"adset_id": adset_id, "status": new_status, "success": True}
+        else:
+            raise HTTPException(status_code=502, detail="Meta API returned error")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Error: {str(e)}")
+
+
 # Agent Endpoints
 @app.post("/agent/optimize", response_model=AgentResponse)
 async def optimize_campaigns(
@@ -1335,7 +1450,15 @@ async def optimize_campaigns(
             except Exception as meta_err:
                 logger.warning(f"Auto-fetch failed (non-blocking): {meta_err}")
 
-        result = run_optimizer(campaigns_data, config_obj.negocio_info or "", api_key)
+        adsets_data = (request.context or {}).get("adsets_data", [])
+        clarity_insights = (request.context or {}).get("clarity_insights", "")
+        result = run_optimizer(
+            campaigns_data,
+            config_obj.negocio_info or "",
+            api_key,
+            adsets_data=adsets_data,
+            clarity_insights=clarity_insights,
+        )
 
         log_entry = AgentLog(
             user_id=user.id,
