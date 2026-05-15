@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Icon } from '../components/Icons';
+import { Markdown } from '../components/Markdown';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const BG      = '#09090b';
@@ -344,6 +345,22 @@ export default function LanzarPage() {
   const [productState, setProductState] = useState({});
   const [completedSteps, setCompletedSteps] = useState([]);
   const [isStreaming, setIsStreaming] = useState(false);
+  const [quota, setQuota] = useState(null);
+
+  // Fetch monthly pipeline quota for the badge
+  useEffect(() => {
+    (async () => {
+      try {
+        const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        if (!token) return;
+        const res = await fetch(`${API_URL}/me/pipeline-quota`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) setQuota(await res.json());
+      } catch {}
+    })();
+  }, []);
 
   const messagesEndRef = useRef(null);
   const textareaRef    = useRef(null);
@@ -366,6 +383,48 @@ export default function LanzarPage() {
       .filter((m) => m.role === 'user' || m.role === 'assistant')
       .map((m) => ({ role: m.role, content: m.content }));
 
+  // Export entire conversation + product state as Markdown file
+  const downloadInfoproducto = () => {
+    const productName = productState.nombre || 'infoproducto';
+    const slug = String(productName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'infoproducto';
+
+    const lines = [];
+    lines.push(`# ${productName}`);
+    lines.push('');
+    lines.push(`_Generado por MetaDash · ${new Date().toLocaleDateString('es-AR')}_`);
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+    lines.push('## 📋 Datos del Infoproducto');
+    lines.push('');
+    Object.entries(productState).forEach(([k, v]) => {
+      if (v) lines.push(`- **${k}**: ${v}`);
+    });
+    lines.push('');
+    lines.push('---');
+    lines.push('');
+    lines.push('## 💬 Conversación completa con el agente');
+    lines.push('');
+    messages.forEach((msg) => {
+      if (!msg.content) return;
+      lines.push(`### ${msg.role === 'user' ? '👤 Vos' : '🤖 Agente IA'}`);
+      lines.push('');
+      lines.push(msg.content);
+      lines.push('');
+    });
+
+    const md = lines.join('\n');
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${slug}-${Date.now()}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const sendMessage = async () => {
     if (!inputText.trim() || isStreaming) return;
 
@@ -386,7 +445,8 @@ export default function LanzarPage() {
       const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
       const history = buildHistory(messages); // history before new user msg
 
-      const res = await fetch('/api/agents/chat/launch', {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const res = await fetch(`${API_URL}/agents/chat/launch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -574,17 +634,96 @@ export default function LanzarPage() {
           {/* ── Left: chat panel ── */}
           <div style={styles.chatLeft}>
             {/* Header */}
-            <div style={styles.chatHeader}>
-              <button style={styles.chatHeaderBack} onClick={() => setMode('selector')}>
-                <Icon name="chevronLeft" size={13} />
-                Volver
-              </button>
-              <div>
-                <p style={styles.chatHeaderTitle}>
-                  <Icon name="brain" size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
-                  Modo IA — Nivel Dios
-                </p>
-                <p style={styles.chatHeaderSub}>El agente guía tu lanzamiento paso a paso</p>
+            <div style={{ ...styles.chatHeader, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button style={styles.chatHeaderBack} onClick={() => setMode('selector')}>
+                  <Icon name="chevronLeft" size={13} />
+                  Volver
+                </button>
+                <div>
+                  <p style={styles.chatHeaderTitle}>
+                    <Icon name="brain" size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                    Modo IA — Nivel Dios
+                  </p>
+                  <p style={styles.chatHeaderSub}>El agente guía tu lanzamiento paso a paso</p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                {quota && (
+                  <span
+                    title={`Plan ${quota.plan_display}`}
+                    style={{
+                      padding: '4px 10px',
+                      borderRadius: 999,
+                      background: 'rgba(255,255,255,0.04)',
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      color: 'rgba(255,255,255,0.55)',
+                      fontSize: 11,
+                      fontWeight: 600,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {quota.limit == null ? 'Ilimitado' : `${quota.used}/${quota.limit} este mes`}
+                  </span>
+                )}
+                <button
+                  onClick={downloadInfoproducto}
+                  disabled={messages.length < 2}
+                  style={{
+                    padding: '8px 14px',
+                    background: messages.length < 2 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.06)',
+                    color: messages.length < 2 ? 'rgba(255,255,255,0.3)' : '#fff',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: messages.length < 2 ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    whiteSpace: 'nowrap',
+                  }}
+                  title="Descargar la conversación como Markdown"
+                >
+                  <Icon name="file" size={13} />
+                  Descargar chat
+                </button>
+                <button
+                  onClick={() => {
+                    // Persist chat-extracted state. Backend's bridge function
+                    // maps these flat keys (nicho, problema, precio, etc.) into
+                    // the nested pipeline shape, so we send them as-is.
+                    try {
+                      localStorage.setItem(
+                        'metadash_pipeline_seed',
+                        JSON.stringify(productState || {}),
+                      );
+                    } catch {}
+                    window.location.href = '/infoproducto/run';
+                  }}
+                  disabled={Object.keys(productState || {}).length < 3}
+                  style={{
+                    padding: '8px 14px',
+                    background: Object.keys(productState || {}).length < 3
+                      ? 'rgba(255,255,255,0.04)'
+                      : 'linear-gradient(135deg,#4f46e5,#7c3aed)',
+                    color: Object.keys(productState || {}).length < 3 ? 'rgba(255,255,255,0.3)' : '#fff',
+                    border: 'none',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: Object.keys(productState || {}).length < 3 ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    whiteSpace: 'nowrap',
+                    boxShadow: Object.keys(productState || {}).length >= 3 ? '0 4px 14px rgba(79,70,229,0.4)' : 'none',
+                  }}
+                  title="Correr el pipeline Nivel Dios: 16 agentes generan tu infoproducto completo"
+                >
+                  <Icon name="rocket" size={13} />
+                  Generar infoproducto completo
+                </button>
               </div>
             </div>
 
@@ -595,7 +734,13 @@ export default function LanzarPage() {
                   <div style={styles.messageRole}>
                     {msg.role === 'user' ? 'Vos' : 'Agente IA'}
                   </div>
-                  {msg.content || (msg.streaming && (
+                  {msg.content ? (
+                    msg.role === 'assistant' ? (
+                      <Markdown compact>{msg.content}</Markdown>
+                    ) : (
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{msg.content}</div>
+                    )
+                  ) : (msg.streaming && (
                     <span>
                       <span style={styles.typingDot} />
                       <span style={{ ...styles.typingDot, animationDelay: '0.2s' }} />

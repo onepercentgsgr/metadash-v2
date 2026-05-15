@@ -43,6 +43,9 @@ class TenantConfig(Base):
     shopify_store_url = Column(String, nullable=True)
     _shopify_webhook_secret = Column("shopify_webhook_secret", String, nullable=True)
     _mercadopago_access_token = Column("mercadopago_access_token", String, nullable=True)
+    clarity_project_id = Column(String, nullable=True)
+    target_margin = Column(String, nullable=True)  # % como string para evitar Float migration issues
+    notification_email = Column(String, nullable=True)
 
     user = relationship("User", back_populates="tenant_config")
 
@@ -178,6 +181,83 @@ class GeneratedVideo(Base):
     angle = Column(String, nullable=True)
     date = Column(String, index=True)  # YYYY-MM-DD
     created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User")
+
+
+class PipelineRun(Base):
+    __tablename__ = "pipeline_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    run_id = Column(String, unique=True, index=True)
+    status = Column(String, default="running")  # "running", "complete", "error"
+    product_name = Column(String, nullable=True)
+    deliverables = Column(JSON, nullable=True)
+    state_snapshot = Column(JSON, nullable=True)
+    error_message = Column(Text, nullable=True)
+    duration_seconds = Column(Integer, nullable=True)
+    started_at = Column(DateTime, default=datetime.utcnow, index=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    user = relationship("User")
+
+
+class MarketValidation(Base):
+    __tablename__ = "market_validations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    validation_id = Column(String, unique=True, index=True)
+    niche = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+    urls = Column(JSON, nullable=True)
+    ads = Column(JSON, nullable=True)
+    pages_analysis = Column(JSON, nullable=True)
+    ads_analysis = Column(JSON, nullable=True)
+    synthesis = Column(JSON, nullable=True)
+    score = Column(Integer, nullable=True, index=True)
+    verdict = Column(String, nullable=True)  # 🟢 RENTABLE / 🟡 RIESGOSO / 🔴 EVITAR
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    user = relationship("User")
+
+
+class CompetitorAnalysis(Base):
+    __tablename__ = "competitor_analyses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    analysis_id = Column(String, unique=True, index=True)
+    competitor_brand = Column(String, nullable=True)
+    niche = Column(String, nullable=True)
+    landing_url = Column(String, nullable=True)
+    inputs = Column(JSON, nullable=True)  # ad_transcription, visual desc, ads_library_manual, hypothesis
+    analysis = Column(JSON, nullable=True)  # full structured output
+    verdict = Column(String, nullable=True)
+    score = Column(Integer, nullable=True, index=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+    user = relationship("User")
+
+
+class VideoAnalysis(Base):
+    __tablename__ = "video_analyses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    analysis_id = Column(String, unique=True, index=True)
+    filename = Column(String, nullable=True)
+    niche = Column(String, nullable=True)
+    brand = Column(String, nullable=True)
+    frames_analyzed = Column(Integer, nullable=True)
+    analysis = Column(JSON, nullable=True)
+    verdict = Column(String, nullable=True)
+    score = Column(Integer, nullable=True, index=True)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
 
     user = relationship("User")
 

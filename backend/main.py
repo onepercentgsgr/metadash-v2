@@ -20,7 +20,7 @@ from slowapi.errors import RateLimitExceeded
 from fastapi.responses import JSONResponse
 
 from database import engine, get_db, Base
-from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog
+from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog, PipelineRun, MarketValidation, CompetitorAnalysis, VideoAnalysis
 from agents.shared_memory import AgentMemory  # registers table with Base.metadata
 import config
 from plan_limits import check_feature_access, check_generation_limit, get_plan_limits, PLAN_DISPLAY_NAMES
@@ -91,6 +91,30 @@ def _run_migrations():
 _run_migrations()
 Base.metadata.create_all(bind=engine)
 
+
+def _run_safe_migrations():
+    """Agrega columnas nuevas a tablas existentes sin romper datos."""
+    from sqlalchemy import text, inspect as sa_inspect
+    inspector = sa_inspect(engine)
+    existing = {c["name"] for c in inspector.get_columns("tenant_configs")}
+    new_cols = {
+        "clarity_project_id": "VARCHAR",
+        "target_margin": "VARCHAR",
+        "notification_email": "VARCHAR",
+    }
+    with engine.connect() as conn:
+        for col, col_type in new_cols.items():
+            if col not in existing:
+                conn.execute(text(f"ALTER TABLE tenant_configs ADD COLUMN {col} {col_type}"))
+                conn.commit()
+                logger.info(f"Migration: added column tenant_configs.{col}")
+
+
+try:
+    _run_safe_migrations()
+except Exception as _e:
+    logger.warning(f"Safe migration skipped: {_e}")
+
 # Create FastAPI app
 app = FastAPI(title="MetaDash API", version="2.0.0")
 
@@ -159,6 +183,14 @@ if PAYMENTS_AVAILABLE:
 if V35_AVAILABLE:
     app.include_router(v35_router)
 
+# Include Master Sky integration (external dashboard aggregator)
+try:
+    from master_sky_routes import router as master_sky_router
+    app.include_router(master_sky_router)
+    logger.info("Master Sky routes loaded")
+except Exception as e:
+    logger.warning(f"Master Sky routes failed to load: {e}")
+
 # Include chat launch routes
 if CHAT_AVAILABLE:
     app.include_router(chat_router)
@@ -217,6 +249,9 @@ class TenantConfigUpdate(BaseModel):
     shopify_store_url: Optional[str] = None
     shopify_webhook_secret: Optional[str] = None
     mercadopago_access_token: Optional[str] = None
+    clarity_project_id: Optional[str] = None
+    target_margin: Optional[str] = None
+    notification_email: Optional[str] = None
 
 
 class TenantConfigResponse(BaseModel):
@@ -233,6 +268,9 @@ class TenantConfigResponse(BaseModel):
     shopify_store_url: Optional[str] = None
     shopify_webhook_secret: Optional[str] = None
     mercadopago_access_token: Optional[str] = None
+    clarity_project_id: Optional[str] = None
+    target_margin: Optional[str] = None
+    notification_email: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -551,6 +589,7 @@ def startup_event():
                 email=admin_email,
                 hashed_password=hash_password(admin_password),
                 name="Admin",
+                # NOTE: password will be force-synced below
                 role="admin",
                 is_active=True,
             )
@@ -573,12 +612,12 @@ def startup_event():
             )
             db.add(subscription)
             db.commit()
-        elif admin.role != "admin":
-            # If admin email user exists but isn't admin yet, upgrade them
-            admin.role = "admin"
-            admin.is_active = True
-            db.commit()
-            logger.info(f"Upgraded {admin_email} to admin role")
+        # Always sync admin password + role from env vars (handles stale DB from old deploys)
+        admin.hashed_password = hash_password(admin_password)
+        admin.role = "admin"
+        admin.is_active = True
+        db.commit()
+        logger.info(f"Admin credentials synced for {admin_email}")
 
         # Ensure admin has enterprise plan (not trial)
         admin_sub = db.query(Subscription).filter(
@@ -1273,6 +1312,10 @@ async def campaign_action(
     if not config_obj.meta_access_token:
         raise HTTPException(status_code=400, detail="Meta API token not configured")
 
+    before_metrics = request.get("before_metrics", {})
+    campaign_name = request.get("campaign_name", campaign_id)
+    triggered_by = request.get("triggered_by", "manual")
+
     try:
         from meta_api import pause_campaign, enable_campaign
         if action == "pause":
@@ -1283,6 +1326,19 @@ async def campaign_action(
             new_status = "ACTIVE"
 
         if success:
+            log_entry = AutonomousActionLog(
+                user_id=user.id,
+                action_type=f"{action}_campaign",
+                status="executed",
+                target=campaign_id,
+                description=f"{'Pausar' if action == 'pause' else 'Activar'} campaña: {campaign_name}",
+                details={"before_metrics": before_metrics, "after_metrics": None},
+                triggered_by=triggered_by,
+                requires_approval=False,
+                executed_at=datetime.utcnow(),
+            )
+            db.add(log_entry)
+            db.commit()
             return {"campaign_id": campaign_id, "status": new_status, "success": True}
         else:
             raise HTTPException(status_code=502, detail="Meta API returned error")
@@ -1290,6 +1346,259 @@ async def campaign_action(
         raise
     except Exception as e:
         logger.error(f"Campaign action error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Error: {str(e)}")
+
+
+@app.get("/campaigns/{campaign_id}/adsets")
+async def get_campaign_adsets(
+    campaign_id: str,
+    date_preset: str = "last_7d",
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Trae los conjuntos de anuncios de una campaña con métricas."""
+    user = await check_subscription(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+
+    if not config_obj.meta_access_token:
+        raise HTTPException(status_code=400, detail="Meta API token not configured")
+
+    try:
+        from meta_api import get_adsets as fetch_adsets
+        adsets = await fetch_adsets(
+            access_token=config_obj.meta_access_token,
+            campaign_id=campaign_id,
+            date_preset=date_preset,
+        )
+        return adsets
+    except Exception as e:
+        logger.error(f"Adsets error for user {user.id}: {e}")
+        raise HTTPException(status_code=502, detail=f"Error fetching ad sets: {str(e)}")
+
+
+@app.get("/campaigns/{campaign_id}/daily")
+async def get_campaign_daily(
+    campaign_id: str,
+    days: int = 14,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Trae breakdown día por día de una campaña."""
+    user = await check_subscription(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+
+    if not config_obj.meta_access_token:
+        raise HTTPException(status_code=400, detail="Meta API token not configured")
+
+    try:
+        from meta_api import get_daily_breakdown
+        data = await get_daily_breakdown(
+            access_token=config_obj.meta_access_token,
+            campaign_id=campaign_id,
+            days=days,
+        )
+        return data
+    except Exception as e:
+        logger.error(f"Daily breakdown error for user {user.id}: {e}")
+        raise HTTPException(status_code=502, detail=f"Error fetching daily data: {str(e)}")
+
+
+@app.get("/campaigns/{campaign_id}/ads")
+async def get_campaign_ads(
+    campaign_id: str,
+    date_preset: str = "last_7d",
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Trae los anuncios de una campaña con métricas y creatividad."""
+    user = await check_subscription(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    if not config_obj.meta_access_token:
+        raise HTTPException(status_code=400, detail="Meta API token not configured")
+    try:
+        from meta_api import get_ads_for_campaign
+        ads = await get_ads_for_campaign(
+            access_token=config_obj.meta_access_token,
+            campaign_id=campaign_id,
+            date_preset=date_preset,
+        )
+        return ads
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Error fetching ads: {str(e)}")
+
+
+@app.post("/agents/war-room")
+async def run_war_room(
+    request: dict,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Sesión diaria completa: 4 agentes en cadena → plan de acción con 5 prioridades."""
+    user = await check_subscription(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+
+    campaigns_data = request.get("campaigns_data", [])
+    adsets_data = request.get("adsets_data", [])
+    ads_data = request.get("ads_data", [])
+    clarity_insights = request.get("clarity_insights", "")
+
+    if not campaigns_data and config_obj.meta_access_token and config_obj.meta_ad_account_id:
+        try:
+            from meta_api import get_campaigns as fetch_meta
+            campaigns_data = await fetch_meta(
+                access_token=config_obj.meta_access_token,
+                ad_account_id=config_obj.meta_ad_account_id,
+                date_preset="last_7d",
+            )
+        except Exception as meta_err:
+            logger.warning(f"War room auto-fetch failed: {meta_err}")
+
+    target_margin = float(config_obj.target_margin or 0)
+
+    try:
+        from agents.war_room import run_war_room as _run_war_room
+        result = _run_war_room(
+            campaigns_data=campaigns_data,
+            adsets_data=adsets_data,
+            ads_data=ads_data,
+            negocio_info=config_obj.negocio_info or "",
+            target_margin=target_margin,
+            clarity_insights=clarity_insights,
+            api_key=api_key,
+        )
+        log_entry = AgentLog(
+            user_id=user.id,
+            agent_type="war_room",
+            input_summary=f"{len(campaigns_data)} campaigns, {len(adsets_data)} adsets",
+            output=result.get("resumen_ejecutivo", "")[:500],
+        )
+        db.add(log_entry)
+        db.commit()
+        return result
+    except Exception as e:
+        logger.error(f"War room error for user {user.id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error running war room: {str(e)}")
+
+
+@app.get("/notifications/check")
+async def check_notifications(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Chequea umbrales de campañas y devuelve alertas. Envía email si hay críticas."""
+    user = await check_subscription(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    if not config_obj.meta_access_token or not config_obj.meta_ad_account_id:
+        return []
+
+    try:
+        from meta_api import get_campaigns as fetch_meta
+        campaigns_data = await fetch_meta(
+            access_token=config_obj.meta_access_token,
+            ad_account_id=config_obj.meta_ad_account_id,
+            date_preset="last_7d",
+        )
+    except Exception:
+        return []
+
+    target_margin = float(config_obj.target_margin or 0)
+    notification_email = config_obj.notification_email or ""
+
+    try:
+        from agents.notifier import check_thresholds
+        alerts = check_thresholds(campaigns_data, target_margin, notification_email)
+        return alerts
+    except Exception as e:
+        logger.warning(f"Notification check failed for user {user.id}: {e}")
+        return []
+
+
+@app.get("/decisions")
+async def get_decisions(
+    limit: int = 50,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Retorna el historial de acciones ejecutadas con métricas antes/después."""
+    user = await check_subscription(authorization, db)
+    entries = (
+        db.query(AutonomousActionLog)
+        .filter(AutonomousActionLog.user_id == user.id)
+        .order_by(AutonomousActionLog.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    result = []
+    for e in entries:
+        days_since = (datetime.utcnow() - e.created_at).days
+        details = e.details or {}
+        details["days_since"] = days_since
+        result.append({
+            "id": e.id,
+            "action_type": e.action_type,
+            "status": e.status,
+            "target": e.target,
+            "description": e.description,
+            "details": details,
+            "triggered_by": e.triggered_by,
+            "created_at": e.created_at.isoformat() if e.created_at else None,
+        })
+    return result
+
+
+@app.post("/adsets/action")
+async def adset_action(
+    request: dict,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Pausar o activar un conjunto de anuncios en Meta Ads."""
+    user = await check_subscription(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+
+    adset_id = request.get("adset_id")
+    action = request.get("action", "pause")
+    before_metrics = request.get("before_metrics", {})
+    adset_name = request.get("adset_name", adset_id)
+    triggered_by = request.get("triggered_by", "manual")
+
+    if not adset_id:
+        raise HTTPException(status_code=400, detail="adset_id is required")
+    if not config_obj.meta_access_token:
+        raise HTTPException(status_code=400, detail="Meta API token not configured")
+
+    try:
+        from meta_api import pause_adset, enable_adset
+        if action == "pause":
+            success = await pause_adset(config_obj.meta_access_token, adset_id)
+            new_status = "PAUSED"
+        else:
+            success = await enable_adset(config_obj.meta_access_token, adset_id)
+            new_status = "ACTIVE"
+
+        if success:
+            log_entry = AutonomousActionLog(
+                user_id=user.id,
+                action_type=f"{action}_adset",
+                status="executed",
+                target=adset_id,
+                description=f"{'Pausar' if action == 'pause' else 'Activar'} conjunto: {adset_name}",
+                details={"before_metrics": before_metrics, "after_metrics": None},
+                triggered_by=triggered_by,
+                requires_approval=False,
+                executed_at=datetime.utcnow(),
+            )
+            db.add(log_entry)
+            db.commit()
+            return {"adset_id": adset_id, "status": new_status, "success": True}
+        else:
+            raise HTTPException(status_code=502, detail="Meta API returned error")
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(status_code=502, detail=f"Error: {str(e)}")
 
 
@@ -1326,7 +1635,15 @@ async def optimize_campaigns(
             except Exception as meta_err:
                 logger.warning(f"Auto-fetch failed (non-blocking): {meta_err}")
 
-        result = run_optimizer(campaigns_data, config_obj.negocio_info or "", api_key)
+        adsets_data = (request.context or {}).get("adsets_data", [])
+        clarity_insights = (request.context or {}).get("clarity_insights", "")
+        result = run_optimizer(
+            campaigns_data,
+            config_obj.negocio_info or "",
+            api_key,
+            adsets_data=adsets_data,
+            clarity_insights=clarity_insights,
+        )
 
         log_entry = AgentLog(
             user_id=user.id,
@@ -2121,6 +2438,34 @@ class InfoproductoRunRequest(BaseModel):
     state: Dict[str, Any]
 
 
+class InfoproductoFromUrlRequest(BaseModel):
+    url: str
+
+
+class PipelineRunRequest(BaseModel):
+    state: Dict[str, Any] = {}
+
+
+class MarketValidateRequest(BaseModel):
+    urls: List[str] = []
+    ads: List[str] = []
+    niche: str = ""
+    notes: str = ""
+    ads_library_data: Optional[Dict[str, Any]] = None
+    video_analysis_id: Optional[str] = None
+    video_analysis: Optional[Dict[str, Any]] = None
+
+
+class CompetitorDeepAnalyzeRequest(BaseModel):
+    competitor_brand: str = ""
+    niche: str = ""
+    landing_url: str = ""
+    ad_transcription: str = ""
+    ad_visual_description: str = ""
+    ads_library_manual: Optional[Dict[str, Any]] = None
+    user_hypothesis: str = ""
+
+
 class TikTokAdsRunRequest(BaseModel):
     mode: str  # "strategy" | "optimize"
     payload: Dict[str, Any] = {}
@@ -2189,6 +2534,772 @@ async def run_infoproducto_endpoint(
     except Exception as e:
         logger.error(f"Infoproducto agent error: {type(e).__name__}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error en agente infoproducto: {str(e)}")
+
+
+@app.post("/agents/infoproducto/from-url")
+async def infoproducto_from_url_endpoint(
+    request: InfoproductoFromUrlRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+
+    url = request.url.strip()
+    if not url.startswith(("http://", "https://")):
+        url = "https://" + url
+
+    try:
+        import httpx
+        from bs4 import BeautifulSoup
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; MetaDash/3.5; +https://metadash.app)",
+            "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
+        }
+        async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client:
+            resp = await client.get(url, headers=headers)
+        resp.raise_for_status()
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        for tag in soup(["script", "style", "nav", "footer", "header", "noscript", "iframe"]):
+            tag.decompose()
+
+        title = soup.title.string.strip() if soup.title and soup.title.string else ""
+        text_blocks = []
+        for tag in soup.find_all(["h1", "h2", "h3", "p", "li", "span", "strong", "em"]):
+            t = tag.get_text(separator=" ", strip=True)
+            if len(t) > 20:
+                text_blocks.append(t)
+
+        page_text = "\n".join(dict.fromkeys(text_blocks))[:12000]
+
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=422, detail=f"No se pudo acceder a la URL: HTTP {e.response.status_code}")
+    except httpx.RequestError as e:
+        raise HTTPException(status_code=422, detail=f"Error de red al acceder a la URL: {str(e)}")
+    except Exception as e:
+        logger.error(f"from-url scrape error: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=422, detail=f"Error procesando la URL: {str(e)}")
+
+    prompt = f"""Eres un experto en marketing de infoproductos. Analiza el contenido de esta página de ventas/landing y extrae la información clave para armar el modelado de oferta.
+
+URL: {url}
+Título: {title}
+
+CONTENIDO DE LA PÁGINA:
+{page_text}
+
+Devuelve ÚNICAMENTE un JSON válido con esta estructura exacta (sin markdown, sin explicaciones adicionales):
+{{
+  "nombre": "nombre del producto o servicio",
+  "tipo": "uno de: ebook, curso, membresía, plantilla, servicio, coaching, comunidad",
+  "problema": "qué problema principal resuelve (2-4 oraciones)",
+  "publico": "descripción del avatar/público objetivo (2-3 oraciones)",
+  "incluye": "qué incluye el producto (lista de bullet points separados por \\n)",
+  "precio": "precio mencionado o vacío si no se encuentra",
+  "diferencial": "qué lo hace único o diferente a la competencia (2-3 oraciones)",
+  "prueba_social": "testimonios, resultados o prueba social mencionada (resume en 2-3 oraciones)",
+  "competidor": "competidor o alternativa mencionada, o vacío",
+  "bonus_count": "cantidad de bonos si se mencionan, o '0'",
+  "notas": "información adicional relevante que no encaja en los campos anteriores"
+}}"""
+
+    try:
+        import anthropic as anthropic_sdk
+        client = anthropic_sdk.Anthropic(api_key=api_key)
+        msg = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1500,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = msg.content[0].text.strip()
+        # Strip markdown code fences if present
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        oferta = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=500, detail=f"Claude devolvió JSON inválido: {str(e)}")
+    except Exception as e:
+        logger.error(f"from-url claude error: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error en el análisis con IA: {str(e)}")
+
+    return {"oferta": oferta}
+
+
+def _bridge_chat_state_to_pipeline_state(chat_state: dict) -> dict:
+    """
+    Bridge the flat shape produced by the chat-launch agent (top-level keys
+    like ``nicho``, ``problema``, ``precio``, ``nombre``, ``mecanismo``,
+    ``audiencia``, ``formato``, ``pais``) into the nested shape that the
+    Nivel Dios pipeline + playbook prompts expect (mirror of the frontend
+    ``emptyState()`` in ``frontend/src/pages/infoproducto.jsx``).
+
+    The function is idempotent: if ``chat_state`` already contains the nested
+    objects (e.g. when the seed comes from the manual /infoproducto page),
+    those values are preserved and only the missing pieces are filled in.
+    """
+    src = dict(chat_state or {})
+
+    # Country -> (moneda, modismo) defaults
+    pais_raw = (src.get("pais") or "LATAM").strip()
+    pais_lower = pais_raw.lower()
+    country_defaults = {
+        "argentina": ("ARS", "argento"),
+        "méxico":    ("MXN", "mexicano"),
+        "mexico":    ("MXN", "mexicano"),
+        "colombia":  ("COP", "colombiano"),
+        "chile":     ("CLP", "chileno"),
+        "perú":      ("PEN", "peruano"),
+        "peru":      ("PEN", "peruano"),
+        "españa":    ("EUR", "español"),
+        "espana":    ("EUR", "español"),
+        "uruguay":   ("UYU", "rioplatense"),
+    }
+    moneda_default, modismo_default = country_defaults.get(
+        pais_lower, ("USD", "neutro latinoamericano")
+    )
+
+    # Allowed `tipo` enum values (must match frontend select)
+    allowed_tipos = {"ebook", "curso", "membresía", "membresia",
+                     "plantilla", "servicio", "coaching", "comunidad"}
+    formato_raw = (src.get("formato") or "").strip()
+    formato_norm = formato_raw.lower()
+    tipo_from_formato = formato_norm if formato_norm in allowed_tipos else None
+
+    # Canonical empty shape (mirrors frontend emptyState())
+    bridged: dict = {
+        "pais": pais_raw or "LATAM",
+        "moneda": src.get("moneda") or moneda_default,
+        "modismo": src.get("modismo") or modismo_default,
+        "paso_actual": src.get("paso_actual", 0),
+        "pasos_completos": src.get("pasos_completos", []),
+        "oferta": {
+            "nombre": "", "tipo": "ebook", "problema": "", "publico": "",
+            "incluye": "", "precio": "", "diferencial": "", "prueba_social": "",
+            "competidor": "", "bonus_count": "3", "notas": "", "output": "",
+        },
+        "investigacion": {"notas": "", "output": ""},
+        "avatares":      {"notas": "", "output": ""},
+        "brand": {
+            "paleta": "Índigo Premium", "estilo": "Profesional",
+            "tono": "Directo & Honesto",
+            "fuentes": "Montserrat + Open Sans",
+            "referencias": "Apple, Hotmart", "evitar": "",
+            "notas": "", "output": "",
+        },
+        "mockup": {"estilo": "Realista 3D", "contexto": "escritorio",
+                   "plataforma": "hotmart", "notas": "", "output": ""},
+        "ads": {"plataforma": "Meta", "cantidad": "29", "notas": "", "output": ""},
+        "bonus_mockups": {"cantidad": "6", "notas": "", "output": ""},
+        "bundle": {"notas": "", "output": ""},
+        "landing": {"plataforma": "hotmart", "objetivo": "venta directa",
+                    "notas": "", "output": ""},
+        "copys": {"plataformas": "Meta, TikTok",
+                  "formatos": "single image, carousel, reel",
+                  "notas": "", "output": ""},
+        "guiones": {"duraciones": "15s, 30s, 60s", "angulos": "",
+                    "notas": "", "output": ""},
+        "ugc": {"cantidad": "5", "notas": "", "output": ""},
+        "producto": {"formato": "ebook", "capitulos": "", "tono_contenido": "",
+                     "notas": "", "output": ""},
+        "upsells": {"modelo": "OTO + bump", "precio_up": "", "precio_down": "",
+                    "notas": "", "output": ""},
+        "email": {"secuencia": "7", "trigger": "compra",
+                  "notas": "", "output": ""},
+        "lanzamiento": {"modo": "Faceless (voz en off + b-roll)",
+                        "duracion": "30-60s",
+                        "plataforma_principal": "TikTok", "angulos": "",
+                        "notas": "", "output": ""},
+    }
+
+    # Preserve any existing nested objects from the source (manual page case)
+    for key, default_val in list(bridged.items()):
+        incoming = src.get(key)
+        if isinstance(default_val, dict) and isinstance(incoming, dict):
+            merged = dict(default_val)
+            merged.update({k: v for k, v in incoming.items() if v is not None})
+            bridged[key] = merged
+
+    # Now overlay the chat-agent's flat top-level fields onto oferta/* etc.
+    oferta = bridged["oferta"]
+    if src.get("nombre") and not oferta.get("nombre"):
+        oferta["nombre"] = src["nombre"]
+    if src.get("problema") and not oferta.get("problema"):
+        oferta["problema"] = src["problema"]
+    if src.get("precio") and not oferta.get("precio"):
+        oferta["precio"] = src["precio"]
+    if src.get("mecanismo") and not oferta.get("diferencial"):
+        oferta["diferencial"] = src["mecanismo"]
+    if src.get("audiencia") and not oferta.get("publico"):
+        oferta["publico"] = src["audiencia"]
+    if tipo_from_formato:
+        # Normalize "membresia" -> "membresía" to match enum exactly
+        oferta["tipo"] = "membresía" if tipo_from_formato == "membresia" else tipo_from_formato
+    # Nicho has no direct slot in oferta; surface it via notas (and investigacion.notas)
+    nicho = src.get("nicho")
+    if nicho:
+        existing_notes = oferta.get("notas") or ""
+        nicho_line = f"Nicho: {nicho}"
+        if nicho_line not in existing_notes:
+            oferta["notas"] = (existing_notes + ("\n" if existing_notes else "") + nicho_line).strip()
+        inv = bridged["investigacion"]
+        inv_notes = inv.get("notas") or ""
+        if nicho_line not in inv_notes:
+            inv["notas"] = (inv_notes + ("\n" if inv_notes else "") + nicho_line).strip()
+
+    return bridged
+
+
+@app.post("/agents/infoproducto/run-pipeline")
+async def run_infoproducto_pipeline_endpoint(
+    request: PipelineRunRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Run the full Nivel Dios pipeline (16 steps) with SSE streaming.
+    Each step's progress is streamed live; final ZIP is fetched separately.
+    """
+    user = get_current_user_from_header(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
+
+    # Quota check: count runs this month
+    from plan_limits import check_pipeline_limit
+    from datetime import datetime as _dt
+    month_start = _dt(_dt.utcnow().year, _dt.utcnow().month, 1)
+    runs_this_month = db.query(PipelineRun).filter(
+        PipelineRun.user_id == user.id,
+        PipelineRun.started_at >= month_start,
+    ).count()
+    check_pipeline_limit(subscription.plan, runs_this_month)
+
+    config_obj = get_tenant_config(user.id, db)
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+
+    import uuid as _uuid
+    run_id = str(_uuid.uuid4())
+
+    # Bridge chat-agent flat state -> nested pipeline schema (idempotent for manual-page seeds)
+    bridged_state = _bridge_chat_state_to_pipeline_state(request.state)
+
+    # Pre-create the run record so the user can navigate to /infoproducto/run/<id>
+    run_record = PipelineRun(
+        user_id=user.id,
+        run_id=run_id,
+        status="running",
+        product_name=(bridged_state.get("oferta") or {}).get("nombre") or request.state.get("nombre"),
+        state_snapshot=bridged_state,
+    )
+    db.add(run_record)
+    db.commit()
+
+    from agents.pipeline_orchestrator import run_pipeline_streaming
+    from fastapi.responses import StreamingResponse
+
+    def event_stream():
+        # We need a fresh db session because the generator runs after the request returns
+        from database import SessionLocal
+        local_db = SessionLocal()
+        deliverables_acc: Dict[str, str] = {}
+        state_acc = dict(bridged_state)
+        had_error = False
+        try:
+            for sse_chunk in run_pipeline_streaming(
+                db=local_db,
+                user_id=user.id,
+                state=state_acc,
+                api_key=api_key,
+                run_id=run_id,
+            ):
+                # Parse the event to capture deliverables for DB persistence
+                try:
+                    payload_str = sse_chunk.split("data: ", 1)[1].strip()
+                    payload = json.loads(payload_str)
+                    if payload.get("type") == "step.complete":
+                        deliverables_acc[payload["step_id"]] = payload.get("output", "")
+                    if payload.get("type") == "pipeline.error":
+                        had_error = True
+                except Exception:
+                    pass
+                yield sse_chunk
+
+            # Persist final result
+            run_db = local_db.query(PipelineRun).filter(PipelineRun.run_id == run_id).first()
+            if run_db:
+                run_db.deliverables = deliverables_acc
+                run_db.state_snapshot = state_acc
+                run_db.status = "error" if had_error else "complete"
+                from datetime import datetime as _dt2
+                run_db.completed_at = _dt2.utcnow()
+                run_db.duration_seconds = int((run_db.completed_at - run_db.started_at).total_seconds())
+                local_db.commit()
+        except Exception as e:
+            logger.exception(f"[pipeline endpoint] error: {e}")
+            run_db = local_db.query(PipelineRun).filter(PipelineRun.run_id == run_id).first()
+            if run_db:
+                run_db.status = "error"
+                run_db.error_message = str(e)
+                local_db.commit()
+            yield f"data: {json.dumps({'type': 'pipeline.error', 'error': str(e)})}\n\n"
+        finally:
+            local_db.close()
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+@app.get("/me/pipeline-quota")
+async def get_pipeline_quota_endpoint(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Return current user's pipeline run quota for the month."""
+    user = get_current_user_from_header(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    from plan_limits import get_plan_limits, PLAN_DISPLAY_NAMES
+    from datetime import datetime as _dt
+    month_start = _dt(_dt.utcnow().year, _dt.utcnow().month, 1)
+    used = db.query(PipelineRun).filter(
+        PipelineRun.user_id == user.id,
+        PipelineRun.started_at >= month_start,
+    ).count()
+    limits = get_plan_limits(subscription.plan)
+    limit = limits.get("pipeline_runs_per_month")
+    return {
+        "plan": subscription.plan,
+        "plan_display": PLAN_DISPLAY_NAMES.get(subscription.plan, subscription.plan),
+        "used": used,
+        "limit": limit,  # null = unlimited
+        "remaining": (limit - used) if limit is not None else None,
+    }
+
+
+@app.get("/agents/infoproducto/runs")
+async def list_pipeline_runs_endpoint(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """List all pipeline runs for the current user."""
+    user = get_current_user_from_header(authorization, db)
+    runs = db.query(PipelineRun).filter(
+        PipelineRun.user_id == user.id,
+    ).order_by(PipelineRun.started_at.desc()).limit(50).all()
+    return [
+        {
+            "run_id": r.run_id,
+            "status": r.status,
+            "product_name": r.product_name,
+            "duration_seconds": r.duration_seconds,
+            "started_at": r.started_at.isoformat() if r.started_at else None,
+            "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+        }
+        for r in runs
+    ]
+
+
+@app.get("/agents/infoproducto/run/{run_id}")
+async def get_pipeline_run_endpoint(
+    run_id: str,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Get a single pipeline run with all deliverables."""
+    user = get_current_user_from_header(authorization, db)
+    run = db.query(PipelineRun).filter(
+        PipelineRun.run_id == run_id,
+        PipelineRun.user_id == user.id,
+    ).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return {
+        "run_id": run.run_id,
+        "status": run.status,
+        "product_name": run.product_name,
+        "deliverables": run.deliverables or {},
+        "state_snapshot": run.state_snapshot or {},
+        "duration_seconds": run.duration_seconds,
+        "error_message": run.error_message,
+        "started_at": run.started_at.isoformat() if run.started_at else None,
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+    }
+
+
+@app.get("/agents/infoproducto/bundle/{run_id}")
+async def download_pipeline_bundle_endpoint(
+    run_id: str,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Download all deliverables as a ZIP."""
+    user = get_current_user_from_header(authorization, db)
+    run = db.query(PipelineRun).filter(
+        PipelineRun.run_id == run_id,
+        PipelineRun.user_id == user.id,
+    ).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    if not run.deliverables:
+        raise HTTPException(status_code=400, detail="Run has no deliverables yet")
+
+    from agents.pipeline_orchestrator import build_bundle_zip
+    from fastapi.responses import Response
+
+    zip_bytes = build_bundle_zip(run.deliverables, run.state_snapshot or {})
+    product_slug = (run.product_name or "infoproducto").lower().replace(" ", "-")
+    # sanitize slug for filename
+    safe_slug = "".join(c for c in product_slug if c.isalnum() or c in "-_") or "infoproducto"
+
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_slug}-{run_id[:8]}.zip"',
+        },
+    )
+
+
+@app.get("/agents/infoproducto/bundle/{run_id}/download-token")
+async def get_pipeline_bundle_token_endpoint(
+    run_id: str,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Get a short-lived signed token to download the bundle without Authorization header.
+    (Browser <a> tags can't send custom headers, so we sign a token instead.)
+    """
+    user = get_current_user_from_header(authorization, db)
+    run = db.query(PipelineRun).filter(
+        PipelineRun.run_id == run_id,
+        PipelineRun.user_id == user.id,
+    ).first()
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    # Reuse the JWT signing key
+    from datetime import datetime as _dt3, timedelta as _td
+    payload = {
+        "sub": str(user.id),
+        "run_id": run_id,
+        "exp": _dt3.utcnow() + _td(minutes=5),
+        "scope": "bundle_download",
+    }
+    token = jwt.encode(payload, config.SECRET_KEY, algorithm=config.ALGORITHM)
+    return {"token": token}
+
+
+@app.get("/agents/infoproducto/bundle/{run_id}/by-token")
+async def download_pipeline_bundle_by_token_endpoint(
+    run_id: str,
+    token: str,
+    db: Session = Depends(get_db),
+):
+    """Download a bundle ZIP using a signed download token (for direct browser links)."""
+    try:
+        decoded = jwt.decode(token, config.SECRET_KEY, algorithms=[config.ALGORITHM])
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid or expired download token")
+
+    if decoded.get("scope") != "bundle_download" or decoded.get("run_id") != run_id:
+        raise HTTPException(status_code=403, detail="Token not valid for this resource")
+
+    user_id = int(decoded.get("sub"))
+    run = db.query(PipelineRun).filter(
+        PipelineRun.run_id == run_id,
+        PipelineRun.user_id == user_id,
+    ).first()
+    if not run or not run.deliverables:
+        raise HTTPException(status_code=404, detail="Run or deliverables not found")
+
+    from agents.pipeline_orchestrator import build_bundle_zip
+    from fastapi.responses import Response
+
+    zip_bytes = build_bundle_zip(run.deliverables, run.state_snapshot or {})
+    product_slug = (run.product_name or "infoproducto").lower().replace(" ", "-")
+    safe_slug = "".join(c for c in product_slug if c.isalnum() or c in "-_") or "infoproducto"
+
+    return Response(
+        content=zip_bytes,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_slug}-{run_id[:8]}.zip"',
+        },
+    )
+
+
+@app.post("/agents/validate-market")
+async def validate_market_endpoint(
+    request: MarketValidateRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Run the Market Validator: scrapes competitor sales pages, analyzes ads,
+    synthesizes a market verdict + wedge + pipeline seed.
+    """
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+
+    if not request.urls and not request.ads and not request.ads_library_data and not (request.video_analysis_id or request.video_analysis):
+        raise HTTPException(status_code=400, detail="Pegá al menos 1 URL, 1 ad, datos de Biblioteca o un análisis de video para validar")
+
+    import uuid as _uuid
+    validation_id = str(_uuid.uuid4())
+
+    # Pre-create the record
+    record = MarketValidation(
+        user_id=user.id,
+        validation_id=validation_id,
+        niche=request.niche or None,
+        notes=request.notes or None,
+        urls=request.urls,
+        ads=request.ads,
+    )
+    db.add(record)
+    db.commit()
+
+    # Si vino video_analysis_id, cargamos el análisis desde DB
+    video_analysis_payload = request.video_analysis
+    if not video_analysis_payload and request.video_analysis_id:
+        vrec = db.query(VideoAnalysis).filter(
+            VideoAnalysis.analysis_id == request.video_analysis_id,
+            VideoAnalysis.user_id == user.id,
+        ).first()
+        if vrec and vrec.analysis:
+            video_analysis_payload = vrec.analysis
+
+    try:
+        from agents.market_validator import validate_market
+        result = validate_market(
+            urls=request.urls,
+            ads=request.ads,
+            niche=request.niche,
+            notes=request.notes,
+            api_key=api_key,
+            ads_library_data=request.ads_library_data,
+            video_analysis=video_analysis_payload,
+        )
+        synth = result.get("synthesis") or {}
+        verdict = (synth.get("veredicto") or {}).get("verdict") or None
+        score_raw = (synth.get("veredicto") or {}).get("score")
+        try:
+            score = int(score_raw) if score_raw is not None else None
+        except (TypeError, ValueError):
+            score = None
+
+        record.pages_analysis = result.get("pages")
+        record.ads_analysis = result.get("ads")
+        record.synthesis = synth
+        record.score = score
+        record.verdict = verdict
+        db.commit()
+
+        return {
+            "validation_id": validation_id,
+            "pages": result.get("pages"),
+            "ads": result.get("ads"),
+            "synthesis": synth,
+        }
+    except Exception as e:
+        logger.exception(f"[validate-market] error: {e}")
+        record.error_message = str(e)
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"Error validando mercado: {str(e)}")
+
+
+@app.get("/agents/validate-market/history")
+async def list_validations_endpoint(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """List all market validations for the current user (latest first)."""
+    user = get_current_user_from_header(authorization, db)
+    rows = db.query(MarketValidation).filter(
+        MarketValidation.user_id == user.id,
+    ).order_by(MarketValidation.created_at.desc()).limit(50).all()
+    return [
+        {
+            "validation_id": r.validation_id,
+            "niche": r.niche,
+            "score": r.score,
+            "verdict": r.verdict,
+            "url_count": len(r.urls) if r.urls else 0,
+            "ad_count": len(r.ads) if r.ads else 0,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
+@app.get("/agents/validate-market/{validation_id}")
+async def get_validation_endpoint(
+    validation_id: str,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Fetch a saved market validation."""
+    user = get_current_user_from_header(authorization, db)
+    rec = db.query(MarketValidation).filter(
+        MarketValidation.validation_id == validation_id,
+        MarketValidation.user_id == user.id,
+    ).first()
+    if not rec:
+        raise HTTPException(status_code=404, detail="Validation not found")
+    return {
+        "validation_id": rec.validation_id,
+        "niche": rec.niche,
+        "notes": rec.notes,
+        "urls": rec.urls,
+        "ads": rec.ads,
+        "pages": rec.pages_analysis,
+        "ads_analysis": rec.ads_analysis,
+        "synthesis": rec.synthesis,
+        "score": rec.score,
+        "verdict": rec.verdict,
+        "created_at": rec.created_at.isoformat() if rec.created_at else None,
+    }
+
+
+@app.post("/agents/deep-analyze")
+async def deep_analyze_competitor_endpoint(
+    request: CompetitorDeepAnalyzeRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Run the Deep Competitor Analyzer (3-agent system) on ONE specific
+    competitor with full ecosystem inputs (ad + landing + ads library + hypothesis).
+    """
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+
+    if not request.ad_transcription and not request.landing_url:
+        raise HTTPException(
+            status_code=400,
+            detail="Pegá al menos la transcripción del ad o la URL de la landing.",
+        )
+
+    import uuid as _uuid
+    analysis_id = str(_uuid.uuid4())
+
+    record = CompetitorAnalysis(
+        user_id=user.id,
+        analysis_id=analysis_id,
+        competitor_brand=request.competitor_brand or None,
+        niche=request.niche or None,
+        landing_url=request.landing_url or None,
+        inputs={
+            "ad_transcription": request.ad_transcription,
+            "ad_visual_description": request.ad_visual_description,
+            "ads_library_manual": request.ads_library_manual,
+            "user_hypothesis": request.user_hypothesis,
+        },
+    )
+    db.add(record)
+    db.commit()
+
+    try:
+        from agents.competitor_analyzer import deep_analyze_competitor
+        result = deep_analyze_competitor(
+            ad_transcription=request.ad_transcription,
+            ad_visual_description=request.ad_visual_description,
+            landing_url=request.landing_url,
+            ads_library_manual=request.ads_library_manual,
+            niche=request.niche,
+            user_hypothesis=request.user_hypothesis,
+            competitor_brand=request.competitor_brand,
+            api_key=api_key,
+        )
+
+        verdict_obj = result.get("fase_4_veredicto") or {}
+        verdict = verdict_obj.get("verdict")
+        score_raw = verdict_obj.get("score")
+        try:
+            score = int(score_raw) if score_raw is not None else None
+        except (TypeError, ValueError):
+            score = None
+
+        record.analysis = result
+        record.verdict = verdict
+        record.score = score
+        db.commit()
+
+        return {"analysis_id": analysis_id, "analysis": result}
+    except Exception as e:
+        logger.exception(f"[deep-analyze] error: {e}")
+        record.error_message = str(e)
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"Error en el análisis profundo: {str(e)}")
+
+
+@app.get("/agents/deep-analyze/history")
+async def list_competitor_analyses_endpoint(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    rows = db.query(CompetitorAnalysis).filter(
+        CompetitorAnalysis.user_id == user.id,
+    ).order_by(CompetitorAnalysis.created_at.desc()).limit(50).all()
+    return [
+        {
+            "analysis_id": r.analysis_id,
+            "competitor_brand": r.competitor_brand,
+            "niche": r.niche,
+            "score": r.score,
+            "verdict": r.verdict,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
+@app.get("/agents/deep-analyze/{analysis_id}")
+async def get_competitor_analysis_endpoint(
+    analysis_id: str,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    rec = db.query(CompetitorAnalysis).filter(
+        CompetitorAnalysis.analysis_id == analysis_id,
+        CompetitorAnalysis.user_id == user.id,
+    ).first()
+    if not rec:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return {
+        "analysis_id": rec.analysis_id,
+        "competitor_brand": rec.competitor_brand,
+        "niche": rec.niche,
+        "landing_url": rec.landing_url,
+        "inputs": rec.inputs,
+        "analysis": rec.analysis,
+        "verdict": rec.verdict,
+        "score": rec.score,
+        "created_at": rec.created_at.isoformat() if rec.created_at else None,
+    }
 
 
 @app.post("/agents/tiktok-ads/run")
@@ -2271,6 +3382,226 @@ async def generate_tiktok_calendar_endpoint(
     except Exception as e:
         logger.error(f"TikTok calendar agent error: {type(e).__name__}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error en agente calendario TikTok: {str(e)}")
+
+
+VIDEO_MAX_MB = 150
+VIDEO_ALLOWED_TYPES = {
+    "video/mp4", "video/quicktime", "video/x-msvideo",
+    "video/webm", "video/3gpp", "video/mpeg",
+}
+
+
+@app.post("/agents/analyze-video")
+async def analyze_video_endpoint(
+    file: UploadFile = File(...),
+    niche: str = "",
+    brand: str = "",
+    hypothesis: str = "",
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Sube un video de ad del competidor y corre el análisis Nivel Dios con Claude Vision.
+    Extrae frames con ffmpeg, lee subtítulos, analiza visual/copy/psicología/estrategia.
+    """
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+
+    content_type = file.content_type or ""
+    if content_type not in VIDEO_ALLOWED_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Formato no soportado: {content_type}. Subí un archivo MP4, MOV, AVI o WebM.",
+        )
+
+    video_bytes = await file.read()
+    size_mb = len(video_bytes) / (1024 * 1024)
+    if size_mb > VIDEO_MAX_MB:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El video pesa {size_mb:.1f} MB. Máximo permitido: {VIDEO_MAX_MB} MB.",
+        )
+
+    import uuid as _uuid
+    analysis_id = str(_uuid.uuid4())
+
+    record = VideoAnalysis(
+        user_id=user.id,
+        analysis_id=analysis_id,
+        filename=file.filename,
+        niche=niche or None,
+        brand=brand or None,
+    )
+    db.add(record)
+    db.commit()
+
+    try:
+        from agents.video_analyzer import analyze_video
+        result = analyze_video(
+            video_bytes=video_bytes,
+            filename=file.filename or "video.mp4",
+            niche=niche,
+            brand=brand,
+            hypothesis=hypothesis,
+            api_key=api_key,
+        )
+
+        meta = result.get("_meta", {})
+        score_raw = (result.get("veredicto_duplicacion") or {}).get("score_general")
+        try:
+            score = int(float(score_raw)) if score_raw is not None else None
+        except (TypeError, ValueError):
+            score = None
+
+        verdict_decision = (result.get("veredicto_duplicacion") or {}).get("decision")
+
+        record.analysis = result
+        record.verdict = verdict_decision
+        record.score = score
+        record.frames_analyzed = meta.get("frames_analyzed")
+        db.commit()
+
+        return {"analysis_id": analysis_id, "analysis": result}
+
+    except RuntimeError as e:
+        record.error_message = str(e)
+        db.commit()
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        logger.exception(f"[analyze-video] error: {e}")
+        record.error_message = str(e)
+        db.commit()
+        raise HTTPException(status_code=500, detail=f"Error en el análisis de video: {str(e)}")
+
+
+class LibraryDataRequest(BaseModel):
+    raw_data: str
+
+
+@app.post("/agents/analyze-video/{analysis_id}/interpret-library")
+async def interpret_library_data_endpoint(
+    analysis_id: str,
+    request: LibraryDataRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """
+    El usuario fue a la Biblioteca de Anuncios, encontró datos (total de ads,
+    fecha más vieja, actividad reciente) y los pega acá. Claude los interpreta
+    en el contexto exacto del análisis ya hecho.
+    """
+    user = get_current_user_from_header(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+
+    rec = db.query(VideoAnalysis).filter(
+        VideoAnalysis.analysis_id == analysis_id,
+        VideoAnalysis.user_id == user.id,
+    ).first()
+    if not rec:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+
+    analysis = rec.analysis or {}
+    estrategico = analysis.get("analisis_estrategico", {})
+    wedge = (analysis.get("veredicto_duplicacion") or {}).get("wedge", "")
+    marca = estrategico.get("marca_detectada", rec.brand or "el competidor")
+    nicho = estrategico.get("nicho_exacto", rec.niche or "el nicho")
+    funnel = estrategico.get("funnel_detectado", "")
+
+    system = (
+        "Sos un media buyer senior especializado en inteligencia competitiva de Facebook Ads. "
+        "Interpretás datos de la Biblioteca de Anuncios de Meta con precisión quirúrgica. "
+        "Sos directo, concreto, sin teoría. Hablás en español argentino informal."
+    )
+
+    brand_str = marca
+    niche_str = nicho
+    funnel_str = funnel
+    wedge_str = wedge
+
+    user_msg = (
+        f"Acabo de analizar un ad de {brand_str} en el nicho de {niche_str}.\n"
+        f"Su funnel detectado: {funnel_str}.\n"
+        f"El WEDGE que encontré para atacarlos: {wedge_str}.\n\n"
+        f"Fui a la Biblioteca de Anuncios de Meta y esto es lo que encontré:\n\n"
+        f"{request.raw_data}\n\n"
+        "Interpretá estos datos de forma concreta. Decime:\n"
+        "1. ¿Qué señal dan estos números? ¿Están testeando, escalando, o pivoteando?\n"
+        "2. ¿Cuán rentable es su operación de paid ads basándome en lo que ves?\n"
+        "3. ¿Vale la pena atacar este competidor ahora o esperás?\n"
+        "4. ¿Qué hacer con esta información en las próximas 48 horas?\n\n"
+        "Respondé en menos de 200 palabras. Sin titulares. Directo al punto."
+    )
+
+    try:
+        import anthropic as _anthropic
+        client = _anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=600,
+            system=system,
+            messages=[{"role": "user", "content": user_msg}],
+        )
+        interpretation = response.content[0].text if response.content else ""
+        return {"interpretation": interpretation}
+    except Exception as e:
+        logger.exception(f"[interpret-library] error: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interpretando datos: {str(e)}")
+
+
+@app.get("/agents/analyze-video/history")
+async def list_video_analyses_endpoint(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    rows = db.query(VideoAnalysis).filter(
+        VideoAnalysis.user_id == user.id,
+    ).order_by(VideoAnalysis.created_at.desc()).limit(50).all()
+    return [
+        {
+            "analysis_id": r.analysis_id,
+            "filename": r.filename,
+            "niche": r.niche,
+            "brand": r.brand,
+            "score": r.score,
+            "verdict": r.verdict,
+            "frames_analyzed": r.frames_analyzed,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
+@app.get("/agents/analyze-video/{analysis_id}")
+async def get_video_analysis_endpoint(
+    analysis_id: str,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = get_current_user_from_header(authorization, db)
+    rec = db.query(VideoAnalysis).filter(
+        VideoAnalysis.analysis_id == analysis_id,
+        VideoAnalysis.user_id == user.id,
+    ).first()
+    if not rec:
+        raise HTTPException(status_code=404, detail="Analysis not found")
+    return {
+        "analysis_id": rec.analysis_id,
+        "filename": rec.filename,
+        "niche": rec.niche,
+        "brand": rec.brand,
+        "frames_analyzed": rec.frames_analyzed,
+        "analysis": rec.analysis,
+        "verdict": rec.verdict,
+        "score": rec.score,
+        "created_at": rec.created_at.isoformat() if rec.created_at else None,
+    }
 
 
 if __name__ == "__main__":
