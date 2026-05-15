@@ -83,6 +83,27 @@ const SECTIONS = [
     ],
   },
   {
+    id: 'rendimiento',
+    title: 'Rendimiento & Alertas',
+    icon: 'financials',
+    accent: '#10b981',
+    description: 'Configurá el margen real de tu producto para que los agentes calculen rentabilidad exacta, no genérica',
+    fields: [
+      {
+        name: 'target_margin',
+        label: 'Margen del Producto (%)',
+        type: 'number',
+        help: 'Ej: 40 si ganás el 40% después de producto + envío. El sistema calcula tu ROAS de breakeven automáticamente.'
+      },
+      {
+        name: 'notification_email',
+        label: 'Email para Alertas Críticas',
+        type: 'email',
+        help: 'Recibís un aviso cuando una campaña cruza umbrales críticos (CPA, ROAS, frecuencia)'
+      },
+    ],
+  },
+  {
     id: 'avanzado',
     title: 'Configuración Avanzada',
     icon: 'settings',
@@ -111,7 +132,7 @@ export default function SettingsPage() {
     meta_access_token: '', meta_ad_account_id: '', meta_app_id: '', meta_app_secret: '',
     anthropic_api_key: '', hf_api_key: '', negocio_info: '', landing_page_url: '',
     shopify_store_url: '', shopify_webhook_secret: '', mercadopago_access_token: '',
-    ga4_property_id: '', clarity_project_id: '',
+    ga4_property_id: '', clarity_project_id: '', target_margin: '', notification_email: '',
   });
 
   useEffect(() => { fetchConfig(); }, []);
@@ -289,6 +310,19 @@ export default function SettingsPage() {
                           rows={4}
                           className={inputBase}
                           style={{ background: '#0d0d11', border: '1px solid #2a2a35', color: 'white', resize: 'none' }}
+                        />
+                      ) : field.type === 'number' ? (
+                        <input
+                          type="number"
+                          name={field.name}
+                          value={val}
+                          onChange={handleChange}
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          placeholder={field.help || `Ingresa ${field.label.toLowerCase()}`}
+                          className={inputBase}
+                          style={{ background: '#0d0d11', border: '1px solid #2a2a35', color: 'white' }}
                         />
                       ) : (
                         <input

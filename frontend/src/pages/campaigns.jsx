@@ -23,6 +23,7 @@ const AGENTS = [
   { id: 'cro',           label: 'CRO',             icon: 'audit',     path: '/agent/cro',           desc: 'Conversión en landing page y funnel' },
   { id: 'landing-audit', label: 'Landing',         icon: 'audit',     path: '/agent/landing-audit', desc: 'Auditoría de landing page y mejoras' },
   { id: 'full-audit',    label: 'Auditoría Total', icon: 'crown',     path: '/agent/full-audit',    desc: 'Análisis completo del negocio' },
+  { id: 'decisions',     label: 'Decisiones',      icon: 'financials',path: '/decisions',           desc: 'Historial de acciones ejecutadas con resultado antes/después' },
 ];
 
 const colorMap = {
@@ -256,6 +257,17 @@ export default function CampaignsPage() {
   const [clarityAgentLoading, setClarityAgentLoading] = useState(false);
   const [clarityAgentOutput, setClarityAgentOutput]   = useState('');
 
+  const [warRoomLoading, setWarRoomLoading] = useState(false);
+  const [warRoomData, setWarRoomData]       = useState(null);
+  const [executedActions, setExecutedActions] = useState({});
+  const [expandedReasons, setExpandedReasons] = useState({});
+
+  const [alerts, setAlerts]               = useState([]);
+  const [alertsExpanded, setAlertsExpanded] = useState(false);
+
+  const [decisionsData, setDecisionsData]   = useState(null);
+  const [decisionsLoading, setDecisionsLoading] = useState(false);
+
   const [tiktokMode, setTiktokMode]         = useState('strategy');
   const [tiktokOutput, setTiktokOutput]     = useState('');
   const [tiktokLoading, setTiktokLoading]   = useState(false);
@@ -281,6 +293,10 @@ export default function CampaignsPage() {
       }
       const data = await res.json();
       setCampaigns(Array.isArray(data) ? data : []);
+      fetch(`${API}/notifications/check`, { headers: { Authorization: `Bearer ${token}` } })
+        .then((r) => r.ok ? r.json() : [])
+        .then((d) => setAlerts(Array.isArray(d) ? d : []))
+        .catch(() => {});
     } catch {
       setCampaignError('No se pudo conectar con Meta Ads. Verificá tu configuración.');
     } finally {
@@ -289,6 +305,12 @@ export default function CampaignsPage() {
   }, [token, period]);
 
   useEffect(() => { fetchCampaigns(); }, [fetchCampaigns]);
+
+  useEffect(() => {
+    if (agentTab === 'decisions' && agentSubTab === 'optimizer' && decisionsData === null) {
+      fetchDecisions();
+    }
+  }, [agentTab, agentSubTab]);
 
   useEffect(() => {
     if (!token) return;
@@ -427,6 +449,50 @@ export default function CampaignsPage() {
     }
   };
 
+  const runWarRoom = async () => {
+    setWarRoomLoading(true);
+    setWarRoomData(null);
+    try {
+      const res = await fetch(`${API}/agents/war-room`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          campaigns_data: campaigns,
+          adsets_data: allAdsets,
+          ads_data: [],
+          clarity_insights: clarityInsights,
+        }),
+      });
+      const data = await res.json();
+      setWarRoomData(res.ok ? data : null);
+    } catch { /* silent — war room is best-effort */ }
+    finally { setWarRoomLoading(false); }
+  };
+
+  const executeWarRoomAction = async (action, idx) => {
+    const endpoint = action.type?.includes('adset') ? '/adsets/action' : '/campaigns/action';
+    try {
+      await fetch(`${API}${endpoint}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target_id: action.target_id, action: action.type }),
+      });
+      setExecutedActions((p) => ({ ...p, [idx]: true }));
+    } catch { /* no-op */ }
+  };
+
+  const fetchDecisions = async () => {
+    setDecisionsLoading(true);
+    try {
+      const res = await fetch(`${API}/decisions?limit=20`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = res.ok ? await res.json() : [];
+      setDecisionsData(Array.isArray(data) ? data : []);
+    } catch { setDecisionsData([]); }
+    finally { setDecisionsLoading(false); }
+  };
+
   const semaphore   = computeSemaphore(campaigns);
   const currentAgent = AGENTS.find((a) => a.id === agentTab);
 
@@ -476,6 +542,34 @@ export default function CampaignsPage() {
             </button>
           </div>
         </div>
+
+        {/* ── Alerts ── */}
+        {alerts.some((a) => a.nivel === 'critico') && (
+          <div className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.08)' }}>
+            <div className="flex items-center gap-3 px-4 py-3">
+              <span style={{ color: '#f87171', fontSize: '1rem' }}>🚨</span>
+              <span className="text-sm font-semibold flex-1" style={{ color: '#fca5a5' }}>
+                {alerts.filter((a) => a.nivel === 'critico').length} alertas críticas
+                {' — '}
+                {alerts.find((a) => a.nivel === 'critico')?.mensaje || ''}
+              </span>
+              <button
+                onClick={() => setAlertsExpanded((p) => !p)}
+                className="text-xs font-semibold px-3 py-1 rounded-lg transition-colors"
+                style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)' }}
+              >
+                {alertsExpanded ? 'Ocultar ▲' : 'Ver todas ▼'}
+              </button>
+            </div>
+            {alertsExpanded && (
+              <div className="px-4 pb-3 space-y-1" style={{ borderTop: '1px solid rgba(239,68,68,0.2)' }}>
+                {alerts.filter((a) => a.nivel === 'critico').map((a, i) => (
+                  <p key={i} className="text-xs py-1" style={{ color: '#fca5a5' }}>• {a.mensaje}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* ── Semaphore ── */}
         {semaphore ? (
@@ -625,6 +719,152 @@ export default function CampaignsPage() {
           </div>
         )}
 
+        {/* ── Positive alerts (non-invasive, bottom of list) ── */}
+        {alerts.some((a) => a.nivel === 'positivo') && !alerts.some((a) => a.nivel === 'critico') && (
+          <div className="rounded-xl px-4 py-3 flex items-center gap-3"
+            style={{ background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)' }}>
+            <span style={{ color: '#34d399' }}>✓</span>
+            <span className="text-sm" style={{ color: '#6ee7b7' }}>
+              {alerts.find((a) => a.nivel === 'positivo')?.mensaje || 'Todo bajo control'}
+            </span>
+          </div>
+        )}
+
+        {/* ── Guerra Room ── */}
+        <div style={{ ...card, overflow: 'hidden' }}>
+          <div className="px-5 py-4 flex items-center gap-4" style={{ borderBottom: '1px solid #1e1e24' }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 text-base"
+              style={{ background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.2)' }}>
+              ⚡
+            </div>
+            <div className="flex-1">
+              <h2 className="text-sm font-bold text-white">Guerra Room — Sesión Diaria</h2>
+              <p className="text-xs mt-0.5" style={{ color: '#6b7280' }}>
+                Análisis completo del equipo en cadena: Optimizer → Finance → CRO → Plan de acción
+              </p>
+            </div>
+            <button
+              onClick={runWarRoom}
+              disabled={warRoomLoading}
+              className="shrink-0 px-5 py-2 text-sm font-bold rounded-xl transition-all disabled:opacity-50"
+              style={{
+                background: 'linear-gradient(135deg,#4f46e5,#7c3aed)',
+                color: 'white',
+                boxShadow: warRoomLoading ? 'none' : '0 4px 15px rgba(99,102,241,0.25)',
+              }}
+            >
+              {warRoomLoading ? 'Ejecutando sesión...' : '▶ Arrancar sesión'}
+            </button>
+          </div>
+
+          {warRoomData && (
+            <div className="p-6 space-y-5">
+              {/* Estado cuenta badge */}
+              {warRoomData.estado_cuenta && (() => {
+                const estadoStyles = {
+                  ESCALANDO: { bg: 'rgba(16,185,129,0.1)',  border: 'rgba(16,185,129,0.25)',  color: '#34d399' },
+                  ESTABLE:   { bg: 'rgba(99,102,241,0.1)',  border: 'rgba(99,102,241,0.25)',  color: '#a5b4fc' },
+                  EN_RIESGO: { bg: 'rgba(234,179,8,0.1)',   border: 'rgba(234,179,8,0.25)',   color: '#fbbf24' },
+                  CRITICO:   { bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.25)',   color: '#f87171' },
+                };
+                const s = estadoStyles[warRoomData.estado_cuenta] || estadoStyles.ESTABLE;
+                return (
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider"
+                    style={{ background: s.bg, border: `1px solid ${s.border}`, color: s.color }}>
+                    {warRoomData.estado_cuenta}
+                  </span>
+                );
+              })()}
+
+              {warRoomData.resumen_ejecutivo && (
+                <p className="text-sm leading-relaxed" style={{ color: '#d1d5db' }}>{warRoomData.resumen_ejecutivo}</p>
+              )}
+
+              {warRoomData.señales_positivas?.length > 0 && (
+                <ul className="space-y-1">
+                  {warRoomData.señales_positivas.map((s, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm" style={{ color: '#d1d5db' }}>
+                      <span style={{ color: '#34d399', marginTop: '1px' }}>✓</span>
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {warRoomData.alerta_critica && (
+                <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                  <p className="text-sm font-semibold" style={{ color: '#f87171' }}>⚠ {warRoomData.alerta_critica}</p>
+                </div>
+              )}
+
+              {warRoomData.acciones?.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {warRoomData.acciones.slice(0, 5).map((action, idx) => {
+                    const riskStyles = {
+                      bajo:  { bg: 'rgba(16,185,129,0.1)',  color: '#34d399' },
+                      medio: { bg: 'rgba(234,179,8,0.1)',   color: '#fbbf24' },
+                      alto:  { bg: 'rgba(239,68,68,0.1)',   color: '#f87171' },
+                    };
+                    const risk = riskStyles[action.riesgo?.toLowerCase()] || riskStyles.medio;
+                    const done = executedActions[idx];
+                    const showReason = expandedReasons[idx];
+
+                    return (
+                      <div key={idx} className="rounded-xl p-4 space-y-3"
+                        style={{ background: '#1a1a21', border: '1px solid #1e1e24' }}>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center"
+                              style={{ background: 'rgba(99,102,241,0.15)', color: '#a5b4fc' }}>
+                              {idx + 1}
+                            </span>
+                            <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-md"
+                              style={{ background: risk.bg, color: risk.color }}>
+                              {action.riesgo || 'medio'}
+                            </span>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-white">{action.titulo || action.title}</p>
+                          <p className="text-xs mt-1" style={{ color: '#9ca3af' }}>{action.descripcion || action.description}</p>
+                        </div>
+                        {action.impacto_estimado && (
+                          <p className="text-xs" style={{ color: '#6b7280' }}>{action.impacto_estimado}</p>
+                        )}
+                        {showReason && action.razon && (
+                          <p className="text-xs p-2 rounded-lg" style={{ background: '#0d0d11', color: '#9ca3af', border: '1px solid #2a2a35' }}>
+                            {action.razon}
+                          </p>
+                        )}
+                        {done ? (
+                          <button disabled className="w-full py-1.5 text-xs font-semibold rounded-lg"
+                            style={{ background: 'rgba(16,185,129,0.1)', color: '#34d399', border: '1px solid rgba(16,185,129,0.2)' }}>
+                            ✓ Ejecutado
+                          </button>
+                        ) : action.ejecutable ? (
+                          <button
+                            onClick={() => executeWarRoomAction(action, idx)}
+                            className="w-full py-1.5 text-xs font-semibold rounded-lg transition-all"
+                            style={{ background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', color: 'white' }}>
+                            ⚡ Ejecutar
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => setExpandedReasons((p) => ({ ...p, [idx]: !p[idx] }))}
+                            className="w-full py-1.5 text-xs font-semibold rounded-lg transition-colors"
+                            style={{ background: 'rgba(107,114,128,0.1)', color: '#9ca3af', border: '1px solid rgba(107,114,128,0.2)' }}>
+                            {showReason ? '▲ Ocultar' : '👁 Ver detalle'}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* ── AI Agents Section ── */}
         <div style={{ ...card, overflow: 'hidden' }}>
           {/* Section header with Optimizador / Clarity sub-tabs */}
@@ -673,7 +913,104 @@ export default function CampaignsPage() {
               </div>
 
               <div className="p-6 space-y-4">
-                {currentAgent && (
+                {currentAgent && agentTab === 'decisions' ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold text-white">Historial de Decisiones</h3>
+                        <p className="text-sm mt-1" style={{ color: '#6b7280' }}>{currentAgent.desc}</p>
+                      </div>
+                      <button
+                        onClick={fetchDecisions}
+                        disabled={decisionsLoading}
+                        className="px-4 py-2 text-sm font-semibold rounded-xl transition-all disabled:opacity-50"
+                        style={{ background: 'rgba(99,102,241,0.12)', color: '#a5b4fc', border: '1px solid rgba(99,102,241,0.25)' }}
+                      >
+                        {decisionsLoading ? 'Cargando...' : '↻ Actualizar'}
+                      </button>
+                    </div>
+                    {decisionsLoading && (
+                      <p className="text-sm text-center py-8" style={{ color: '#6b7280' }}>Cargando decisiones...</p>
+                    )}
+                    {!decisionsLoading && decisionsData !== null && decisionsData.length === 0 && (
+                      <p className="text-sm text-center py-8" style={{ color: '#6b7280' }}>
+                        No hay decisiones registradas aún. Ejecutá acciones desde la tabla o la Guerra Room.
+                      </p>
+                    )}
+                    {!decisionsLoading && decisionsData && decisionsData.length > 0 && (
+                      <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid #1e1e24' }}>
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr style={{ borderBottom: '1px solid #1e1e24', background: '#0d0d11' }}>
+                              {['Fecha', 'Descripción', 'Tipo', 'Estado', 'Antes', 'Después', 'Origen'].map((h) => (
+                                <th key={h} className="px-4 py-3 text-left text-[10px] font-semibold uppercase tracking-widest" style={{ color: '#6b7280' }}>
+                                  {h}
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {decisionsData.map((d, i) => {
+                              const statusStyle = {
+                                executed: { bg: 'rgba(16,185,129,0.1)',  color: '#34d399',  label: 'Ejecutada' },
+                                pending:  { bg: 'rgba(234,179,8,0.1)',   color: '#fbbf24',  label: 'Pendiente' },
+                                failed:   { bg: 'rgba(239,68,68,0.1)',   color: '#f87171',  label: 'Fallida'   },
+                              }[d.status] || { bg: 'rgba(107,114,128,0.1)', color: '#9ca3af', label: d.status };
+                              const before = d.details?.before_metrics;
+                              const after  = d.details?.after_metrics;
+                              const measuring = d.details?.days_since < 3 && !after;
+                              const roasDelta = after && before ? (after.roas - before.roas) : null;
+                              return (
+                                <tr key={d.id || i} style={{ borderBottom: '1px solid rgba(30,30,36,0.6)' }}
+                                  className="transition-colors hover:bg-white/[0.02]">
+                                  <td className="px-4 py-3 text-xs whitespace-nowrap" style={{ color: '#9ca3af' }}>
+                                    {new Date(d.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                                  </td>
+                                  <td className="px-4 py-3 text-xs max-w-[180px]" style={{ color: '#d1d5db' }}>{d.description}</td>
+                                  <td className="px-4 py-3">
+                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold"
+                                      style={{ background: 'rgba(99,102,241,0.1)', color: '#a5b4fc' }}>
+                                      {d.action_type}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold"
+                                      style={{ background: statusStyle.bg, color: statusStyle.color }}>
+                                      {statusStyle.label}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3 text-xs" style={{ color: '#9ca3af' }}>
+                                    {before ? (
+                                      <span>ROAS {before.roas?.toFixed(2)}x · CPA ${before.cpa} · ${before.spend}</span>
+                                    ) : '—'}
+                                  </td>
+                                  <td className="px-4 py-3 text-xs">
+                                    {measuring ? (
+                                      <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold"
+                                        style={{ background: 'rgba(107,114,128,0.1)', color: '#9ca3af' }}>
+                                        Midiendo resultado...
+                                      </span>
+                                    ) : after ? (
+                                      <span style={{ color: roasDelta >= 0 ? '#34d399' : '#f87171' }}>
+                                        {roasDelta >= 0 ? `+${roasDelta.toFixed(2)}x ↑` : `${roasDelta.toFixed(2)}x ↓`}
+                                      </span>
+                                    ) : '—'}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold"
+                                      style={{ background: 'rgba(107,114,128,0.1)', color: '#6b7280' }}>
+                                      {d.triggered_by || '—'}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                ) : currentAgent ? (
                   <>
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -718,7 +1055,7 @@ export default function CampaignsPage() {
                       </div>
                     )}
                   </>
-                )}
+                ) : null}
               </div>
             </>
           )}
