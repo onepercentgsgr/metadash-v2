@@ -175,6 +175,34 @@ async def _get_ad_insights(access_token: str, ad_id: str, date_preset: str) -> d
     }
 
 
+async def get_ads_for_campaign(
+    access_token: str,
+    campaign_id: str,
+    date_preset: str = "last_7d",
+) -> list[dict]:
+    """Trae todos los anuncios de una campaña con métricas y thumbnail."""
+    url = f"{BASE_URL}/{campaign_id}/ads"
+    params = {
+        "fields": "id,name,status,adset_id,creative{thumbnail_url,body,title,image_url}",
+        "limit": 200,
+    }
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        r = await client.get(url, headers=_headers(access_token), params=params)
+        if r.status_code != 200:
+            logger.error(f"Meta API get_ads_for_campaign error {r.status_code}: {r.text[:300]}")
+            return []
+        ads = r.json().get("data", [])
+
+    for ad in ads:
+        try:
+            insights = await _get_ad_insights(access_token, ad["id"], date_preset)
+            ad.update(insights)
+        except Exception as e:
+            logger.warning(f"Meta API: Failed insights for ad {ad['id']}: {e}")
+
+    return ads
+
+
 async def get_adsets(
     access_token: str,
     campaign_id: str,

@@ -99,6 +99,8 @@ def _run_safe_migrations():
     existing = {c["name"] for c in inspector.get_columns("tenant_configs")}
     new_cols = {
         "clarity_project_id": "VARCHAR",
+        "target_margin": "VARCHAR",
+        "notification_email": "VARCHAR",
     }
     with engine.connect() as conn:
         for col, col_type in new_cols.items():
@@ -248,6 +250,8 @@ class TenantConfigUpdate(BaseModel):
     shopify_webhook_secret: Optional[str] = None
     mercadopago_access_token: Optional[str] = None
     clarity_project_id: Optional[str] = None
+    target_margin: Optional[str] = None
+    notification_email: Optional[str] = None
 
 
 class TenantConfigResponse(BaseModel):
@@ -265,6 +269,8 @@ class TenantConfigResponse(BaseModel):
     shopify_webhook_secret: Optional[str] = None
     mercadopago_access_token: Optional[str] = None
     clarity_project_id: Optional[str] = None
+    target_margin: Optional[str] = None
+    notification_email: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -1306,6 +1312,10 @@ async def campaign_action(
     if not config_obj.meta_access_token:
         raise HTTPException(status_code=400, detail="Meta API token not configured")
 
+    before_metrics = request.get("before_metrics", {})
+    campaign_name = request.get("campaign_name", campaign_id)
+    triggered_by = request.get("triggered_by", "manual")
+
     try:
         from meta_api import pause_campaign, enable_campaign
         if action == "pause":
@@ -1316,6 +1326,19 @@ async def campaign_action(
             new_status = "ACTIVE"
 
         if success:
+            log_entry = AutonomousActionLog(
+                user_id=user.id,
+                action_type=f"{action}_campaign",
+                status="executed",
+                target=campaign_id,
+                description=f"{'Pausar' if action == 'pause' else 'Activar'} campaña: {campaign_name}",
+                details={"before_metrics": before_metrics, "after_metrics": None},
+                triggered_by=triggered_by,
+                requires_approval=False,
+                executed_at=datetime.utcnow(),
+            )
+            db.add(log_entry)
+            db.commit()
             return {"campaign_id": campaign_id, "status": new_status, "success": True}
         else:
             raise HTTPException(status_code=502, detail="Meta API returned error")
@@ -1380,6 +1403,152 @@ async def get_campaign_daily(
         raise HTTPException(status_code=502, detail=f"Error fetching daily data: {str(e)}")
 
 
+@app.get("/campaigns/{campaign_id}/ads")
+async def get_campaign_ads(
+    campaign_id: str,
+    date_preset: str = "last_7d",
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Trae los anuncios de una campaña con métricas y creatividad."""
+    user = await check_subscription(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    if not config_obj.meta_access_token:
+        raise HTTPException(status_code=400, detail="Meta API token not configured")
+    try:
+        from meta_api import get_ads_for_campaign
+        ads = await get_ads_for_campaign(
+            access_token=config_obj.meta_access_token,
+            campaign_id=campaign_id,
+            date_preset=date_preset,
+        )
+        return ads
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Error fetching ads: {str(e)}")
+
+
+@app.post("/agents/war-room")
+async def run_war_room(
+    request: dict,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Sesión diaria completa: 4 agentes en cadena → plan de acción con 5 prioridades."""
+    user = await check_subscription(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+
+    campaigns_data = request.get("campaigns_data", [])
+    adsets_data = request.get("adsets_data", [])
+    ads_data = request.get("ads_data", [])
+    clarity_insights = request.get("clarity_insights", "")
+
+    if not campaigns_data and config_obj.meta_access_token and config_obj.meta_ad_account_id:
+        try:
+            from meta_api import get_campaigns as fetch_meta
+            campaigns_data = await fetch_meta(
+                access_token=config_obj.meta_access_token,
+                ad_account_id=config_obj.meta_ad_account_id,
+                date_preset="last_7d",
+            )
+        except Exception as meta_err:
+            logger.warning(f"War room auto-fetch failed: {meta_err}")
+
+    target_margin = float(config_obj.target_margin or 0)
+
+    try:
+        from agents.war_room import run_war_room as _run_war_room
+        result = _run_war_room(
+            campaigns_data=campaigns_data,
+            adsets_data=adsets_data,
+            ads_data=ads_data,
+            negocio_info=config_obj.negocio_info or "",
+            target_margin=target_margin,
+            clarity_insights=clarity_insights,
+            api_key=api_key,
+        )
+        log_entry = AgentLog(
+            user_id=user.id,
+            agent_type="war_room",
+            input_summary=f"{len(campaigns_data)} campaigns, {len(adsets_data)} adsets",
+            output=result.get("resumen_ejecutivo", "")[:500],
+        )
+        db.add(log_entry)
+        db.commit()
+        return result
+    except Exception as e:
+        logger.error(f"War room error for user {user.id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error running war room: {str(e)}")
+
+
+@app.get("/notifications/check")
+async def check_notifications(
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Chequea umbrales de campañas y devuelve alertas. Envía email si hay críticas."""
+    user = await check_subscription(authorization, db)
+    config_obj = get_tenant_config(user.id, db)
+    if not config_obj.meta_access_token or not config_obj.meta_ad_account_id:
+        return []
+
+    try:
+        from meta_api import get_campaigns as fetch_meta
+        campaigns_data = await fetch_meta(
+            access_token=config_obj.meta_access_token,
+            ad_account_id=config_obj.meta_ad_account_id,
+            date_preset="last_7d",
+        )
+    except Exception:
+        return []
+
+    target_margin = float(config_obj.target_margin or 0)
+    notification_email = config_obj.notification_email or ""
+
+    try:
+        from agents.notifier import check_thresholds
+        alerts = check_thresholds(campaigns_data, target_margin, notification_email)
+        return alerts
+    except Exception as e:
+        logger.warning(f"Notification check failed for user {user.id}: {e}")
+        return []
+
+
+@app.get("/decisions")
+async def get_decisions(
+    limit: int = 50,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    """Retorna el historial de acciones ejecutadas con métricas antes/después."""
+    user = await check_subscription(authorization, db)
+    entries = (
+        db.query(AutonomousActionLog)
+        .filter(AutonomousActionLog.user_id == user.id)
+        .order_by(AutonomousActionLog.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    result = []
+    for e in entries:
+        days_since = (datetime.utcnow() - e.created_at).days
+        details = e.details or {}
+        details["days_since"] = days_since
+        result.append({
+            "id": e.id,
+            "action_type": e.action_type,
+            "status": e.status,
+            "target": e.target,
+            "description": e.description,
+            "details": details,
+            "triggered_by": e.triggered_by,
+            "created_at": e.created_at.isoformat() if e.created_at else None,
+        })
+    return result
+
+
 @app.post("/adsets/action")
 async def adset_action(
     request: dict,
@@ -1392,6 +1561,9 @@ async def adset_action(
 
     adset_id = request.get("adset_id")
     action = request.get("action", "pause")
+    before_metrics = request.get("before_metrics", {})
+    adset_name = request.get("adset_name", adset_id)
+    triggered_by = request.get("triggered_by", "manual")
 
     if not adset_id:
         raise HTTPException(status_code=400, detail="adset_id is required")
@@ -1408,6 +1580,19 @@ async def adset_action(
             new_status = "ACTIVE"
 
         if success:
+            log_entry = AutonomousActionLog(
+                user_id=user.id,
+                action_type=f"{action}_adset",
+                status="executed",
+                target=adset_id,
+                description=f"{'Pausar' if action == 'pause' else 'Activar'} conjunto: {adset_name}",
+                details={"before_metrics": before_metrics, "after_metrics": None},
+                triggered_by=triggered_by,
+                requires_approval=False,
+                executed_at=datetime.utcnow(),
+            )
+            db.add(log_entry)
+            db.commit()
             return {"adset_id": adset_id, "status": new_status, "success": True}
         else:
             raise HTTPException(status_code=502, detail="Meta API returned error")

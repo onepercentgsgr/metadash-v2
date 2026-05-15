@@ -44,6 +44,8 @@ class TenantConfig(Base):
     _shopify_webhook_secret = Column("shopify_webhook_secret", String, nullable=True)
     _mercadopago_access_token = Column("mercadopago_access_token", String, nullable=True)
     clarity_project_id = Column(String, nullable=True)
+    target_margin = Column(String, nullable=True)  # % como string para evitar Float migration issues
+    notification_email = Column(String, nullable=True)
 
     user = relationship("User", back_populates="tenant_config")
 

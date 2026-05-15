@@ -13,6 +13,7 @@ const NAV = [
   { label: 'Spy de Ads',     path: '/spy',          icon: 'audit'       },
   { label: 'Infoproducto',   path: '/infoproducto', icon: 'rocket'      },
   { label: 'Agentes IA',     path: '/agents',       icon: 'agents'      },
+  { label: 'Decisiones',     path: '/decisiones',   icon: 'financials'  },
   { label: 'Auditoría',      path: '/audit',        icon: 'audit'       },
   { label: 'Finanzas',       path: '/financials',   icon: 'financials'  },
   { label: 'Configuración',  path: '/settings',     icon: 'settings'    },
