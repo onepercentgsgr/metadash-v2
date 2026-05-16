@@ -115,6 +115,12 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
+  compareLandings: (urlOwn, urlCompetitor) =>
+    apiFetch("/agent/compare-landings", {
+      method: "POST",
+      body: JSON.stringify({ url_own: urlOwn, url_competitor: urlCompetitor }),
+    }),
+
   runFullAudit: (payload) =>
     apiFetch("/agent/full-audit", {
       method: "POST",
