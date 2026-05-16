@@ -23,7 +23,7 @@ from database import engine, get_db, Base
 from models import User, TenantConfig, Subscription, AgentLog, FinancialRecord, ShopifyOrder, AutonomousActionLog, PipelineRun, MarketValidation, CompetitorAnalysis, VideoAnalysis
 from agents.shared_memory import AgentMemory  # registers table with Base.metadata
 import config
-from plan_limits import check_feature_access, check_generation_limit, get_plan_limits, PLAN_DISPLAY_NAMES
+from plan_limits import get_plan_limits, check_feature_access, check_generation_limit, check_pipeline_limit, check_war_room_limit, check_optimizer_limit, check_action_permission, PLAN_DISPLAY_NAMES
 
 logger = logging.getLogger(__name__)
 
@@ -1302,6 +1302,8 @@ async def campaign_action(
 ):
     """Pausar o activar una campaña en Meta Ads."""
     user = await check_subscription(authorization, db)
+    _sub_action = get_active_subscription(user.id, db)
+    check_action_permission(_sub_action.plan)
     config_obj = get_tenant_config(user.id, db)
 
     campaign_id = request.get("campaign_id")
@@ -1435,6 +1437,14 @@ async def run_war_room(
 ):
     """Sesión diaria completa: 4 agentes en cadena → plan de acción con 5 prioridades."""
     user = await check_subscription(authorization, db)
+    _sub_wr = get_active_subscription(user.id, db)
+    _month_start_wr = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    _wr_count = db.query(AgentLog).filter(
+        AgentLog.user_id == user.id,
+        AgentLog.agent_type == "war_room",
+        AgentLog.created_at >= _month_start_wr,
+    ).count()
+    check_war_room_limit(_sub_wr.plan, _wr_count)
     config_obj = get_tenant_config(user.id, db)
     api_key = get_anthropic_api_key(config_obj)
     if not api_key:
@@ -1557,6 +1567,8 @@ async def adset_action(
 ):
     """Pausar o activar un conjunto de anuncios en Meta Ads."""
     user = await check_subscription(authorization, db)
+    _sub_adset = get_active_subscription(user.id, db)
+    check_action_permission(_sub_adset.plan)
     config_obj = get_tenant_config(user.id, db)
 
     adset_id = request.get("adset_id")
@@ -1612,6 +1624,13 @@ async def optimize_campaigns(
     user = await check_subscription(authorization, db)
     subscription = get_active_subscription(user.id, db)
     check_feature_access(subscription.plan, "chat_launch")
+    _month_start_opt = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    _opt_count = db.query(AgentLog).filter(
+        AgentLog.user_id == user.id,
+        AgentLog.agent_type == "optimizer",
+        AgentLog.created_at >= _month_start_opt,
+    ).count()
+    check_optimizer_limit(subscription.plan, _opt_count)
     config_obj = get_tenant_config(user.id, db)
 
     api_key = get_anthropic_api_key(config_obj)
