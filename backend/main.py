@@ -1886,6 +1886,53 @@ async def audit_landing_page(
         raise HTTPException(status_code=500, detail=f"Error en auditoría de landing: {str(e)}")
 
 
+class CompareLandingsRequest(BaseModel):
+    url_own: str
+    url_competitor: str
+
+
+@app.post("/agent/compare-landings", response_model=AgentResponse)
+async def compare_landings_endpoint(
+    request: CompareLandingsRequest,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    user = await check_subscription(authorization, db)
+    subscription = get_active_subscription(user.id, db)
+    check_feature_access(subscription.plan, "chat_launch")
+    config_obj = get_tenant_config(user.id, db)
+
+    api_key = get_anthropic_api_key(config_obj)
+    if not api_key:
+        raise HTTPException(status_code=400, detail="Anthropic API key not configured")
+
+    if not request.url_own or not request.url_competitor:
+        raise HTTPException(status_code=400, detail="Se requieren ambas URLs (propia y competidor)")
+
+    try:
+        from agents.landing_comparator import compare_landings
+        result = compare_landings(
+            url_own=request.url_own,
+            url_competitor=request.url_competitor,
+            negocio_info=config_obj.negocio_info or "",
+            api_key=api_key,
+        )
+
+        log_entry = AgentLog(
+            user_id=user.id,
+            agent_type="landing_comparator",
+            input_summary=f"{request.url_own} vs {request.url_competitor}",
+            output=str(result)[:1000],
+        )
+        db.add(log_entry)
+        db.commit()
+
+        return AgentResponse(result=result, agent="Landing Comparator")
+    except Exception as e:
+        logger.error(f"Landing compare error: {type(e).__name__}: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en comparación de landings: {str(e)}")
+
+
 @app.post("/agent/full-audit", response_model=AgentResponse)
 async def full_audit(
     request: AgentRequest,
