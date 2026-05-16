@@ -11,57 +11,59 @@ const FEATURES = [
   { icon: 'rocket',     accent: '#6366f1', name: 'Landing Pages con CRO',    desc: 'Generá y auditá tu landing con IA. Headlines, CTAs y trust signals optimizados para vender.' },
   { icon: 'campaigns',  accent: '#3b82f6', name: 'Meta Ads — 24/7',          desc: 'Agentes que analizan ROAS, CPM y fatiga creativa. Detectan qué pausar, escalar o ajustar.' },
   { icon: 'financials', accent: '#10b981', name: 'Control financiero',        desc: 'MER, breakeven ROAS, márgenes y proyecciones. Sabés exactamente si tu negocio es rentable.' },
-  { icon: 'brain',      accent: '#8b5cf6', name: 'IA de nivel pro',          desc: '8 agentes especializados con contexto compartido. Cada uno sabe lo que hacen los demás.' },
+  { icon: 'agents',     accent: '#8b5cf6', name: 'Guerra Room diaria',        desc: '4 agentes en cadena (Media Buyer, CFO, CRO, Commander) te dan un plan de acción cada mañana.' },
   { icon: 'creditcard', accent: '#f59e0b', name: 'Pagos integrados',         desc: 'MercadoPago y Stripe listos para cobrar. Tus clientes pagan, vos recibís.' },
 ];
 
 const STEPS = [
-  { num: '01', title: 'Registrate en 2 minutos',    desc: 'Creá tu cuenta. Sin tarjeta, sin compromiso. 14 días para probar todo.' },
-  { num: '02', title: 'Conectá tus herramientas',   desc: 'Meta Ads, GA4 y MercadoPago en un solo lugar. Los agentes empiezan a trabajar solos.' },
+  { num: '01', title: 'Registrate en 2 minutos',    desc: 'Creá tu cuenta. Sin tarjeta, sin compromiso. 7 días para probar todo.' },
+  { num: '02', title: 'Conectá tus herramientas',   desc: 'Meta Ads y MercadoPago en un solo lugar. Los agentes empiezan a trabajar solos.' },
   { num: '03', title: 'Generá tu primer contenido', desc: 'TikTok, copys para ads, guiones de video — todo en segundos con contexto de tu producto.' },
-  { num: '04', title: 'Vendé y escalá',             desc: 'Los agentes optimizan tus campañas mientras vos dormís. Vos te enfocás en el producto.' },
+  { num: '04', title: 'Vendé y escalá',             desc: 'La Guerra Room te da el plan del día. Vos aprobás, los agentes ejecutan.' },
 ];
 
 const PLANS = [
   {
-    name: 'Launch',
+    name: 'Emprendedor',
     price: 19,
     accent: '#3b82f6',
-    desc: 'Para emprendedores que empiezan',
+    desc: 'Para lanzar tu primer infoproducto',
     features: [
       '1 infoproducto activo',
-      '5 agentes de IA especializados',
-      '100 generaciones IA por mes',
-      '1 cuenta Meta Ads conectada',
-      'Wizard de lanzamiento guiado',
+      '8 agentes de IA especializados',
+      'Guerra Room — sesión diaria de estrategia',
+      'Meta Ads con optimización 24/7',
+      'Wizard de lanzamiento en 14 pasos',
+      'Breakeven ROAS calculado a tu margen real',
       'Soporte por email',
     ],
-    cta: 'Empezar con Launch',
+    cta: 'Empezar por $19/mes',
   },
   {
-    name: 'Scale',
+    name: 'Master',
     price: 49,
     accent: '#6366f1',
-    desc: 'Para escalar y automatizar',
+    desc: 'Para escalar con múltiples infoproductos',
     popular: true,
     features: [
       'Infoproductos ilimitados',
-      'Agentes IA ilimitados + autónomos 24/7',
+      'Todos los agentes + autónomos 24/7',
       'Generaciones IA ilimitadas',
       '5 cuentas Meta Ads',
-      'Chat IA para lanzar en horas',
-      'Optimización autónoma de campañas',
+      'Historial de decisiones con delta ROAS/CPA',
+      'Alertas proactivas por email cuando algo falla',
       'Soporte prioritario',
     ],
-    cta: 'Empezar con Scale',
+    cta: 'Empezar con Master',
   },
 ];
 
 const FAQS = [
   { q: '¿Necesito experiencia en marketing?',        a: 'No. MetaDash está diseñado para que los agentes hagan el trabajo técnico. Vos decidís la estrategia.' },
   { q: '¿Puedo empezar sin producto terminado?',     a: 'Sí. El wizard de Infoproducto te guía en 14 pasos: de la idea al lanzamiento, con todo generado por IA.' },
-  { q: '¿Qué pasa cuando termina el trial de 14 días?', a: 'Tu cuenta se pausa. Elegís un plan pago para continuar: Launch ($19/mes) o Scale ($49/mes). Sin cobros automáticos ni sorpresas.' },
+  { q: '¿Qué pasa cuando termina el trial de 7 días?', a: 'Tu cuenta se pausa. Elegís un plan pago para continuar: Emprendedor ($19/mes) o Master ($49/mes). Sin cobros automáticos ni sorpresas.' },
   { q: '¿Funciona para infoproductos en cualquier nicho?', a: 'Sí. Los agentes adaptan el tono, modismos y estrategia según tu mercado (Argentina, México, España, LATAM, etc.).' },
+  { q: '¿Qué es la Guerra Room?', a: '4 agentes en cadena que se leen entre sí: Media Buyer analiza campañas, CFO calcula rentabilidad, CRO revisa la landing, y el Commander te da el plan del día con acciones concretas.' },
 ];
 
 function CheckSVG({ color = '#10b981' }) {
@@ -128,7 +130,7 @@ export default function HomePage() {
         <div style={{ maxWidth: 780, margin: '0 auto' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 999, background: 'rgba(99,102,241,0.1)', border: '1px solid rgba(99,102,241,0.25)', marginBottom: 28 }}>
             <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#6366f1', boxShadow: '0 0 8px rgba(99,102,241,0.8)' }} />
-            <span style={{ fontSize: 11, fontWeight: 700, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.1em' }}>14 días gratis · Sin tarjeta</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#a5b4fc', textTransform: 'uppercase', letterSpacing: '0.1em' }}>7 días gratis · Sin tarjeta</span>
           </div>
 
           <h1 style={{ fontSize: 'clamp(36px,6vw,68px)', fontWeight: 900, letterSpacing: '-0.04em', lineHeight: 1.05, marginBottom: 20 }}>
@@ -146,7 +148,7 @@ export default function HomePage() {
           </p>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 24px', maxWidth: 480, margin: '0 auto 40px', textAlign: 'left' }}>
-            {['Videos TikTok automáticos diarios', 'Optimización de Meta Ads 24/7', 'Wizard de infoproducto guiado por IA', 'CRO en landing page + análisis', 'Control financiero con MER y ROAS', 'Pagos con MercadoPago y Stripe'].map((f) => (
+            {['Videos TikTok automáticos diarios', 'Optimización de Meta Ads 24/7', 'Guerra Room — plan de acción diario', 'CRO en landing page + análisis', 'Breakeven ROAS a tu margen real', 'Pagos con MercadoPago'].map((f) => (
               <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <CheckSVG />
                 <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)' }}>{f}</span>
@@ -187,9 +189,6 @@ export default function HomePage() {
                 <div style={{ fontSize: 11, fontWeight: 800, color: '#4f46e5', marginBottom: 14, letterSpacing: '0.06em', fontVariantNumeric: 'tabular-nums' }}>{s.num}</div>
                 <h3 style={{ fontSize: 15, fontWeight: 700, color: 'white', marginBottom: 8, letterSpacing: '-0.01em' }}>{s.title}</h3>
                 <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.38)', lineHeight: 1.6 }}>{s.desc}</p>
-                {i < STEPS.length - 1 && (
-                  <div style={{ position: 'absolute', right: -13, top: '50%', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.12)', fontSize: 18, display: 'none' }}>→</div>
-                )}
               </div>
             ))}
           </div>
@@ -233,13 +232,13 @@ export default function HomePage() {
 
       {/* Pricing */}
       <section id="pricing" style={{ position: 'relative', zIndex: 1, padding: '80px 24px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+        <div style={{ maxWidth: 860, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 56 }}>
             <p style={{ fontSize: 11, fontWeight: 700, color: '#8b5cf6', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 10 }}>Planes y Precios</p>
             <h2 style={{ fontSize: 'clamp(26px,4vw,38px)', fontWeight: 800, letterSpacing: '-0.03em', background: 'linear-gradient(135deg,#fff 40%,rgba(255,255,255,0.5) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text', marginBottom: 10 }}>
               Escalá tu negocio con IA
             </h2>
-            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.35)' }}>14 días de trial gratis en todos los planes</p>
+            <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.35)' }}>7 días de trial gratis en todos los planes</p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 16, alignItems: 'start' }}>
             {PLANS.map((plan) => (
@@ -326,7 +325,7 @@ export default function HomePage() {
             ¿Listo para lanzar?
           </h2>
           <p style={{ fontSize: 16, color: 'rgba(255,255,255,0.35)', marginBottom: 32, lineHeight: 1.6 }}>
-            14 días gratis. Sin tarjeta. Cancelá cuando quieras.
+            7 días gratis. Sin tarjeta. Cancelá cuando quieras.
           </p>
           <Link href="/register" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '16px 40px', background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', borderRadius: 16, color: 'white', fontWeight: 800, fontSize: 16, textDecoration: 'none', boxShadow: '0 8px 32px rgba(79,70,229,0.45), inset 0 1px 0 rgba(255,255,255,0.15)', letterSpacing: '-0.01em' }}>
             Comenzar gratis <Icon name="arrowright" size={18} strokeWidth={2.5} />
@@ -341,7 +340,7 @@ export default function HomePage() {
           <span style={{ fontWeight: 700, fontSize: 13, color: 'rgba(255,255,255,0.4)' }}>MetaDash</span>
         </div>
         <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.18)' }}>
-          © 2025 MetaDash · Todos los derechos reservados · SSL · Backups automáticos
+          © 2026 MetaDash · Todos los derechos reservados · SSL · Backups automáticos
         </p>
       </footer>
 

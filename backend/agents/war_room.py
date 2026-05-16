@@ -12,7 +12,7 @@ def run_war_room(
     adsets_data: list,
     ads_data: list,
     negocio_info: str,
-    target_margin: float,
+    target_margin: float,  # % 0-100
     clarity_insights: str,
     api_key: str,
 ) -> dict:
@@ -27,15 +27,15 @@ def run_war_room(
     # Fase 1 — Optimizer
     fase1_text = "Análisis no disponible"
     try:
+        system1 = f"Eres un Media Buyer Senior analizando cuentas publicitarias de infoproductos.\n\nCONTEXTO DEL NEGOCIO:\n{negocio_info}"
         resp1 = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=1500,
+            system=[{"type": "text", "text": system1, "cache_control": {"type": "ephemeral"}}],
             messages=[
                 {
                     "role": "user",
                     "content": (
-                        f"Eres un Media Buyer Senior analizando cuentas publicitarias. "
-                        f"Negocio: {negocio_info}\n\n"
                         f"CAMPAÑAS:\n{campaigns_json}\n\n"
                         f"ADSETS:\n{adsets_json}\n\n"
                         f"ADS:\n{ads_json}\n\n"
@@ -57,20 +57,19 @@ def run_war_room(
         total_spend = sum(c.get("spend", 0) or 0 for c in campaigns_data)
         total_revenue = sum(c.get("revenue", 0) or 0 for c in campaigns_data)
 
+        system2 = f"Eres el CFO de esta cuenta publicitaria de infoproductos.\nBreakeven ROAS: {breakeven_roas}\nMargen objetivo: {target_margin}%"
         resp2 = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=1500,
+            system=[{"type": "text", "text": system2, "cache_control": {"type": "ephemeral"}}],
             messages=[
                 {
                     "role": "user",
                     "content": (
-                        f"Eres el CFO de esta cuenta publicitaria. "
                         f"Informe del Media Buyer:\n{fase1_text}\n\n"
                         f"DATOS FINANCIEROS:\n"
                         f"- Gasto total: ${total_spend:.2f}\n"
-                        f"- Revenue total: ${total_revenue:.2f}\n"
-                        f"- Breakeven ROAS: {breakeven_roas}\n"
-                        f"- Margen objetivo: {target_margin}%\n\n"
+                        f"- Revenue total: ${total_revenue:.2f}\n\n"
                         f"Analiza en español: ¿es rentable la cuenta?, burn rate actual, "
                         f"cuándo agotan presupuesto al ritmo actual, si vale escalar o hay que cortar."
                     ),
@@ -86,17 +85,18 @@ def run_war_room(
     # Fase 3 — CRO
     fase3_text = "Análisis no disponible"
     try:
+        system3 = f"Eres un especialista en CRO y landing pages para infoproductos.\n\nCONTEXTO DEL NEGOCIO:\n{negocio_info}"
         resp3 = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=1500,
+            system=[{"type": "text", "text": system3, "cache_control": {"type": "ephemeral"}}],
             messages=[
                 {
                     "role": "user",
                     "content": (
-                        f"Eres un especialista en CRO y landing pages. "
                         f"Informe del Media Buyer:\n{fase1_text}\n\n"
                         f"Informe del CFO:\n{fase2_text}\n\n"
-                        f"Insights de comportamiento (Clarity/Hotjar):\n{clarity_insights}\n\n"
+                        f"Insights de comportamiento (Clarity):\n{clarity_insights}\n\n"
                         f"Analiza en español: dónde se pierde conversión entre el click y la compra, "
                         f"qué mejorar en la landing page para aumentar el CVR."
                     ),
@@ -160,7 +160,6 @@ def run_war_room(
 
         raw = next((b.text for b in resp4.content if b.type == "text"), "")
 
-        # Extraer JSON de markdown si viene envuelto
         match = re.search(r"```(?:json)?\s*([\s\S]*?)```", raw)
         json_str = match.group(1).strip() if match else raw.strip()
 
