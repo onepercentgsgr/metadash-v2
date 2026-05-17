@@ -596,7 +596,18 @@ export default function CampaignsPage() {
         ) : (
           <div style={{ ...card, padding: '1.25rem', textAlign: 'center' }}>
             {campaignError ? (
-              <p className="text-sm" style={{ color: '#f87171' }}>{campaignError}</p>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 text-left p-4 rounded-xl"
+                  style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                  <span style={{ color: '#f87171', fontSize: 18, flexShrink: 0 }}>⚠️</span>
+                  <p className="text-sm" style={{ color: '#fca5a5' }}>{campaignError}</p>
+                </div>
+                <a href="/settings"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all"
+                  style={{ background: 'linear-gradient(135deg,#4f46e5,#7c3aed)', color: 'white' }}>
+                  ⚙️ Ir a Configuración
+                </a>
+              </div>
             ) : loadingCampaigns ? (
               <p className="text-sm" style={{ color: '#6b7280' }}>Cargando métricas...</p>
             ) : (
