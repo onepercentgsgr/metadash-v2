@@ -1280,18 +1280,37 @@ async def get_campaigns(
     if not config_obj.meta_ad_account_id:
         raise HTTPException(status_code=400, detail="Ad Account ID not configured. Go to Settings to add your Meta Ad Account ID.")
 
+    # Validate account ID is numeric (not an email or slug)
+    account_id = config_obj.meta_ad_account_id.strip()
+    if not account_id.lstrip("0123456789").replace("act_", "") == "" and not account_id.isdigit():
+        raise HTTPException(
+            status_code=400,
+            detail="El Ad Account ID debe ser un número (ej: 1234567890), no un email ni nombre. Corregilo en Configuración."
+        )
+
     try:
         from meta_api import get_campaigns as fetch_meta_campaigns
         campaigns = await fetch_meta_campaigns(
             access_token=config_obj.meta_access_token,
-            ad_account_id=config_obj.meta_ad_account_id,
+            ad_account_id=account_id,
             date_preset=date_preset,
         )
         logger.info(f"Fetched {len(campaigns)} campaigns for user {user.id}")
         return campaigns
     except Exception as e:
-        logger.error(f"Meta API error for user {user.id}: {type(e).__name__}: {str(e)}")
-        raise HTTPException(status_code=502, detail=f"Error connecting to Meta API: {str(e)}")
+        err_str = str(e)
+        logger.error(f"Meta API error for user {user.id}: {type(e).__name__}: {err_str}")
+        if "401" in err_str or "Unauthorized" in err_str or "OAuthException" in err_str:
+            raise HTTPException(
+                status_code=502,
+                detail="Tu token de Meta Ads venció o es inválido. Andá a Configuración y generá un nuevo token en Meta for Developers.",
+            )
+        if "190" in err_str or "access token" in err_str.lower():
+            raise HTTPException(
+                status_code=502,
+                detail="Token de Meta Ads inválido o sin permisos suficientes. Necesitás un token con permisos ads_read. Andá a Configuración.",
+            )
+        raise HTTPException(status_code=502, detail=f"Error conectando con Meta Ads: {err_str}")
 
 
 @app.post("/campaigns/action")
